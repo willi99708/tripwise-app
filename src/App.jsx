@@ -101,6 +101,10 @@ const hm = (min) => { const h = Math.floor(min / 60), m = min % 60; return `${h}
 const timeOf = (s) => { if (!s) return "--:--"; return new Date(s).toUTCString().slice(17, 22); };
 const legDur = (segs) => (segs || []).filter(s => s.mode !== "ferry").reduce((s, x) => s + (x.durationMin || 0), 0);
 const LABELS = { recommended: { t: "Выбор TripWise", c: T.violet, icon: "✦" }, cheapest: { t: "Самый дешёвый", c: T.green, icon: "₽" }, relevant: { t: "Хитрый маршрут", c: T.cyan, icon: "✈" }, stopover: { t: "Лучший stopover", c: T.violet, icon: "🌙" } };
+const dayWord = (n) => { const a = Math.abs(n) % 100, b = a % 10; if (a > 10 && a < 20) return "дней"; if (b === 1) return "день"; if (b >= 2 && b <= 4) return "дня"; return "дней"; };
+const PREP = { "Куала-Лумпур": "Куала-Лумпуре", "Сингапур": "Сингапуре", "Стамбул": "Стамбуле", "Дубай": "Дубае", "Пекин": "Пекине", "Бангкок": "Бангкоке", "Сеул": "Сеуле", "Доха": "Дохе", "Гонконг": "Гонконге", "Абу-Даби": "Абу-Даби" };
+const prep = (c) => PREP[c] || c;
+const stopLabel = (s) => `${s.nights} ${dayWord(s.nights)} в ${prep(s.city)}`;
 
 function Icon({ d, size = 20, color = T.violet }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{d}</svg>; }
 const I = {
@@ -129,8 +133,8 @@ function Btn({ children, onClick, grad = GRAD.cta, style }) { return <button onC
 function Logo() { return <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.text, letterSpacing: .2 }}>TripWise<span style={{ color: T.violet }}>AI</span></div>; }
 function Header({ onBack, title, subtitle }) {
   return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px 8px", position: "relative", minHeight: 30 }}>
-    {onBack && <div onClick={onBack} className="press" style={{ position: "absolute", left: 20, top: 16, cursor: "pointer" }}><Icon d={I.back} size={22} color={T.text} /></div>}
-    {title ? <div style={{ textAlign: "center", maxWidth: 240 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>{subtitle && <div style={{ fontSize: 11, color: T.subd, marginTop: 2 }}>{subtitle}</div>}</div> : <Logo />}
+    {onBack && <div onClick={onBack} className="press" style={{ position: "absolute", left: 20, top: 16, transform: "translate(127px, 59px)", zIndex: 5, cursor: "pointer" }}><Icon d={I.back} size={22} color={T.text} /></div>}
+    <div style={{ transform: "translateY(-25px)" }}>{title ? <div style={{ textAlign: "center", maxWidth: 240 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>{subtitle && <div style={{ fontSize: 11, color: T.subd, marginTop: 2 }}>{subtitle}</div>}</div> : <Logo />}</div>
   </div>;
 }
 function BottomNav({ tab, setTab, bottomStr = "0px" }) {
@@ -291,7 +295,10 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
     <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
       <div style={{ flex: 1 }}>
         <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, fontSize: 15.5, color: T.text, lineHeight: 1.25 }}>{r.title || (r.stopover ? `Через ${r.stopover.city}` : "Маршрут")}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 10, flexWrap: "wrap" }}>{codes.map((c, idx) => (<React.Fragment key={idx}>{idx > 0 && <Icon d={I.plane} size={12} color={T.subd} />}<span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{c}</span></React.Fragment>))}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", flex: 1 }}>{codes.map((c, idx) => (<React.Fragment key={idx}>{idx > 0 && <Icon d={I.plane} size={12} color={T.subd} />}<span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{c}</span></React.Fragment>))}</div>
+          <Icon d={I.chevR} size={16} color={T.violet} />
+        </div>
       </div>
       <Porthole grad={grad} h={84} style={{ width: 110, borderRadius: 14 }} />
     </div>
@@ -306,8 +313,8 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
 function Results({ query, routes, loading, error, onRetry, onBack, onOpen, isLiked, onLike }) {
   return <div style={{ animation: "slideIn .28s ease" }}>
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 8px" }}>
-      <div onClick={onBack} className="press" style={{ cursor: "pointer" }}><Icon d={I.back} size={22} color={T.text} /></div>
-      <div style={{ textAlign: "center" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>{query.origin} → {query.destName}</div><div style={{ fontSize: 11, color: T.subd }}>{query.datesLabel}</div></div>
+      <div onClick={onBack} className="press" style={{ cursor: "pointer", transform: "translate(127px, 59px)", zIndex: 5 }}><Icon d={I.back} size={22} color={T.text} /></div>
+      <div style={{ textAlign: "center", transform: "translateY(-25px)" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>{query.origin} → {query.destName}</div><div style={{ fontSize: 11, color: T.subd }}>{query.datesLabel}</div></div>
       <span onClick={onBack} className="press" style={{ color: T.violet, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Изменить</span>
     </div>
     {error ? <div style={{ textAlign: "center", padding: "40px 20px" }}><div style={{ fontSize: 15, color: T.text, fontWeight: 700 }}>Не удалось загрузить данные</div><div style={{ fontSize: 13, marginTop: 6, marginBottom: 16, color: T.subd }}>Проверьте соединение и попробуйте ещё раз</div><Btn onClick={onRetry}>Повторить</Btn></div> : <>
@@ -328,18 +335,10 @@ function Detail({ r, query, onBack, liked, onLike, onShare, goHotels }) {
   const dur = legDur(r.segments);
   return <div style={{ animation: "slideIn .28s ease" }}>
     <Header onBack={onBack} title={`${query.origin} → ${query.destName}`} subtitle={query.datesLabel} />
-    {r.segments && r.segments.length === 0 && r.bookingLinks && r.bookingLinks.length > 0 && (
-      <div style={{ padding: "0 20px", marginTop: -2 }}>
-        <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 14, marginTop: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 4 }}>Туда-обратно одним билетом</div>
-          <div style={{ fontSize: 11.5, color: T.subd, marginBottom: 12 }}>Покупка одной бронью — удобно, без раздельных билетов</div>
-          <a href={r.bookingLinks[0].url} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Btn>Купить билет · {rub(r.total)}</Btn></a>
-        </div>
-      </div>)}
     <div style={{ padding: "4px 20px 0" }}>
       <div style={{ position: "relative", borderRadius: 22, overflow: "hidden", height: 150, background: GRAD.sunset, padding: 16, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent,rgba(5,5,20,.7))" }} />
-        <div style={{ position: "relative" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 22, color: "#fff" }}>{r.stopover ? `${r.stopover.nights} дня в ${r.stopover.city}` : (r.title || "Маршрут")}</div>{r.stopover && <div style={{ background: "linear-gradient(90deg,#48dcdc,#7c5cff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 800, fontSize: 20, fontFamily: "Sora,sans-serif" }}>почти бесплатно</div>}</div>
+        <div style={{ position: "relative" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 22, color: "#fff" }}>{r.stopover ? stopLabel(r.stopover) : (r.title || "Маршрут")}</div>{r.stopover && <div style={{ background: "linear-gradient(90deg,#48dcdc,#7c5cff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 800, fontSize: 20, fontFamily: "Sora,sans-serif" }}>почти бесплатно</div>}</div>
       </div>
     </div>
     <div style={{ padding: "12px 20px 0", display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -348,7 +347,7 @@ function Detail({ r, query, onBack, liked, onLike, onShare, goHotels }) {
     </div>
     <div style={{ padding: "14px 20px 0" }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, padding: "14px 10px" }}>
-        {[[rub(r.total), "Билеты"], [hm(r.roundTrip ? (r.durationOut || dur) : dur), r.roundTrip ? "Туда" : "Время в пути"], [`${query.adults || 1} пасс.`, "Эконом"], [r.transfers ? `${r.transfers}` : "0", "Пересадки"]].map(([a, b], i) => (<div key={i} style={{ textAlign: "center" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 13.5 }}>{a}</div><div style={{ fontSize: 10.5, color: T.subd, marginTop: 2 }}>{b}</div></div>))}
+        {[[rub(r.total), "Билеты"], [r.roundTrip ? `${hm(r.durationOut || dur)} · ${hm(r.durationRet || 0)}` : hm(dur), r.roundTrip ? "Туда · Обратно" : "В пути"], [`${query.adults || 1} пасс.`, "Эконом"], [r.transfers ? `${r.transfers}` : "0", "Пересадки"]].map(([a, b], i) => (<div key={i} style={{ textAlign: "center" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 13.5 }}>{a}</div><div style={{ fontSize: 10.5, color: T.subd, marginTop: 2 }}>{b}</div></div>))}
       </div>
     </div>
     <div style={{ padding: "12px 20px 0" }}>
@@ -365,11 +364,11 @@ function Detail({ r, query, onBack, liked, onLike, onShare, goHotels }) {
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
               <AirlineLogo code={s.airline} />
               <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{airlineName(s.airline)}</div><div style={{ fontSize: 11, color: T.subd }}>{s.flightNumber || (s.mode === "ferry" ? "Паром" : "рейс уточняется")}</div></div>
-              {s.mode === "ferry" ? <Badge label="паром" color={T.cyan} /> : (r.segments.length === 1 ? <Badge label="Прямой рейс" color={T.green} /> : <Badge label={`Рейс ${i + 1}`} color={T.violet} />)}
+              {s.mode === "ferry" ? <Badge label="паром" color={T.cyan} /> : (r.segments.length === 1 && (s.transfers || 0) === 0 ? <Badge label="Прямой рейс" color={T.green} /> : (r.segments.length === 1 ? null : <Badge label={`Рейс ${i + 1}`} color={T.violet} />))}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{timeOf(s.departISO)}</div><div style={{ fontSize: 11, color: T.subd }}>{s.fromCode}</div></div>
-              <div style={{ flex: 1, textAlign: "center", fontSize: 10.5, color: T.subd }}>{hm(s.durationMin || 0)}<div style={{ height: 1, background: T.line, margin: "5px 0" }} />прямой</div>
+              <div style={{ flex: 1, textAlign: "center", fontSize: 10.5, color: T.subd }}>{hm(s.durationMin || 0)}<div style={{ height: 1, background: T.line, margin: "5px 0" }} />{(s.transfers || 0) > 0 ? `${s.transfers} ${s.transfers === 1 ? "пересадка" : "пересадки"}` : "прямой"}</div>
               <div style={{ textAlign: "right" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{s.toCode}</div></div>
               <a href={s.deepLink || (r.bookingLinks && r.bookingLinks[i] && r.bookingLinks[i].url) || "#"} target="_blank" rel="noreferrer" className="press" style={{ textDecoration: "none" }}><div style={{ background: GRAD.cta, borderRadius: 12, padding: "8px 12px", color: "#fff", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap" }}>{rub(s.priceLive || s.priceEstimate)}</div></a>
             </div>
@@ -385,8 +384,12 @@ function Detail({ r, query, onBack, liked, onLike, onShare, goHotels }) {
             </div>)}
         </div>))}
       </div>
-      {(r.notes || []).length > 0 && <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>{r.notes.map((n, i) => <Badge key={i} label={n} color={T.cyan} />)}</div>}
+      {(() => { const notes = (r.notes || []).filter(n => (r.segments || []).length <= 2 || !/раздельны|отдельных билета/i.test(n)); return notes.length > 0 ? <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>{notes.map((n, i) => <Badge key={i} label={n} color={T.cyan} />)}</div> : null; })()}
     </div>
+    {r.segments && r.segments.length === 0 && r.bookingLinks && r.bookingLinks.length > 0 && (
+      <div style={{ padding: "8px 20px 0" }}>
+        <a href={r.bookingLinks[0].url} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Btn>Купить билет · {rub(r.total)}</Btn></a>
+      </div>)}
     <div style={{ padding: "16px 20px 8px", display: "flex", gap: 10 }}>
       <div onClick={() => onLike(r)} className="press" style={{ width: 52, borderRadius: 16, border: `1px solid ${T.line}`, display: "grid", placeItems: "center", background: T.card, cursor: "pointer" }}><Icon d={I.heart} size={20} color={liked ? T.pink : T.subd} /></div>
       <Btn style={{ flex: 1 }} onClick={() => onShare(r)}>Поделиться маршрутом</Btn>
@@ -649,7 +652,7 @@ export default function App() {
       .app-root{height:100vh;height:100dvh}
     `}</style>
     <div className="app-root" style={{ width: "100%", maxWidth: 420, paddingTop: safeTop, background: `radial-gradient(120% 60% at 80% 0%, #1a1340 0%, ${T.bg} 55%)`, color: T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>{main}</div>
+      <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", paddingTop: 45 }}>{main}</div>
       <BottomNav tab={tab} setTab={setTab} bottomStr={inset.bottomStr} />
       {sheet && <SearchSheet form={form} setForm={setForm} onClose={() => setSheet(false)} onSubmit={() => runSearch()} setToast={setToast} />}
       {traveler && <Traveler safeTop={safeTop} bottomStr={inset.bottomStr} onBack={() => setTraveler(false)} />}
