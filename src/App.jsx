@@ -133,9 +133,9 @@ function Header({ onBack, title, subtitle }) {
     {title ? <div style={{ textAlign: "center", maxWidth: 240 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>{subtitle && <div style={{ fontSize: 11, color: T.subd, marginTop: 2 }}>{subtitle}</div>}</div> : <Logo />}
   </div>;
 }
-function BottomNav({ tab, setTab }) {
+function BottomNav({ tab, setTab, bottomInset = 0 }) {
   const items = [["home", "Главная", I.home], ["routes", "Маршруты", I.route], ["hotels", "Отели", I.hotel], ["profile", "Профиль", I.user]];
-  return <div style={{ flexShrink: 0, height: 68, display: "flex", background: "rgba(10,10,24,.92)", backdropFilter: "blur(12px)", borderTop: `1px solid ${T.line}` }}>
+  return <div style={{ flexShrink: 0, height: 64 + (bottomInset || 0), paddingBottom: bottomInset || 0, display: "flex", background: "rgba(10,10,24,.92)", backdropFilter: "blur(12px)", borderTop: `1px solid ${T.line}` }}>
     {items.map(([k, label, ic]) => (<button key={k} onClick={() => setTab(k)} className="press" style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, color: tab === k ? T.violet : T.subd }}><Icon d={ic} size={22} color={tab === k ? T.violet : T.subd} /><span style={{ fontSize: 11, fontWeight: tab === k ? 700 : 500 }}>{label}</span></button>))}
   </div>;
 }
@@ -143,7 +143,7 @@ function Toast({ msg }) { if (!msg) return null; return <div style={{ position: 
 function Overlay({ children, onClose }) {
   return <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
     <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.6)", animation: "fade .2s ease" }} />
-    <div style={{ position: "relative", background: T.bg2, borderRadius: "24px 24px 0 0", border: `1px solid ${T.line}`, padding: "16px 20px 28px", width: "100%", maxWidth: 420, margin: "0 auto", animation: "slideUp .28s cubic-bezier(.2,.8,.2,1)" }}>
+    <div style={{ position: "relative", background: T.bg2, borderRadius: "24px 24px 0 0", border: `1px solid ${T.line}`, paddingTop: 16, paddingLeft: 20, paddingRight: 20, paddingBottom: "calc(24px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 420, margin: "0 auto", animation: "slideUp .28s cubic-bezier(.2,.8,.2,1)" }}>
       <div style={{ width: 40, height: 4, borderRadius: 2, background: T.line2, margin: "0 auto 14px" }} />{children}
     </div>
   </div>;
@@ -443,7 +443,7 @@ function TravelerRow({ flag, name, on, onToggle, sub, addMode }) {
   </div>;
 }
 function FilterBox({ ph, v, set }) { return <div style={{ display: "flex", alignItems: "center", gap: 8, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "11px 14px", marginBottom: 8 }}><Icon d={I.search} size={16} color={T.subd} /><input value={v} onChange={(e) => set(e.target.value)} placeholder={ph} style={{ flex: 1, background: "none", border: "none", outline: "none", color: T.text, fontSize: 13.5, fontFamily: "Manrope,sans-serif" }} /></div>; }
-function Traveler({ onBack, safeTop }) {
+function Traveler({ onBack, safeTop, bottomInset = 0 }) {
   const [tab, setTab] = useState("cit"); const [q, setQ] = useState("");
   const allCit = [["🇷🇺", "Россия"], ["🇰🇿", "Казахстан"], ["🇦🇺", "Австралия"], ["🇦🇹", "Австрия"], ["🇦🇿", "Азербайджан"], ["🇦🇱", "Албания"], ["🇦🇷", "Аргентина"], ["🇦🇲", "Армения"], ["🇧🇾", "Беларусь"], ["🇩🇪", "Германия"], ["🇬🇪", "Грузия"]];
   const [cit, setCit] = useState({ "Россия": true, "Казахстан": true });
@@ -469,7 +469,7 @@ function Traveler({ onBack, safeTop }) {
         <div style={{ marginTop: 14, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: 12, fontSize: 11.5, color: T.subd }}>ⓘ <b style={{ color: T.sub }}>Важно знать.</b> Информация о визах используется только для подбора маршрутов и не передаётся третьим лицам.</div>
       </>}
     </div>
-    <div style={{ padding: "12px 20px 24px", borderTop: `1px solid ${T.line}` }}><Btn onClick={onBack}>Сохранить</Btn></div>
+    <div style={{ padding: "12px 20px", paddingBottom: 16 + (bottomInset || 0), borderTop: `1px solid ${T.line}` }}><Btn onClick={onBack}>Сохранить</Btn></div>
   </div>;
 }
 
@@ -536,32 +536,39 @@ export default function App() {
   const [traveler, setTraveler] = useState(false);
   const [editName, setEditName] = useState(false);
   const [name, setName] = useState("Даниил");
-  const [safeTop, setSafeTop] = useState(0);
+  const [inset, setInset] = useState({ top: 0, bottom: 0, height: (typeof window !== "undefined" ? window.innerHeight : 800) });
+  const safeTop = inset.top;
   const [toast, setToastRaw] = useState(null);
   const toastTimer = useRef(null);
   const setToast = (m) => { setToastRaw(m); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToastRaw(null), 2200); };
 
-  // интеграция с Telegram WebApp (в реальном мини-аппе подтянет имя/тему; в браузере — no-op)
+  // Telegram Mini App layout: живая высота viewport + safe areas (а не 100vh)
   useEffect(() => {
-    // запрет зума (страница не масштабируется пальцами / при фокусе на поле)
     try {
       let mv = document.querySelector('meta[name="viewport"]');
       if (!mv) { mv = document.createElement("meta"); mv.name = "viewport"; document.head.appendChild(mv); }
       mv.content = "width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover";
     } catch (e) { }
     const tg = (typeof window !== "undefined") && window.Telegram && window.Telegram.WebApp;
-    if (tg) {
-      try {
-        tg.ready(); tg.expand();
-        if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
-        const u = tg.initDataUnsafe && tg.initDataUnsafe.user; if (u && u.first_name) setName([u.first_name, u.last_name].filter(Boolean).join(" "));
-        const applyInset = () => { const ci = tg.contentSafeAreaInset || {}, sa = tg.safeAreaInset || {}; setSafeTop((ci.top || 0) + (sa.top || 0)); };
-        applyInset();
-        if (tg.onEvent) { tg.onEvent("safeAreaChanged", applyInset); tg.onEvent("contentSafeAreaChanged", applyInset); tg.onEvent("viewportChanged", applyInset); }
-        // запас, если инсеты не пришли — Telegram-кнопки занимают ~ верх
-        setTimeout(() => { const ci = tg.contentSafeAreaInset || {}, sa = tg.safeAreaInset || {}; setSafeTop(Math.max((ci.top || 0) + (sa.top || 0), 8)); }, 300);
-      } catch (e) { }
+    if (!tg) { // вне Telegram — обычная высота окна
+      const onR = () => setInset((p) => ({ ...p, height: window.innerHeight }));
+      window.addEventListener("resize", onR); onR();
+      return () => window.removeEventListener("resize", onR);
     }
+    const recalc = () => {
+      const sa = tg.safeAreaInset || {}, ci = tg.contentSafeAreaInset || {};
+      const h = tg.viewportStableHeight || tg.viewportHeight || window.innerHeight;
+      setInset({ top: (sa.top || 0) + (ci.top || 0), bottom: (sa.bottom || 0), height: h });
+    };
+    try {
+      tg.ready(); tg.expand();
+      if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
+      const u = tg.initDataUnsafe && tg.initDataUnsafe.user; if (u && u.first_name) setName([u.first_name, u.last_name].filter(Boolean).join(" "));
+      recalc();
+      ["viewportChanged", "safeAreaChanged", "contentSafeAreaChanged"].forEach((ev) => tg.onEvent && tg.onEvent(ev, recalc));
+      setTimeout(recalc, 300);
+    } catch (e) { }
+    return () => { try { ["viewportChanged", "safeAreaChanged", "contentSafeAreaChanged"].forEach((ev) => tg.offEvent && tg.offEvent(ev, recalc)); } catch (e) { } };
   }, []);
 
   const [form, setForm] = useState({ origin: AIRPORTS.find(a => a.code === "MOW"), dest: byDest("samui"), round: true, dep: new Date(2026, 9, 12), ret: new Date(2026, 9, 26), adults: 1 });
@@ -641,11 +648,11 @@ export default function App() {
       input,select,textarea{font-size:16px}
       html,body{touch-action:pan-y}
     `}</style>
-    <div style={{ width: "100%", maxWidth: 420, height: "100vh", paddingTop: safeTop, background: `radial-gradient(120% 60% at 80% 0%, #1a1340 0%, ${T.bg} 55%)`, color: T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column" }}>
-      <div style={{ flex: 1, overflowY: "auto" }}>{main}</div>
-      <BottomNav tab={tab} setTab={setTab} />
-      {sheet && <SearchSheet form={form} setForm={setForm} onClose={() => setSheet(false)} onSubmit={() => runSearch()} setToast={setToast} />}
-      {traveler && <Traveler safeTop={safeTop} onBack={() => setTraveler(false)} />}
+    <div style={{ width: "100%", maxWidth: 420, height: inset.height, paddingTop: safeTop, background: `radial-gradient(120% 60% at 80% 0%, #1a1340 0%, ${T.bg} 55%)`, color: T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>{main}</div>
+      <BottomNav tab={tab} setTab={setTab} bottomInset={inset.bottom} />
+      {sheet && <SearchSheet form={form} setForm={setForm} onClose={() => setSheet(false)} onSubmit={() => runSearch()} setToast={setToast} bottomInset={inset.bottom} />}
+      {traveler && <Traveler safeTop={safeTop} bottomInset={inset.bottom} onBack={() => setTraveler(false)} />}
       {editName && <NameEdit name={name} onClose={() => setEditName(false)} onSave={(n) => { setName(n); setEditName(false); setToast("Имя сохранено"); }} />}
       <Toast msg={toast} />
     </div>
