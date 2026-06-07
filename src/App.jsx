@@ -133,10 +133,10 @@ function Header({ onBack, title, subtitle }) {
     {title ? <div style={{ textAlign: "center", maxWidth: 240 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>{subtitle && <div style={{ fontSize: 11, color: T.subd, marginTop: 2 }}>{subtitle}</div>}</div> : <Logo />}
   </div>;
 }
-function BottomNav({ tab, setTab, bottomInset = 0 }) {
+function BottomNav({ tab, setTab, bottomStr = "0px" }) {
   const items = [["home", "Главная", I.home], ["routes", "Маршруты", I.route], ["hotels", "Отели", I.hotel], ["profile", "Профиль", I.user]];
-  return <div style={{ flexShrink: 0, height: 64 + (bottomInset || 0), paddingBottom: bottomInset || 0, display: "flex", background: "rgba(10,10,24,.92)", backdropFilter: "blur(12px)", borderTop: `1px solid ${T.line}` }}>
-    {items.map(([k, label, ic]) => (<button key={k} onClick={() => setTab(k)} className="press" style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, color: tab === k ? T.violet : T.subd }}><Icon d={ic} size={22} color={tab === k ? T.violet : T.subd} /><span style={{ fontSize: 11, fontWeight: tab === k ? 700 : 500 }}>{label}</span></button>))}
+  return <div style={{ flexShrink: 0, minHeight: 64, paddingBottom: `max(${bottomStr}, 12px)`, display: "flex", background: "rgba(10,10,24,.92)", backdropFilter: "blur(12px)", borderTop: `1px solid ${T.line}` }}>
+    {items.map(([k, label, ic]) => (<button key={k} onClick={() => setTab(k)} className="press" style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, paddingTop: 8, color: tab === k ? T.violet : T.subd }}><Icon d={ic} size={22} color={tab === k ? T.violet : T.subd} /><span style={{ fontSize: 11, fontWeight: tab === k ? 700 : 500 }}>{label}</span></button>))}
   </div>;
 }
 function Toast({ msg }) { if (!msg) return null; return <div style={{ position: "fixed", left: "50%", bottom: 86, transform: "translateX(-50%)", zIndex: 100, background: "#1c1c40", border: `1px solid ${T.line2}`, color: T.text, fontSize: 13, fontWeight: 600, padding: "10px 18px", borderRadius: 999, boxShadow: "0 8px 30px rgba(0,0,0,.5)", animation: "fadeUp .25s ease" }}>{msg}</div>; }
@@ -443,7 +443,7 @@ function TravelerRow({ flag, name, on, onToggle, sub, addMode }) {
   </div>;
 }
 function FilterBox({ ph, v, set }) { return <div style={{ display: "flex", alignItems: "center", gap: 8, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "11px 14px", marginBottom: 8 }}><Icon d={I.search} size={16} color={T.subd} /><input value={v} onChange={(e) => set(e.target.value)} placeholder={ph} style={{ flex: 1, background: "none", border: "none", outline: "none", color: T.text, fontSize: 13.5, fontFamily: "Manrope,sans-serif" }} /></div>; }
-function Traveler({ onBack, safeTop, bottomInset = 0 }) {
+function Traveler({ onBack, safeTop, bottomStr = "0px" }) {
   const [tab, setTab] = useState("cit"); const [q, setQ] = useState("");
   const allCit = [["🇷🇺", "Россия"], ["🇰🇿", "Казахстан"], ["🇦🇺", "Австралия"], ["🇦🇹", "Австрия"], ["🇦🇿", "Азербайджан"], ["🇦🇱", "Албания"], ["🇦🇷", "Аргентина"], ["🇦🇲", "Армения"], ["🇧🇾", "Беларусь"], ["🇩🇪", "Германия"], ["🇬🇪", "Грузия"]];
   const [cit, setCit] = useState({ "Россия": true, "Казахстан": true });
@@ -469,7 +469,7 @@ function Traveler({ onBack, safeTop, bottomInset = 0 }) {
         <div style={{ marginTop: 14, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: 12, fontSize: 11.5, color: T.subd }}>ⓘ <b style={{ color: T.sub }}>Важно знать.</b> Информация о визах используется только для подбора маршрутов и не передаётся третьим лицам.</div>
       </>}
     </div>
-    <div style={{ padding: "12px 20px", paddingBottom: 16 + (bottomInset || 0), borderTop: `1px solid ${T.line}` }}><Btn onClick={onBack}>Сохранить</Btn></div>
+    <div style={{ padding: "12px 20px", paddingBottom: `max(${bottomStr}, 16px)`, borderTop: `1px solid ${T.line}` }}><Btn onClick={onBack}>Сохранить</Btn></div>
   </div>;
 }
 
@@ -536,13 +536,13 @@ export default function App() {
   const [traveler, setTraveler] = useState(false);
   const [editName, setEditName] = useState(false);
   const [name, setName] = useState("Даниил");
-  const [inset, setInset] = useState({ top: 0, bottom: 0, height: (typeof window !== "undefined" ? window.innerHeight : 800) });
+  const [inset, setInset] = useState({ top: 0, bottomStr: "env(safe-area-inset-bottom)" });
   const safeTop = inset.top;
   const [toast, setToastRaw] = useState(null);
   const toastTimer = useRef(null);
   const setToast = (m) => { setToastRaw(m); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToastRaw(null), 2200); };
 
-  // Telegram Mini App layout: живая высота viewport + safe areas (а не 100vh)
+  // Telegram Mini App layout. Высоту держим на CSS (100dvh) — НЕ в JS, иначе меню "застревает" после клавиатуры.
   useEffect(() => {
     try {
       let mv = document.querySelector('meta[name="viewport"]');
@@ -550,15 +550,14 @@ export default function App() {
       mv.content = "width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover";
     } catch (e) { }
     const tg = (typeof window !== "undefined") && window.Telegram && window.Telegram.WebApp;
-    if (!tg) { // вне Telegram — обычная высота окна
-      const onR = () => setInset((p) => ({ ...p, height: window.innerHeight }));
-      window.addEventListener("resize", onR); onR();
-      return () => window.removeEventListener("resize", onR);
-    }
+    if (!tg) return; // вне Telegram отступы не нужны
     const recalc = () => {
       const sa = tg.safeAreaInset || {}, ci = tg.contentSafeAreaInset || {};
-      const h = tg.viewportStableHeight || tg.viewportHeight || window.innerHeight;
-      setInset({ top: (sa.top || 0) + (ci.top || 0), bottom: (sa.bottom || 0), height: h });
+      const sum = (sa.top || 0) + (ci.top || 0);
+      // если Telegram прислал инсеты — берём их; иначе гарантированный запас под шапку Telegram (вырез + ~хедер)
+      const top = sum > 0 ? Math.max(sum, 48) : "calc(env(safe-area-inset-top) + 52px)";
+      const bottomStr = (sa.bottom || 0) > 0 ? `${sa.bottom}px` : "env(safe-area-inset-bottom)";
+      setInset({ top, bottomStr });
     };
     try {
       tg.ready(); tg.expand();
@@ -566,7 +565,7 @@ export default function App() {
       const u = tg.initDataUnsafe && tg.initDataUnsafe.user; if (u && u.first_name) setName([u.first_name, u.last_name].filter(Boolean).join(" "));
       recalc();
       ["viewportChanged", "safeAreaChanged", "contentSafeAreaChanged"].forEach((ev) => tg.onEvent && tg.onEvent(ev, recalc));
-      setTimeout(recalc, 300);
+      setTimeout(recalc, 400);
     } catch (e) { }
     return () => { try { ["viewportChanged", "safeAreaChanged", "contentSafeAreaChanged"].forEach((ev) => tg.offEvent && tg.offEvent(ev, recalc)); } catch (e) { } };
   }, []);
@@ -647,12 +646,13 @@ export default function App() {
       input::placeholder{color:${T.subd}}
       input,select,textarea{font-size:16px}
       html,body{touch-action:pan-y}
+      .app-root{height:100vh;height:100dvh}
     `}</style>
-    <div style={{ width: "100%", maxWidth: 420, height: inset.height, paddingTop: safeTop, background: `radial-gradient(120% 60% at 80% 0%, #1a1340 0%, ${T.bg} 55%)`, color: T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div className="app-root" style={{ width: "100%", maxWidth: 420, paddingTop: safeTop, background: `radial-gradient(120% 60% at 80% 0%, #1a1340 0%, ${T.bg} 55%)`, color: T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>{main}</div>
-      <BottomNav tab={tab} setTab={setTab} bottomInset={inset.bottom} />
-      {sheet && <SearchSheet form={form} setForm={setForm} onClose={() => setSheet(false)} onSubmit={() => runSearch()} setToast={setToast} bottomInset={inset.bottom} />}
-      {traveler && <Traveler safeTop={safeTop} bottomInset={inset.bottom} onBack={() => setTraveler(false)} />}
+      <BottomNav tab={tab} setTab={setTab} bottomStr={inset.bottomStr} />
+      {sheet && <SearchSheet form={form} setForm={setForm} onClose={() => setSheet(false)} onSubmit={() => runSearch()} setToast={setToast} />}
+      {traveler && <Traveler safeTop={safeTop} bottomStr={inset.bottomStr} onBack={() => setTraveler(false)} />}
       {editName && <NameEdit name={name} onClose={() => setEditName(false)} onSave={(n) => { setName(n); setEditName(false); setToast("Имя сохранено"); }} />}
       <Toast msg={toast} />
     </div>
