@@ -91,12 +91,10 @@ const pad = (n) => String(n).padStart(2, "0");
 const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const fmtShort = (d) => d ? `${d.getDate()} ${MONTHS_S[d.getMonth()]}` : "";
 async function apiSearch(req) {
-  try {
-    const r = await fetch(`${API_BASE}?action=search-routes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req) });
-    const d = await r.json();
-    if (d && d.ok && d.routes && d.routes.length) return d.routes;
-    return MOCK_ROUTES;
-  } catch (e) { return MOCK_ROUTES; }
+  const r = await fetch(`${API_BASE}?action=search-routes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req) });
+  const d = await r.json();
+  if (d && d.ok) return d.routes || [];
+  return [];
 }
 const rub = (n) => (n == null ? "—" : Math.round(n).toLocaleString("ru-RU") + " ₽");
 const hm = (min) => { const h = Math.floor(min / 60), m = min % 60; return `${h}ч${m ? " " + m + "м" : ""}`; };
@@ -129,10 +127,10 @@ function Porthole({ grad = GRAD.sunset, h = 150, label, sub, codeRight, style })
 function Badge({ label, color = T.violet, icon }) { return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 999, background: color + "22", border: `1px solid ${color}55`, color, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>{icon && <span style={{ fontSize: 11 }}>{icon}</span>}{label}</span>; }
 function Btn({ children, onClick, grad = GRAD.cta, style }) { return <button onClick={onClick} className="press" style={{ border: "none", cursor: "pointer", color: "#fff", fontWeight: 700, fontFamily: "Sora,sans-serif", fontSize: 15, borderRadius: 16, padding: "16px 20px", width: "100%", background: grad, boxShadow: "0 10px 30px -8px rgba(124,92,255,.6)", ...style }}>{children}</button>; }
 function Logo() { return <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.text, letterSpacing: .2 }}>TripWise<span style={{ color: T.violet }}>AI</span></div>; }
-function Header({ onBack, title }) {
+function Header({ onBack, title, subtitle }) {
   return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px 8px", position: "relative", minHeight: 30 }}>
-    {onBack && <div onClick={onBack} className="press" style={{ position: "absolute", left: 20, cursor: "pointer" }}><Icon d={I.back} size={22} color={T.text} /></div>}
-    {title ? <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15, textAlign: "center", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div> : <Logo />}
+    {onBack && <div onClick={onBack} className="press" style={{ position: "absolute", left: 20, top: 16, cursor: "pointer" }}><Icon d={I.back} size={22} color={T.text} /></div>}
+    {title ? <div style={{ textAlign: "center", maxWidth: 240 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>{subtitle && <div style={{ fontSize: 11, color: T.subd, marginTop: 2 }}>{subtitle}</div>}</div> : <Logo />}
   </div>;
 }
 function BottomNav({ tab, setTab }) {
@@ -305,20 +303,21 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
     </div>
   </div>;
 }
-function Results({ query, routes, loading, onBack, onOpen, isLiked, onLike }) {
+function Results({ query, routes, loading, error, onRetry, onBack, onOpen, isLiked, onLike }) {
   return <div style={{ animation: "slideIn .28s ease" }}>
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 8px" }}>
       <div onClick={onBack} className="press" style={{ cursor: "pointer" }}><Icon d={I.back} size={22} color={T.text} /></div>
       <div style={{ textAlign: "center" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>{query.origin} → {query.destName}</div><div style={{ fontSize: 11, color: T.subd }}>{query.datesLabel}</div></div>
       <span onClick={onBack} className="press" style={{ color: T.violet, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Изменить</span>
     </div>
+    {error ? <div style={{ textAlign: "center", padding: "40px 20px" }}><div style={{ fontSize: 15, color: T.text, fontWeight: 700 }}>Не удалось загрузить данные</div><div style={{ fontSize: 13, marginTop: 6, marginBottom: 16, color: T.subd }}>Проверьте соединение и попробуйте ещё раз</div><Btn onClick={onRetry}>Повторить</Btn></div> : <>
     <div style={{ padding: "4px 20px 0" }}>
       <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 20, color: T.text }}>Нашли <span style={{ color: T.violet }}>{loading ? "…" : routes.length} хитрых</span> способов добраться</div>
       <div style={{ color: T.subd, fontSize: 12.5, marginTop: 4 }}>Показываем только лучшее — не сотни билетов.</div>
     </div>
     <div style={{ padding: "16px 20px 8px", display: "flex", flexDirection: "column", gap: 14 }}>
       {loading ? [0, 1, 2].map(i => <Skeleton key={i} />) : (routes.length ? routes.map((r, i) => <RouteCard key={r.id} r={r} i={i} liked={isLiked(r)} onLike={onLike} onOpen={() => onOpen(r)} />) : <Empty onBack={onBack} />)}
-    </div>
+    </div></>}
   </div>;
 }
 function Empty({ onBack }) { return <div style={{ textAlign: "center", padding: "40px 20px" }}><div style={{ fontSize: 15, color: T.text, fontWeight: 700 }}>Ничего не найдено</div><div style={{ fontSize: 13, marginTop: 6, marginBottom: 16, color: T.subd }}>Попробуйте изменить параметры</div><Btn onClick={onBack}>Изменить параметры поиска</Btn></div>; }
@@ -328,7 +327,15 @@ function AirlineLogo({ code }) { const colors = ["#7c5cff", "#48dcdc", "#39d98a"
 function Detail({ r, query, onBack, liked, onLike, onShare, goHotels }) {
   const dur = legDur(r.segments);
   return <div style={{ animation: "slideIn .28s ease" }}>
-    <Header onBack={onBack} title={`${query.origin} → ${query.destName}`} />
+    <Header onBack={onBack} title={`${query.origin} → ${query.destName}`} subtitle={query.datesLabel} />
+    {r.segments && r.segments.length === 0 && r.bookingLinks && r.bookingLinks.length > 0 && (
+      <div style={{ padding: "0 20px", marginTop: -2 }}>
+        <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 14, marginTop: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 4 }}>Туда-обратно одним билетом</div>
+          <div style={{ fontSize: 11.5, color: T.subd, marginBottom: 12 }}>Покупка одной бронью — удобно, без раздельных билетов</div>
+          <a href={r.bookingLinks[0].url} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Btn>Купить билет · {rub(r.total)}</Btn></a>
+        </div>
+      </div>)}
     <div style={{ padding: "4px 20px 0" }}>
       <div style={{ position: "relative", borderRadius: 22, overflow: "hidden", height: 150, background: GRAD.sunset, padding: 16, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent,rgba(5,5,20,.7))" }} />
@@ -351,7 +358,7 @@ function Detail({ r, query, onBack, liked, onLike, onShare, goHotels }) {
       </div>
     </div>
     <div style={{ padding: "18px 20px 0" }}>
-      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 16, marginBottom: 10 }}>Маршрут по сегментам</div>
+      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 16, marginBottom: 10 }}>{r.segments && r.segments.length > 0 ? "Маршрут по сегментам" : ""}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {r.segments.map((s, i) => (<div key={i}>
           <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 14 }}>
@@ -436,14 +443,14 @@ function TravelerRow({ flag, name, on, onToggle, sub, addMode }) {
   </div>;
 }
 function FilterBox({ ph, v, set }) { return <div style={{ display: "flex", alignItems: "center", gap: 8, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "11px 14px", marginBottom: 8 }}><Icon d={I.search} size={16} color={T.subd} /><input value={v} onChange={(e) => set(e.target.value)} placeholder={ph} style={{ flex: 1, background: "none", border: "none", outline: "none", color: T.text, fontSize: 13.5, fontFamily: "Manrope,sans-serif" }} /></div>; }
-function Traveler({ onBack }) {
+function Traveler({ onBack, safeTop }) {
   const [tab, setTab] = useState("cit"); const [q, setQ] = useState("");
   const allCit = [["🇷🇺", "Россия"], ["🇰🇿", "Казахстан"], ["🇦🇺", "Австралия"], ["🇦🇹", "Австрия"], ["🇦🇿", "Азербайджан"], ["🇦🇱", "Албания"], ["🇦🇷", "Аргентина"], ["🇦🇲", "Армения"], ["🇧🇾", "Беларусь"], ["🇩🇪", "Германия"], ["🇬🇪", "Грузия"]];
   const [cit, setCit] = useState({ "Россия": true, "Казахстан": true });
   const allVisas = [["🇪🇺", "Шенгенская зона", "26 стран"], ["🇺🇸", "США"], ["🇨🇦", "Канада"], ["🇬🇧", "Великобритания"], ["🇯🇵", "Япония"], ["🇨🇳", "Китай"], ["🇦🇺", "Австралия"], ["🇳🇿", "Новая Зеландия"], ["🇰🇷", "Южная Корея"], ["🇹🇭", "Таиланд"], ["🇹🇷", "Турция"], ["🇦🇪", "ОАЭ"]];
   const [vis, setVis] = useState({ "Шенгенская зона": true, "США": true, "Канада": true });
   const f = (arr) => arr.filter(x => x[1].toLowerCase().includes(q.toLowerCase()));
-  return <div style={{ position: "fixed", inset: 0, zIndex: 50, background: T.bg2, display: "flex", flexDirection: "column", maxWidth: 420, margin: "0 auto", animation: "slideIn .28s ease" }}>
+  return <div style={{ position: "fixed", inset: 0, zIndex: 50, background: T.bg2, display: "flex", flexDirection: "column", maxWidth: 420, margin: "0 auto", paddingTop: safeTop || 0, animation: "slideIn .28s ease" }}>
     <Header onBack={onBack} title="Путешественник" />
     <div style={{ margin: "4px 20px 0", background: T.card, borderRadius: 12, padding: 4, display: "flex" }}>
       {[["cit", "Гражданство"], ["vis", "Визы"]].map(([k, t]) => (<button key={k} onClick={() => { setTab(k); setQ(""); }} style={{ flex: 1, border: "none", cursor: "pointer", borderRadius: 9, padding: 10, fontWeight: 700, fontSize: 13.5, background: tab === k ? GRAD.violet : "transparent", color: tab === k ? "#fff" : T.sub }}>{t}</button>))}
@@ -529,19 +536,38 @@ export default function App() {
   const [traveler, setTraveler] = useState(false);
   const [editName, setEditName] = useState(false);
   const [name, setName] = useState("Даниил");
+  const [safeTop, setSafeTop] = useState(0);
   const [toast, setToastRaw] = useState(null);
   const toastTimer = useRef(null);
   const setToast = (m) => { setToastRaw(m); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToastRaw(null), 2200); };
 
   // интеграция с Telegram WebApp (в реальном мини-аппе подтянет имя/тему; в браузере — no-op)
   useEffect(() => {
+    // запрет зума (страница не масштабируется пальцами / при фокусе на поле)
+    try {
+      let mv = document.querySelector('meta[name="viewport"]');
+      if (!mv) { mv = document.createElement("meta"); mv.name = "viewport"; document.head.appendChild(mv); }
+      mv.content = "width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover";
+    } catch (e) { }
     const tg = (typeof window !== "undefined") && window.Telegram && window.Telegram.WebApp;
-    if (tg) { try { tg.ready(); tg.expand(); const u = tg.initDataUnsafe && tg.initDataUnsafe.user; if (u && u.first_name) setName([u.first_name, u.last_name].filter(Boolean).join(" ")); } catch (e) { } }
+    if (tg) {
+      try {
+        tg.ready(); tg.expand();
+        if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
+        const u = tg.initDataUnsafe && tg.initDataUnsafe.user; if (u && u.first_name) setName([u.first_name, u.last_name].filter(Boolean).join(" "));
+        const applyInset = () => { const ci = tg.contentSafeAreaInset || {}, sa = tg.safeAreaInset || {}; setSafeTop((ci.top || 0) + (sa.top || 0)); };
+        applyInset();
+        if (tg.onEvent) { tg.onEvent("safeAreaChanged", applyInset); tg.onEvent("contentSafeAreaChanged", applyInset); tg.onEvent("viewportChanged", applyInset); }
+        // запас, если инсеты не пришли — Telegram-кнопки занимают ~ верх
+        setTimeout(() => { const ci = tg.contentSafeAreaInset || {}, sa = tg.safeAreaInset || {}; setSafeTop(Math.max((ci.top || 0) + (sa.top || 0), 8)); }, 300);
+      } catch (e) { }
+    }
   }, []);
 
   const [form, setForm] = useState({ origin: AIRPORTS.find(a => a.code === "MOW"), dest: byDest("samui"), round: true, dep: new Date(2026, 9, 12), ret: new Date(2026, 9, 26), adults: 1 });
   const [query, setQuery] = useState({ origin: "Москва", destName: "Самуи", destinationId: "samui", adults: 1, datesLabel: "12 окт — 26 окт" });
   const [routes, setRoutes] = useState([]); const [loading, setLoading] = useState(false); const [selected, setSelected] = useState(null);
+  const [searchError, setSearchError] = useState(false);
 
   const [saved, setSaved] = useState([
     { id: "s-bali", name: "Москва — Бали", dates: "12 окт — 26 окт", price: 45230, emoji: "🏝", route: MOCK_ROUTES[0], query: { origin: "Москва", destName: "Бали", adults: 1, datesLabel: "12 окт — 26 окт" } },
@@ -560,10 +586,13 @@ export default function App() {
   const runSearch = async (f) => {
     const ff = f || form;
     const nq = { origin: ff.origin.city, destName: ff.dest.city, destinationId: ff.dest.destId || ff.dest.code, adults: ff.adults, datesLabel: datesLabel(ff) };
-    setQuery(nq); setSheet(false); setTab("routes"); setStack(["results"]); setLoading(true);  // <- переходим в «Маршруты»
+    setQuery(nq); setSheet(false); setTab("routes"); setStack(["results"]); setLoading(true); setSearchError(false);  // <- переходим в «Маршруты»
     setRecent((p) => [{ name: `${nq.origin} — ${nq.destName}`, dates: nq.datesLabel, form: ff }, ...p.filter(x => x.name !== `${nq.origin} — ${nq.destName}`)].slice(0, 7));
-    const res = await apiSearch({ origin: ff.origin.city, originCode: ff.origin.code, destinationId: ff.dest.destId || undefined, destCode: ff.dest.code, destName: ff.dest.city, dateFrom: iso(ff.dep), dateTo: ff.round && ff.ret ? iso(ff.ret) : undefined, style: "stopover", tier: "free", roundTrip: !!(ff.round && ff.ret), passengers: { adults: ff.adults } });
-    setRoutes(res); setLoading(false);
+    try {
+      const res = await apiSearch({ origin: ff.origin.city, originCode: ff.origin.code, destinationId: ff.dest.destId || undefined, destCode: ff.dest.code, destName: ff.dest.city, dateFrom: iso(ff.dep), dateTo: ff.round && ff.ret ? iso(ff.ret) : undefined, style: "stopover", tier: "free", roundTrip: !!(ff.round && ff.ret), passengers: { adults: ff.adults } });
+      setRoutes(res);
+    } catch (e) { setSearchError(true); setRoutes([]); }
+    setLoading(false);
   };
   const openSheetWithDest = (id) => { const a = byDest(id); setForm((f) => ({ ...f, dest: a })); setSheet(true); };
   const isLiked = (r) => !!saved.find(x => x.id === ("liked-" + r.id));
@@ -588,7 +617,7 @@ export default function App() {
   let main = null;
   if (tab === "routes") {
     if (top === "detail") main = <Detail r={selected} query={query} onBack={() => setStack(["results"])} liked={isLiked(selected)} onLike={likeRoute} onShare={shareRoute} goHotels={() => setTab("hotels")} />;
-    else if (top === "results") main = <Results query={query} routes={routes} loading={loading} onBack={() => setStack([])} onOpen={(r) => { setSelected(r); setStack(["results", "detail"]); }} isLiked={isLiked} onLike={likeRoute} />;
+    else if (top === "results") main = <Results query={query} routes={routes} loading={loading} error={searchError} onRetry={() => runSearch()} onBack={() => setStack([])} onOpen={(r) => { setSelected(r); setStack(["results", "detail"]); }} isLiked={isLiked} onLike={likeRoute} />;
     else main = <RoutesScreen onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved(p => p.filter(x => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => { setForm(s.form); runSearch(s.form); }} />;
   } else if (tab === "home") main = <Home onSearch={() => setSheet(true)} onPickDest={openSheetWithDest} goProfile={() => setTab("profile")} />;
   else if (tab === "hotels") main = <Hotels setToast={setToast} />;
@@ -609,12 +638,14 @@ export default function App() {
       .carousel{scrollbar-width:none}
       ::-webkit-scrollbar{display:none}
       input::placeholder{color:${T.subd}}
+      input,select,textarea{font-size:16px}
+      html,body{touch-action:pan-y}
     `}</style>
-    <div style={{ width: "100%", maxWidth: 420, height: "100vh", background: `radial-gradient(120% 60% at 80% 0%, #1a1340 0%, ${T.bg} 55%)`, color: T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column" }}>
+    <div style={{ width: "100%", maxWidth: 420, height: "100vh", paddingTop: safeTop, background: `radial-gradient(120% 60% at 80% 0%, #1a1340 0%, ${T.bg} 55%)`, color: T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column" }}>
       <div style={{ flex: 1, overflowY: "auto" }}>{main}</div>
       <BottomNav tab={tab} setTab={setTab} />
       {sheet && <SearchSheet form={form} setForm={setForm} onClose={() => setSheet(false)} onSubmit={() => runSearch()} setToast={setToast} />}
-      {traveler && <Traveler onBack={() => setTraveler(false)} />}
+      {traveler && <Traveler safeTop={safeTop} onBack={() => setTraveler(false)} />}
       {editName && <NameEdit name={name} onClose={() => setEditName(false)} onSave={(n) => { setName(n); setEditName(false); setToast("Имя сохранено"); }} />}
       <Toast msg={toast} />
     </div>
