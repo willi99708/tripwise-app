@@ -308,7 +308,7 @@ function Home({ onSearch, onPickDest, goProfile }) {
     overflow: "hidden",
     backgroundImage: "url('/graphics/main.png')",
     backgroundSize: "cover",
-    backgroundPosition: "center -20px"
+    backgroundPosition: "center -10px"
   }}
 />
       </div>
