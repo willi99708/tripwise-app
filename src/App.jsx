@@ -71,7 +71,14 @@ const filterAirports = (q) => { const s = (q || "").trim().toLowerCase(); if (!s
 const MONTHS_S = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
 const MON_NOM = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
 const WD = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-const AIRLINES = { SU: "Аэрофлот", CA: "Air China", TR: "Scoot", AK: "AirAsia", MH: "Malaysia Airlines", EK: "Emirates", QR: "Qatar Airways", TK: "Turkish Airlines", WY: "Oman Air", S7: "S7 Airlines", U6: "Уральские", FZ: "flydubai", GA: "Garuda", TG: "Thai Airways", KE: "Korean Air", D7: "AirAsia X" };
+/* Названия авиакомпаний по IATA-коду. Добавить новую — просто новая строка КОД:"Название".
+   ЛОГОТИПЫ: см. компонент AirlineLogo ниже — там описано, как подставить картинки логотипов. */
+const AIRLINES = { SU: "Аэрофлот", S7: "S7 Airlines", U6: "Уральские авиалинии", DP: "Победа", UT: "ЮТэйр", N4: "Nordwind", 5N: "Smartavia", WZ: "Red Wings",
+  TK: "Turkish Airlines", PC: "Pegasus", LH: "Lufthansa", AF: "Air France", KL: "KLM", BA: "British Airways", AY: "Finnair", LX: "Swiss", OS: "Austrian", AZ: "ITA Airways", IB: "Iberia", VY: "Vueling", W6: "Wizz Air", FR: "Ryanair", U2: "easyJet",
+  EK: "Emirates", QR: "Qatar Airways", FZ: "flydubai", EY: "Etihad", WY: "Oman Air", GF: "Gulf Air", SV: "Saudia", MS: "EgyptAir", ET: "Ethiopian",
+  CA: "Air China", MU: "China Eastern", CZ: "China Southern", CX: "Cathay Pacific", HX: "Hong Kong Airlines", SQ: "Singapore Airlines", TR: "Scoot", MH: "Malaysia Airlines", AK: "AirAsia", D7: "AirAsia X", TG: "Thai Airways", GA: "Garuda", KE: "Korean Air", OZ: "Asiana", JL: "JAL", NH: "ANA",
+  VN: "Vietnam Airlines", VJ: "VietJet", AI: "Air India", "6E": "IndiGo", UL: "SriLankan", PG: "Bangkok Airways",
+  HY: "Uzbekistan Airways", KC: "Air Astana", J2: "AZAL", PS: "МАУ", B2: "Belavia" };
 const airlineName = (c) => AIRLINES[c] || (c ? c : "Авиакомпания");
 
 const MOCK_ROUTES = [
@@ -103,6 +110,12 @@ async function apiSearch(req) {
 const rub = (n) => (n == null ? "—" : Math.round(n).toLocaleString("ru-RU") + " ₽");
 const hm = (min) => { const h = Math.floor(min / 60), m = min % 60; return `${h}ч${m ? " " + m + "м" : ""}`; };
 const timeOf = (s) => { if (!s) return "--:--"; return new Date(s).toUTCString().slice(17, 22); };
+// смещение из ISO ("...+05:00") в минутах
+const isoOff = (iso) => { const m = String(iso || "").match(/([+-]\d{2}):?(\d{2})$/); if (!m) return 0; const sign = m[1][0] === "-" ? -1 : 1; return sign * (parseInt(m[1].slice(1), 10) * 60 + parseInt(m[2], 10)); };
+// время вылета: берём готовое от бэка, иначе из ISO (локальное время вылета)
+const depOf = (s) => s.departHM || (s.departISO ? String(s.departISO).slice(11, 16) : (s.departISO ? timeOf(s.departISO) : "—"));
+// время прилёта: берём готовое от бэка, иначе считаем вылет+длительность в локальном времени вылета (фолбэк)
+const arrOf = (s) => { if (s.arriveHM) return s.arriveHM; if (s.departISO && s.durationMin != null) { const t = Date.parse(s.departISO) + s.durationMin * 60000 + isoOff(s.departISO) * 60000; return new Date(t).toISOString().slice(11, 16); } return "—"; };
 const legDur = (segs) => (segs || []).filter(s => s.mode !== "ferry").reduce((s, x) => s + (x.durationMin || 0), 0);
 const LABELS = { recommended: { t: "Выбор TripWise", c: T.violet, icon: "✦" }, cheapest: { t: "Самый дешёвый", c: T.green, icon: "₽" }, relevant: { t: "Хитрый маршрут", c: T.cyan, icon: "✈" }, stopover: { t: "Лучший stopover", c: T.violet, icon: "🌙" } };
 const dayWord = (n) => { const a = Math.abs(n) % 100, b = a % 10; if (a > 10 && a < 20) return "дней"; if (b === 1) return "день"; if (b >= 2 && b <= 4) return "дня"; return "дней"; };
@@ -139,7 +152,7 @@ function Logo() { return <div style={{ fontFamily: "Sora,sans-serif", fontWeight
 function Header({ onBack, title, subtitle }) {
   return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px 8px", position: "relative", minHeight: 30 }}>
     {onBack && <div onClick={onBack} className="press" style={{ position: "absolute", left: 20, top: 16, transform: "translateY(20px)", zIndex: 5, cursor: "pointer" }}><Icon d={I.back} size={22} color={T.text} /></div>}
-    <div style={{ transform: title ? "translateY(-5px)" : "translateY(-20px)" }}>{title ? <div style={{ textAlign: "center", maxWidth: 240 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>{subtitle && <div style={{ fontSize: 11, color: T.subd, marginTop: 2 }}>{subtitle}</div>}</div> : <Logo />}</div>
+    <div style={{ transform: title ? "translateY(-4px)" : "translateY(-15px)" }}>{title ? <div style={{ textAlign: "center", maxWidth: 240 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>{subtitle && <div style={{ fontSize: 11, color: T.subd, marginTop: 2 }}>{subtitle}</div>}</div> : <Logo />}</div>
   </div>;
 }
 function BottomNav({ tab, setTab, bottomStr = "0px" }) {
@@ -291,7 +304,10 @@ function Skeleton() { return <div style={{ height: 150, borderRadius: 18, backgr
 function RouteCard({ r, onOpen, liked, onLike, i }) {
   const grad = r.badge === "cheapest" ? GRAD.sunset : r.badge === "unexpected" ? GRAD.city : GRAD.night;
   const dur = legDur(r.segments);
-  const codes = r.segments.map((s, idx) => idx === 0 ? [s.fromCode, s.toCode] : [s.toCode]).flat();
+  const codesOf = (segs) => (segs || []).map((s, idx) => idx === 0 ? [s.fromCode, s.toCode] : [s.toCode]).flat();
+  const outSegs = r.roundTrip ? ((r.outbound && r.outbound.segments) || r.segments.filter(s => s.direction !== "return")) : r.segments;
+  const retSegs = r.roundTrip ? ((r.return && r.return.segments) || r.segments.filter(s => s.direction === "return")) : [];
+  const CodeLine = ({ segs, dir }) => { const cs = codesOf(segs); if (!cs.length) return null; return <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>{cs.map((c, idx) => (<React.Fragment key={idx}>{idx > 0 && <svg width="13" height="13" viewBox="0 0 24 24" style={{ transform: `rotate(${dir === "ret" ? 270 : 90}deg)`, flexShrink: 0 }}><path d={I.plane} fill={T.subd} /></svg>}<span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{c}</span></React.Fragment>))}</div>; };
   return <div onClick={onOpen} className="press card-in" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 20, padding: 14, cursor: "pointer", animationDelay: `${i * 70}ms` }}>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{(r.picks || [r.badge]).map(p => { const l = LABELS[p]; return l ? <Badge key={p} label={l.t} color={l.c} icon={l.icon} /> : null; })}</div>
@@ -301,7 +317,10 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
       <div style={{ flex: 1 }}>
         <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, fontSize: 15.5, color: T.text, lineHeight: 1.25 }}>{r.title || (r.stopover ? `Через ${r.stopover.city}` : "Маршрут")}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", flex: 1 }}>{codes.map((c, idx) => (<React.Fragment key={idx}>{idx > 0 && <Icon d={I.plane} size={12} color={T.subd} />}<span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{c}</span></React.Fragment>))}</div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+            <CodeLine segs={outSegs} dir="out" />
+            {r.roundTrip && retSegs.length > 0 && <CodeLine segs={retSegs} dir="ret" />}
+          </div>
           <Icon d={I.chevR} size={16} color={T.violet} />
         </div>
       </div>
@@ -318,9 +337,9 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
 function Results({ query, routes, loading, error, onRetry, onBack, onEdit, onOpen, isLiked, onLike }) {
   return <div style={{ animation: "slideIn .28s ease" }}>
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 8px", position: "relative" }}>
-      <div onClick={onBack} className="press" style={{ cursor: "pointer", transform: "translateY(20px)", zIndex: 5 }}><Icon d={I.back} size={22} color={T.text} /></div>
-      <div style={{ position: "absolute", left: 0, right: 0, textAlign: "center", transform: "translateY(20px)", pointerEvents: "none" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>{query.origin} → {query.destName}</div><div style={{ fontSize: 11, color: T.subd }}>{query.datesLabel}</div></div>
-      <span onClick={onBack} className="press" style={{ color: T.violet, fontSize: 13, fontWeight: 700, cursor: "pointer", transform: "translateY(20px)", zIndex: 5 }}>Изменить</span>
+      <div onClick={onBack} className="press" style={{ cursor: "pointer", transform: "translateY(-4px)", zIndex: 5 }}><Icon d={I.back} size={22} color={T.text} /></div>
+      <div style={{ position: "absolute", left: 0, right: 0, textAlign: "center", transform: "translateY(-4px)", pointerEvents: "none" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>{query.origin} → {query.destName}</div><div style={{ fontSize: 11, color: T.subd }}>{query.datesLabel}</div></div>
+      <span onClick={onBack} className="press" style={{ color: T.violet, fontSize: 13, fontWeight: 700, cursor: "pointer", transform: "translateY(-4px)", zIndex: 5 }}>Изменить</span>
     </div>
     {error ? <div style={{ textAlign: "center", padding: "40px 20px" }}><div style={{ fontSize: 15, color: T.text, fontWeight: 700 }}>Не удалось загрузить данные</div><div style={{ fontSize: 13, marginTop: 6, marginBottom: 16, color: T.subd }}>Проверьте соединение и попробуйте ещё раз</div><Btn onClick={onRetry}>Повторить</Btn></div> : <>
     <div style={{ padding: "4px 20px 0" }}>
@@ -335,6 +354,13 @@ function Results({ query, routes, loading, error, onRetry, onBack, onEdit, onOpe
 function Empty({ onEdit }) { return <div style={{ textAlign: "center", padding: "40px 20px" }}><div style={{ fontSize: 15, color: T.text, fontWeight: 700 }}>Ничего не найдено</div><div style={{ fontSize: 13, marginTop: 6, marginBottom: 16, color: T.subd }}>Попробуйте изменить параметры</div><Btn onClick={onEdit}>Изменить параметры поиска</Btn></div>; }
 
 /* ================================ Детали ================================ */
+/* ЛОГОТИПЫ АВИАКОМПАНИЙ.
+   Сейчас в аватарке — 2 буквы кода (заглушка). Чтобы показать картинки логотипов:
+   1) положи файлы в проект (напр. public/airlines/TK.png) или возьми URL;
+   2) заведи карту: const AIRLINE_LOGO = { TK: "/airlines/TK.png", SU: "/airlines/SU.png", ... };
+   3) в AirlineLogo: если AIRLINE_LOGO[code] есть — вернуть
+      <img src={AIRLINE_LOGO[code]} style={{width:30,height:30,borderRadius:8,objectFit:"cover"}}/>,
+      иначе оставить текущую заглушку с буквами. */
 function AirlineLogo({ code }) { const colors = ["#7c5cff", "#48dcdc", "#39d98a", "#f5c451", "#ff6db0", "#f59640"]; const c = colors[(code || "X").charCodeAt(0) % colors.length]; return <div style={{ width: 30, height: 30, borderRadius: 8, background: c + "26", border: `1px solid ${c}55`, display: "grid", placeItems: "center", color: c, fontWeight: 800, fontSize: 11, fontFamily: "Sora,sans-serif" }}>{(code || "✈").slice(0, 2)}</div>; }
 function Detail({ r, query, onBack, liked, onLike, onShare, goHotels }) {
   const dur = legDur(r.segments);
@@ -351,8 +377,11 @@ function Detail({ r, query, onBack, liked, onLike, onShare, goHotels }) {
       {r.priced && r.savings > 0 && <Badge label={`Экономия ${rub(r.savings)}`} color={T.green} />}
     </div>
     <div style={{ padding: "14px 20px 0" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, padding: "14px 10px" }}>
-        {[[rub(r.total), "Билеты"], [r.roundTrip ? `${hm(r.durationOut || dur)} · ${hm(r.durationRet || 0)}` : hm(dur), r.roundTrip ? "Туда · Обратно" : "В пути"], [`${query.adults || 1} пасс.`, "Эконом"], [r.transfers ? `${r.transfers}` : "0", "Пересадки"]].map(([a, b], i) => (<div key={i} style={{ textAlign: "center" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 13.5 }}>{a}</div><div style={{ fontSize: 10.5, color: T.subd, marginTop: 2 }}>{b}</div></div>))}
+      <div style={{ display: "grid", gridTemplateColumns: r.roundTrip ? "repeat(5,1fr)" : "repeat(4,1fr)", gap: r.roundTrip ? 5 : 8, background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, padding: "14px 10px" }}>
+        {(r.roundTrip
+          ? [[rub(r.total), "Билеты"], [hm(r.durationOut || dur), "Туда"], [hm(r.durationRet || 0), "Обратно"], [`${query.adults || 1} пасс.`, "Эконом"], [r.transfers ? `${r.transfers}` : "0", "Пересадки"]]
+          : [[rub(r.total), "Билеты"], [hm(dur), "Туда"], [`${query.adults || 1} пасс.`, "Эконом"], [r.transfers ? `${r.transfers}` : "0", "Пересадки"]]
+        ).map(([a, b], i) => (<div key={i} style={{ textAlign: "center" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: r.roundTrip ? 12 : 13.5 }}>{a}</div><div style={{ fontSize: r.roundTrip ? 9.5 : 10.5, color: T.subd, marginTop: 2 }}>{b}</div></div>))}
       </div>
     </div>
     <div style={{ padding: "12px 20px 0" }}>
@@ -372,9 +401,9 @@ function Detail({ r, query, onBack, liked, onLike, onShare, goHotels }) {
               {s.mode === "ferry" ? <Badge label="паром" color={T.cyan} /> : (r.segments.length === 1 && (s.transfers || 0) === 0 ? <Badge label="Прямой рейс" color={T.green} /> : (r.segments.length === 1 ? null : <Badge label={`Рейс ${i + 1}`} color={T.violet} />))}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{s.departHM || timeOf(s.departISO)}</div><div style={{ fontSize: 11, color: T.subd }}>{s.fromCode}</div></div>
+              <div><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{depOf(s)}</div><div style={{ fontSize: 11, color: T.subd }}>{s.fromCode}</div></div>
               <div style={{ flex: 1, textAlign: "center", fontSize: 10.5, color: T.subd }}>{hm(s.durationMin || 0)}<div style={{ height: 1, background: T.line, margin: "5px 0" }} />{(s.transfers || 0) > 0 ? `${s.transfers} ${s.transfers === 1 ? "пересадка" : "пересадки"}` : "прямой"}</div>
-              <div style={{ textAlign: "right" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{s.arriveHM || "—"}</div><div style={{ fontSize: 11, color: T.subd }}>{s.toCode}</div></div>
+              <div style={{ textAlign: "right" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{arrOf(s)}</div><div style={{ fontSize: 11, color: T.subd }}>{s.toCode}</div></div>
               <a href={s.deepLink || (r.bookingLinks && r.bookingLinks[i] && r.bookingLinks[i].url) || "#"} target="_blank" rel="noreferrer" className="press" style={{ textDecoration: "none" }}><div style={{ background: GRAD.cta, borderRadius: 12, padding: "8px 12px", color: "#fff", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap" }}>{rub(s.priceLive || s.priceEstimate)}</div></a>
             </div>
           </div>
@@ -587,7 +616,7 @@ export default function App() {
   const [sheet, setSheet] = useState(false);
   const [traveler, setTraveler] = useState(false);
   const [editName, setEditName] = useState(false);
-  const [name, setName] = useState("Даниил");
+  const [name, setName] = useState("TripWise tester");
   const [inset, setInset] = useState({ top: 0, bottomStr: "env(safe-area-inset-bottom)" });
   const safeTop = inset.top;
   const [toast, setToastRaw] = useState(null);
@@ -627,13 +656,8 @@ export default function App() {
   const [routes, setRoutes] = useState([]); const [loading, setLoading] = useState(false); const [selected, setSelected] = useState(null);
   const [searchError, setSearchError] = useState(false);
 
-  const [saved, setSaved] = useState([
-    { id: "s-bali", name: "Москва — Бали", dates: "12 окт — 26 окт", price: 45230, emoji: "🏝", route: MOCK_ROUTES[0], query: { origin: "Москва", destName: "Бали", adults: 1, datesLabel: "12 окт — 26 окт" } },
-    { id: "s-tokyo", name: "Санкт-Петербург — Токио", dates: "1 ноя — 14 ноя", price: 52840, emoji: "🗼", route: MOCK_ROUTES[2], query: { origin: "Санкт-Петербург", destName: "Токио", adults: 1, datesLabel: "1 ноя — 14 ноя" } },
-    { id: "s-cape", name: "Москва — Кейптаун", dates: "2 дек — 16 дек", price: 48910, emoji: "🦁", route: MOCK_ROUTES[1], query: { origin: "Москва", destName: "Кейптаун", adults: 1, datesLabel: "2 дек — 16 дек" } },
-    { id: "s-x1", name: "Москва — Пхукет", dates: "5 янв — 19 янв", price: 51200, emoji: "🏖", route: MOCK_ROUTES[0], query: { origin: "Москва", destName: "Пхукет", adults: 1, datesLabel: "5 янв — 19 янв" } },
-    { id: "s-x2", name: "Москва — Мальдивы", dates: "10 фев — 20 фев", price: 63400, emoji: "🐠", route: MOCK_ROUTES[1], query: { origin: "Москва", destName: "Мальдивы", adults: 1, datesLabel: "10 фев — 20 фев" } },
-  ]);
+  const [saved, setSaved] = useState(() => { try { const s = localStorage.getItem("tw_saved"); return s ? JSON.parse(s) : []; } catch (e) { return []; } });
+  useEffect(() => { try { localStorage.setItem("tw_saved", JSON.stringify(saved)); } catch (e) { } }, [saved]);
   const [recent, setRecent] = useState([
     { name: "Москва — Самуи", dates: "12 окт — 26 окт", form: { origin: AIRPORTS.find(a => a.code === "MOW"), dest: byDest("samui"), round: true, dep: new Date(2026, 9, 12), ret: new Date(2026, 9, 26), adults: 1 } },
   ]);
@@ -702,7 +726,7 @@ export default function App() {
     `}</style>
     <div className="app-root" style={{ width: "100%", maxWidth: 420, paddingTop: safeTop, background: `radial-gradient(120% 60% at 80% 0%, #1a1340 0%, ${T.bg} 55%)`, color: T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", paddingTop: 45 }}>{main}</div>
-      <BottomNav tab={tab} setTab={setTab} bottomStr={inset.bottomStr} />
+      <BottomNav tab={tab} setTab={(k) => { if (k === tab && (k === "routes" || k === "profile" || k === "hotels")) setStack([]); if (k === "routes" && tab === "routes") setStack([]); setTab(k); }} bottomStr={inset.bottomStr} />
       {sheet && <SearchSheet form={form} setForm={setForm} onClose={() => setSheet(false)} onSubmit={() => runSearch()} setToast={setToast} />}
       {traveler && <Traveler safeTop={safeTop} bottomStr={inset.bottomStr} onBack={() => setTraveler(false)} />}
       {editName && <NameEdit name={name} onClose={() => setEditName(false)} onSave={(n) => { setName(n); setEditName(false); setToast("Имя сохранено"); }} />}
