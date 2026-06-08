@@ -579,8 +579,9 @@ function RoutesScreen({ onPickDest, onSearch, saved, onUnlike, onOpenSaved, rece
 const SERVICES = [
   { id: "yandex", name: "Яндекс Путешествия", desc: "Отели по всему миру", grad: GRAD.ocean, url: "https://travel.yandex.ru",
     promos: [
-      { header: "Скидка на первое бронирование отеля", code: "TRIPWISE20", discountRub: 5000, endDate: "2026-12-31" },
-      { header: "Кэшбэк баллами на популярные направления", code: "YANDEX1500", discountRub: 1500, endDate: "2026-09-30" },
+      { header: "Скидка 5000 ₽ на бронирование от 50 000₽", code: "NETSIL20", discountRub: 5000, endDate: "2026-06-30" },
+      { header: "Скидка 3000 ₽ на бронирование от 30 000₽", code: "ETO-FACT", discountRub: 3000, endDate: "2026-06-30" },
+      { header: "Скидка 10%, но не более 1500₽ на отели Чувашии", code: "CHVSH", discountRub: 1500, endDate: "2026-07-31" },
     ] },
   { id: "ostrovok", name: "Островок", desc: "Кэшбэк на бронирования", grad: GRAD.sunset, url: "https://ostrovok.ru",
     promos: [
