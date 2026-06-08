@@ -300,7 +300,17 @@ function Home({ onSearch, onPickDest, goProfile }) {
     <div style={{ padding: "8px 20px 0" }}>
       <div style={{ display: "flex", gap: 12 }}>
         <div style={{ flex: 1 }}><h1 style={{ fontFamily: "Sora,sans-serif", fontSize: 30, lineHeight: 1.08, margin: 0, fontWeight: 800, color: T.text }}>Куда<br />хочется<br /><span style={{ background: "linear-gradient(90deg,#48dcdc,#7c5cff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>отправиться?</span></h1><p style={{ color: T.sub, fontSize: 13, marginTop: 12, lineHeight: 1.4 }}>Найдём лучшие маршруты,<br />о которых вы не знали</p></div>
-        <Porthole grad={GRAD.hero} h={170} style={{ width: 130, borderRadius: 22 }} />
+<div
+  style={{
+    width: 130,
+    height: 170,
+    borderRadius: 22,
+    overflow: "hidden",
+    backgroundImage: "url('/graphics/main.png')",
+    backgroundSize: "cover",
+    backgroundPosition: "center"
+  }}
+/>
       </div>
     </div>
     <div style={{ padding: "18px 30px 0" }}>
