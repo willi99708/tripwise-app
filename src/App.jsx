@@ -297,7 +297,7 @@ function Home({ onSearch, onPickDest, goProfile }) {
   const ideas = [["Бали", "через Сингапур", "20–40%", "/graphics/bali.png", "SIN", "bali"], ["Токио", "через Сеул", "30–50%", "/graphics/tokyo.png", "ICN", "tokyo"], ["Мальдивы", "через Дубай", "25–45%", "/graphics/male.png", "DXB", "maldives"], ["Пхукет", "через Куала-Лумпур", "20–40%", "/graphics/phuket.png", "KUL", "phuket"]];
   return <div style={{ paddingBottom: 16, animation: "fadeUp .3s ease" }}>
     <Header />
-    <div style={{ padding: "8px 20px 0" }}>
+    <div style={{ padding: "8px 32px 0" }}>
       <div style={{ display: "flex", gap: 12 }}>
         <div style={{ flex: 1 }}><h1 style={{ fontFamily: "Sora,sans-serif", fontSize: 30, lineHeight: 1.08, margin: 0, fontWeight: 800, color: T.text }}>Куда<br />хочется<br /><span style={{ background: "linear-gradient(90deg,#48dcdc,#7c5cff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>отправиться?</span></h1><p style={{ color: T.sub, fontSize: 13, marginTop: 12, lineHeight: 1.4 }}>Найдём лучшие маршруты,<br />о которых вы не знали</p></div>
 <div
