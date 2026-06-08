@@ -14,6 +14,10 @@ const T = {
   text: "#f4f5ff", sub: "#9aa0c4", subd: "#6b7099",
   violet: "#7c5cff", cyan: "#48dcdc", green: "#39d98a", gold: "#f5c451", pink: "#ff6db0",
 };
+/* ФОТО-ЗАГЛУШКИ: все «фото» (иллюминаторы, идеи, отели, hero) — это CSS-градиенты ниже.
+   Чтобы заменить на реальные фото: в компоненте Porthole вместо `background: grad`
+   подставь `backgroundImage: url("ссылка-на-фото"), backgroundSize:"cover"`.
+   Места с фото помечены в коде словом Porthole. */
 const GRAD = {
   hero: "linear-gradient(135deg,#3a1d6e,#7c3a9e 40%,#f0863a 78%,#ffd16b)",
   ocean: "linear-gradient(135deg,#0f3b5e,#1b7a8c,#3fe0c0)", city: "linear-gradient(135deg,#2a1b4e,#7a3a9e,#ff7db0)",
@@ -121,6 +125,7 @@ const I = {
 };
 
 function Porthole({ grad = GRAD.sunset, h = 150, label, sub, codeRight, style }) {
+  /* ФОТО-ЗАГЛУШКА: замените `background: grad` ниже на backgroundImage:url(...) для реальных фото */
   return <div style={{ position: "relative", borderRadius: 18, overflow: "hidden", height: h, background: grad, boxShadow: "inset 0 0 40px rgba(0,0,0,.35), inset 0 0 0 3px rgba(255,255,255,.08)", ...style }}>
     <div style={{ position: "absolute", inset: 0, background: "radial-gradient(120% 80% at 70% 20%, rgba(255,255,255,.25), transparent 60%)" }} />
     <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "55%", background: "linear-gradient(transparent, rgba(5,5,20,.85))" }} />
@@ -133,8 +138,8 @@ function Btn({ children, onClick, grad = GRAD.cta, style }) { return <button onC
 function Logo() { return <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.text, letterSpacing: .2 }}>TripWise<span style={{ color: T.violet }}>AI</span></div>; }
 function Header({ onBack, title, subtitle }) {
   return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px 8px", position: "relative", minHeight: 30 }}>
-    {onBack && <div onClick={onBack} className="press" style={{ position: "absolute", left: 20, top: 16, transform: "translate(127px, 59px)", zIndex: 5, cursor: "pointer" }}><Icon d={I.back} size={22} color={T.text} /></div>}
-    <div style={{ transform: "translateY(-25px)" }}>{title ? <div style={{ textAlign: "center", maxWidth: 240 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>{subtitle && <div style={{ fontSize: 11, color: T.subd, marginTop: 2 }}>{subtitle}</div>}</div> : <Logo />}</div>
+    {onBack && <div onClick={onBack} className="press" style={{ position: "absolute", left: 20, top: 16, transform: "translateY(20px)", zIndex: 5, cursor: "pointer" }}><Icon d={I.back} size={22} color={T.text} /></div>}
+    <div style={{ transform: title ? "translateY(-5px)" : "translateY(-20px)" }}>{title ? <div style={{ textAlign: "center", maxWidth: 240 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>{subtitle && <div style={{ fontSize: 11, color: T.subd, marginTop: 2 }}>{subtitle}</div>}</div> : <Logo />}</div>
   </div>;
 }
 function BottomNav({ tab, setTab, bottomStr = "0px" }) {
@@ -263,16 +268,16 @@ function Home({ onSearch, onPickDest, goProfile }) {
         <div style={{ width: 38, height: 38, borderRadius: 12, background: GRAD.cta, display: "grid", placeItems: "center" }}><Icon d={I.spark} size={18} color="#fff" /></div>
       </div>
     </div>
-    <div style={{ padding: "16px 20px 0", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
+    <div style={{ padding: "21px 20px 0", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
       {adv.map(([t, s, g, ic]) => (<div key={t} style={{ textAlign: "center" }}><div style={{ height: 52, borderRadius: 14, background: g, display: "grid", placeItems: "center", marginBottom: 6 }}><Icon d={ic} size={20} color="#fff" /></div><div style={{ fontSize: 10.5, color: T.text, fontWeight: 700, lineHeight: 1.15 }}>{t}</div><div style={{ fontSize: 9.5, color: T.subd, marginTop: 2 }}>{s}</div></div>))}
     </div>
     <div style={{ padding: "22px 0 0 20px" }}>
       <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 17, marginBottom: 12 }}>Идеи для путешествий ✨</div>
       <div className="carousel" style={{ display: "flex", gap: 12, overflowX: "auto", paddingRight: 20, paddingBottom: 4, scrollSnapType: "x mandatory" }}>
-        {ideas.map(([name, via, save, g, code, id]) => (<div key={name} onClick={() => onPickDest(id)} className="press" style={{ minWidth: 160, cursor: "pointer", scrollSnapAlign: "start" }}><Porthole grad={g} h={120} label={name} sub={via} codeRight={"→ " + code} style={{ borderRadius: 16 }} /><div style={{ marginTop: 8, fontSize: 11, color: T.subd }}>Скидка</div><div style={{ fontSize: 15, fontWeight: 800, color: T.green, fontFamily: "Sora,sans-serif" }}>{save}</div></div>))}
+        {ideas.map(([name, via, save, g, code, id]) => (<div key={name} onClick={() => onPickDest(id)} className="press" style={{ minWidth: 160, cursor: "pointer", scrollSnapAlign: "start" }}><Porthole grad={g} h={110} label={name} sub={via} codeRight={"→ " + code} style={{ borderRadius: 16 }} /><div style={{ marginTop: 8, fontSize: 11, color: T.subd }}>Скидка</div><div style={{ fontSize: 15, fontWeight: 800, color: T.green, fontFamily: "Sora,sans-serif" }}>{save}</div></div>))}
       </div>
     </div>
-    <div style={{ padding: "20px 20px 0" }}>
+    <div style={{ padding: "15px 20px 0" }}>
       <div onClick={goProfile} className="press" style={{ display: "flex", alignItems: "center", gap: 14, background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, padding: 16, cursor: "pointer" }}>
         <div style={{ flex: 1 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>Бизнес-залы, eSIM и страховка</div><div style={{ color: T.subd, fontSize: 12, marginTop: 4 }}>Всё для комфортной поездки</div></div>
         <div style={{ width: 42, height: 42, borderRadius: 12, background: GRAD.cta, display: "grid", placeItems: "center" }}><Icon d={I.arrow} size={18} color="#fff" /></div>
@@ -310,12 +315,12 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
     </div>
   </div>;
 }
-function Results({ query, routes, loading, error, onRetry, onBack, onOpen, isLiked, onLike }) {
+function Results({ query, routes, loading, error, onRetry, onBack, onEdit, onOpen, isLiked, onLike }) {
   return <div style={{ animation: "slideIn .28s ease" }}>
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 8px" }}>
-      <div onClick={onBack} className="press" style={{ cursor: "pointer", transform: "translate(127px, 59px)", zIndex: 5 }}><Icon d={I.back} size={22} color={T.text} /></div>
-      <div style={{ textAlign: "center", transform: "translateY(-25px)" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>{query.origin} → {query.destName}</div><div style={{ fontSize: 11, color: T.subd }}>{query.datesLabel}</div></div>
-      <span onClick={onBack} className="press" style={{ color: T.violet, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Изменить</span>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 8px", position: "relative" }}>
+      <div onClick={onBack} className="press" style={{ cursor: "pointer", transform: "translateY(20px)", zIndex: 5 }}><Icon d={I.back} size={22} color={T.text} /></div>
+      <div style={{ position: "absolute", left: 0, right: 0, textAlign: "center", transform: "translateY(20px)", pointerEvents: "none" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>{query.origin} → {query.destName}</div><div style={{ fontSize: 11, color: T.subd }}>{query.datesLabel}</div></div>
+      <span onClick={onBack} className="press" style={{ color: T.violet, fontSize: 13, fontWeight: 700, cursor: "pointer", transform: "translateY(20px)", zIndex: 5 }}>Изменить</span>
     </div>
     {error ? <div style={{ textAlign: "center", padding: "40px 20px" }}><div style={{ fontSize: 15, color: T.text, fontWeight: 700 }}>Не удалось загрузить данные</div><div style={{ fontSize: 13, marginTop: 6, marginBottom: 16, color: T.subd }}>Проверьте соединение и попробуйте ещё раз</div><Btn onClick={onRetry}>Повторить</Btn></div> : <>
     <div style={{ padding: "4px 20px 0" }}>
@@ -323,11 +328,11 @@ function Results({ query, routes, loading, error, onRetry, onBack, onOpen, isLik
       <div style={{ color: T.subd, fontSize: 12.5, marginTop: 4 }}>Показываем только лучшее — не сотни билетов.</div>
     </div>
     <div style={{ padding: "16px 20px 8px", display: "flex", flexDirection: "column", gap: 14 }}>
-      {loading ? [0, 1, 2].map(i => <Skeleton key={i} />) : (routes.length ? routes.map((r, i) => <RouteCard key={r.id} r={r} i={i} liked={isLiked(r)} onLike={onLike} onOpen={() => onOpen(r)} />) : <Empty onBack={onBack} />)}
+      {loading ? [0, 1, 2].map(i => <Skeleton key={i} />) : (routes.length ? routes.map((r, i) => <RouteCard key={r.id} r={r} i={i} liked={isLiked(r)} onLike={onLike} onOpen={() => onOpen(r)} />) : <Empty onEdit={onEdit} />)}
     </div></>}
   </div>;
 }
-function Empty({ onBack }) { return <div style={{ textAlign: "center", padding: "40px 20px" }}><div style={{ fontSize: 15, color: T.text, fontWeight: 700 }}>Ничего не найдено</div><div style={{ fontSize: 13, marginTop: 6, marginBottom: 16, color: T.subd }}>Попробуйте изменить параметры</div><Btn onClick={onBack}>Изменить параметры поиска</Btn></div>; }
+function Empty({ onEdit }) { return <div style={{ textAlign: "center", padding: "40px 20px" }}><div style={{ fontSize: 15, color: T.text, fontWeight: 700 }}>Ничего не найдено</div><div style={{ fontSize: 13, marginTop: 6, marginBottom: 16, color: T.subd }}>Попробуйте изменить параметры</div><Btn onClick={onEdit}>Изменить параметры поиска</Btn></div>; }
 
 /* ================================ Детали ================================ */
 function AirlineLogo({ code }) { const colors = ["#7c5cff", "#48dcdc", "#39d98a", "#f5c451", "#ff6db0", "#f59640"]; const c = colors[(code || "X").charCodeAt(0) % colors.length]; return <div style={{ width: 30, height: 30, borderRadius: 8, background: c + "26", border: `1px solid ${c}55`, display: "grid", placeItems: "center", color: c, fontWeight: 800, fontSize: 11, fontFamily: "Sora,sans-serif" }}>{(code || "✈").slice(0, 2)}</div>; }
@@ -367,9 +372,9 @@ function Detail({ r, query, onBack, liked, onLike, onShare, goHotels }) {
               {s.mode === "ferry" ? <Badge label="паром" color={T.cyan} /> : (r.segments.length === 1 && (s.transfers || 0) === 0 ? <Badge label="Прямой рейс" color={T.green} /> : (r.segments.length === 1 ? null : <Badge label={`Рейс ${i + 1}`} color={T.violet} />))}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{timeOf(s.departISO)}</div><div style={{ fontSize: 11, color: T.subd }}>{s.fromCode}</div></div>
+              <div><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{s.departHM || timeOf(s.departISO)}</div><div style={{ fontSize: 11, color: T.subd }}>{s.fromCode}</div></div>
               <div style={{ flex: 1, textAlign: "center", fontSize: 10.5, color: T.subd }}>{hm(s.durationMin || 0)}<div style={{ height: 1, background: T.line, margin: "5px 0" }} />{(s.transfers || 0) > 0 ? `${s.transfers} ${s.transfers === 1 ? "пересадка" : "пересадки"}` : "прямой"}</div>
-              <div style={{ textAlign: "right" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{s.toCode}</div></div>
+              <div style={{ textAlign: "right" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{s.arriveHM || "—"}</div><div style={{ fontSize: 11, color: T.subd }}>{s.toCode}</div></div>
               <a href={s.deepLink || (r.bookingLinks && r.bookingLinks[i] && r.bookingLinks[i].url) || "#"} target="_blank" rel="noreferrer" className="press" style={{ textDecoration: "none" }}><div style={{ background: GRAD.cta, borderRadius: 12, padding: "8px 12px", color: "#fff", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap" }}>{rub(s.priceLive || s.priceEstimate)}</div></a>
             </div>
           </div>
@@ -506,27 +511,71 @@ function RoutesScreen({ onPickDest, onSearch, saved, onUnlike, onOpenSaved, rece
 }
 
 /* ================================ Отели ================================= */
+/*
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  КАК ДОБАВЛЯТЬ ПРОМОКОДЫ (заглушка под ручное заполнение)              ║
+  ║  Каждый сервис = объект с массивом promos. Новый промокод — новый      ║
+  ║  объект в массив promos этого сервиса:                                 ║
+  ║    {                                                                   ║
+  ║      header: "Одно предложение — заголовок над кодом",                 ║
+  ║      code: "PROMO2026",          // сам промокод                       ║
+  ║      discountRub: 5000,          // скидка в рублях (для сортировки)    ║
+  ║      endDate: "2026-12-31",      // действует до этой даты (вкл.)       ║
+  ║    }                                                                   ║
+  ║  Показываются только НЕистёкшие (endDate >= сегодня), сортируются по    ║
+  ║  discountRub по убыванию. Чтобы добавить новый СЕРВИС — новый объект    ║
+  ║  в массив SERVICES.                                                    ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+*/
+const SERVICES = [
+  { id: "yandex", name: "Яндекс Путешествия", desc: "Отели по всему миру", grad: GRAD.ocean, url: "https://travel.yandex.ru",
+    promos: [
+      { header: "Скидка на первое бронирование отеля", code: "TRIPWISE20", discountRub: 5000, endDate: "2026-12-31" },
+      { header: "Кэшбэк баллами на популярные направления", code: "YANDEX1500", discountRub: 1500, endDate: "2026-09-30" },
+    ] },
+  { id: "ostrovok", name: "Островок", desc: "Кэшбэк на бронирования", grad: GRAD.sunset, url: "https://ostrovok.ru",
+    promos: [
+      { header: "Скидка на отели в Азии", code: "OSTROVOK15", discountRub: 3000, endDate: "2026-11-15" },
+    ] },
+  { id: "bali", name: "Bali Resorts", desc: "Спецпредложение на виллы", grad: GRAD.city, url: "https://example.com",
+    promos: [
+      { header: "Скидка на виллы с бассейном", code: "BALI25", discountRub: 8000, endDate: "2026-10-01" },
+      // пример истёкшего — НЕ покажется: { header:"Старая акция", code:"OLD", discountRub:9999, endDate:"2025-01-01" },
+    ] },
+];
 function Hotels({ setToast }) {
-  const promos = [["Яндекс Путешествия", "Скидка на отели по всему миру", "20%", GRAD.ocean, "TRIPWISE20"], ["Островок", "Кэшбэк на бронирования", "15%", GRAD.sunset, "OSTROVOK15"], ["Bali Resorts", "Спецпредложение на виллы", "25%", GRAD.city, "BALI25"]];
-  const [popup, setPopup] = useState(null);
+  const [svc, setSvc] = useState(null);
+  const today = new Date().toISOString().slice(0, 10);
   const copy = async (code) => { try { await navigator.clipboard.writeText(code); setToast("Промокод скопирован"); } catch (e) { setToast("Не удалось скопировать"); } };
+  const activePromos = (s) => (s.promos || []).filter(p => p.endDate >= today).sort((a, b) => b.discountRub - a.discountRub);
   return <div style={{ animation: "fadeUp .3s ease" }}>
     <Header />
     <div style={{ padding: "8px 20px 0" }}>
       <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 20, color: T.text }}>Промокоды на отели</div>
-      <div style={{ color: T.subd, fontSize: 12.5, marginTop: 4, marginBottom: 16 }}>Каталог активных скидок — переходи и бронируй выгодно.</div>
+      <div style={{ color: T.subd, fontSize: 12.5, marginTop: 4, marginBottom: 16 }}>Выберите сервис — внутри активные промокоды.</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {promos.map((p, i) => (<div key={p[0]} onClick={() => setPopup(p)} className="press card-in" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, overflow: "hidden", cursor: "pointer", animationDelay: `${i * 70}ms` }}><Porthole grad={p[3]} h={110} style={{ borderRadius: 0 }} /><div style={{ padding: 14, display: "flex", alignItems: "center", gap: 12 }}><div style={{ flex: 1 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>{p[0]}</div><div style={{ fontSize: 12, color: T.subd }}>{p[1]}</div></div><Badge label={`−${p[2]}`} color={T.green} /></div></div>))}
+        {SERVICES.map((s, i) => { const n = activePromos(s).length; return (
+          <div key={s.id} onClick={() => setSvc(s)} className="press card-in" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, overflow: "hidden", cursor: "pointer", animationDelay: `${i * 70}ms` }}>
+            <Porthole grad={s.grad} h={110} style={{ borderRadius: 0 }} />
+            <div style={{ padding: 14, display: "flex", alignItems: "center", gap: 12 }}><div style={{ flex: 1 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>{s.name}</div><div style={{ fontSize: 12, color: T.subd }}>{s.desc}</div></div><Badge label={n ? `${n} промо` : "скоро"} color={n ? T.green : T.subd} /></div>
+          </div>); })}
       </div>
     </div>
-    {popup && <Overlay onClose={() => setPopup(null)}>
-      <SheetHead title={popup[0]} onClose={() => setPopup(null)} />
-      <div style={{ color: T.subd, fontSize: 13, marginTop: -6, marginBottom: 16 }}>{popup[1]}</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px dashed ${T.violet}`, borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
-        <span style={{ flex: 1, fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.violet, letterSpacing: 1 }}>{popup[4]}</span>
-        <div onClick={() => copy(popup[4])} className="press" style={{ cursor: "pointer", padding: 6, borderRadius: 8, background: T.violet + "22" }}><Icon d={I.copy} size={18} color={T.violet} /></div>
+    {svc && <Overlay onClose={() => setSvc(null)}>
+      <SheetHead title={svc.name} onClose={() => setSvc(null)} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 16, maxHeight: 380, overflowY: "auto" }}>
+        {activePromos(svc).length ? activePromos(svc).map((p) => (
+          <div key={p.code}>
+            <div style={{ fontSize: 13, color: T.text, fontWeight: 600, marginBottom: 8 }}>{p.header}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px dashed ${T.violet}`, borderRadius: 12, padding: "14px 16px" }}>
+              <span style={{ flex: 1, fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.violet, letterSpacing: 1 }}>{p.code}</span>
+              <div onClick={() => copy(p.code)} className="press" style={{ cursor: "pointer", padding: 6, borderRadius: 8, background: T.violet + "22" }}><Icon d={I.copy} size={18} color={T.violet} /></div>
+            </div>
+            <div style={{ fontSize: 11, color: T.subd, marginTop: 4 }}>Скидка до {rub(p.discountRub)} · действует до {p.endDate}</div>
+          </div>
+        )) : <div style={{ color: T.subd, fontSize: 13, textAlign: "center", padding: 12 }}>Активных промокодов пока нет</div>}
       </div>
-      <Btn onClick={() => setToast("Открываем Яндекс Путешествия…")}>Перейти в Яндекс Путешествия</Btn>
+      <div style={{ marginTop: 16 }}><Btn onClick={() => { try { window.open(svc.url, "_blank"); } catch (e) { } setToast(`Открываем ${svc.name}…`); }}>Перейти в {svc.name}</Btn></div>
     </Overlay>}
   </div>;
 }
@@ -626,7 +675,7 @@ export default function App() {
   let main = null;
   if (tab === "routes") {
     if (top === "detail") main = <Detail r={selected} query={query} onBack={() => setStack(["results"])} liked={isLiked(selected)} onLike={likeRoute} onShare={shareRoute} goHotels={() => setTab("hotels")} />;
-    else if (top === "results") main = <Results query={query} routes={routes} loading={loading} error={searchError} onRetry={() => runSearch()} onBack={() => setStack([])} onOpen={(r) => { setSelected(r); setStack(["results", "detail"]); }} isLiked={isLiked} onLike={likeRoute} />;
+    else if (top === "results") main = <Results query={query} routes={routes} loading={loading} error={searchError} onRetry={() => runSearch()} onEdit={() => { setTab("home"); setSheet(true); }} onBack={() => setStack([])} onOpen={(r) => { setSelected(r); setStack(["results", "detail"]); }} isLiked={isLiked} onLike={likeRoute} />;
     else main = <RoutesScreen onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved(p => p.filter(x => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => { setForm(s.form); runSearch(s.form); }} />;
   } else if (tab === "home") main = <Home onSearch={() => setSheet(true)} onPickDest={openSheetWithDest} goProfile={() => setTab("profile")} />;
   else if (tab === "hotels") main = <Hotels setToast={setToast} />;
