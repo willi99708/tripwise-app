@@ -165,9 +165,9 @@ const I = {
   shield: <><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" /></>, search: <><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></>,
 };
 
-function Porthole({ grad = GRAD.sunset, h = 150, label, sub, codeRight, style }) {
+function Porthole({ grad = GRAD.sunset, image, h = 150, label, sub, codeRight, style }) {
   /* ФОТО-ЗАГЛУШКА: замените `background: grad` ниже на backgroundImage:url(...) для реальных фото */
-  return <div style={{ position: "relative", borderRadius: 18, overflow: "hidden", height: h, background: grad, boxShadow: "inset 0 0 40px rgba(0,0,0,.35), inset 0 0 0 3px rgba(255,255,255,.08)", ...style }}>
+  return <div style={{ position: "relative", borderRadius: 18, overflow: "hidden", height: h, background: image ? undefined : grad, backgroundImage: image ? `url(${image})` : undefined, backgroundSize: "cover", backgroundPosition: "center", boxShadow: "inset 0 0 40px rgba(0,0,0,.35), inset 0 0 0 3px rgba(255,255,255,.08)", ...style }}>
     <div style={{ position: "absolute", inset: 0, background: "radial-gradient(120% 80% at 70% 20%, rgba(255,255,255,.25), transparent 60%)" }} />
     <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "55%", background: "linear-gradient(transparent, rgba(5,5,20,.85))" }} />
     {label && <div style={{ position: "absolute", left: 12, bottom: 10 }}><div style={{ color: "#fff", fontWeight: 700, fontSize: 15, fontFamily: "Sora,sans-serif" }}>{label}</div>{sub && <div style={{ color: "rgba(255,255,255,.8)", fontSize: 12 }}>{sub}</div>}</div>}
@@ -294,7 +294,7 @@ function SearchSheet({ form, setForm, onClose, onSubmit, setToast }) {
 /* ================================ Главная =============================== */
 function Home({ onSearch, onPickDest, goProfile }) {
   const adv = [["Умные маршруты", "Экономим до 20%", GRAD.violet, I.spark], ["StopOver-маршруты", "Ещё одна страна бесплатно", GRAD.night, I.moon], ["Промокоды на отели", "Скидки до 20%", GRAD.city, I.hotel], ["Сервисы путешествий", "Залы, eSIM, страховка", GRAD.ocean, I.bag]];
-  const ideas = [["Бали", "через Сингапур", "20–40%", GRAD.ocean, "SIN", "bali"], ["Токио", "через Сеул", "30–50%", GRAD.city, "ICN", "tokyo"], ["Мальдивы", "через Дубай", "25–45%", GRAD.sunset, "DXB", "maldives"], ["Пхукет", "через Куала-Лумпур", "20–40%", GRAD.night, "KUL", "phuket"]];
+  const ideas = [["Бали", "через Сингапур", "20–40%", "/graphics/bali.png", "SIN", "bali"], ["Токио", "через Сеул", "30–50%", "/graphics/tokyo.png", "ICN", "tokyo"], ["Мальдивы", "через Дубай", "25–45%", "/graphics/male.png", "DXB", "maldives"], ["Пхукет", "через Куала-Лумпур", "20–40%", "/graphics/phuket.png", "KUL", "phuket"]];
   return <div style={{ paddingBottom: 16, animation: "fadeUp .3s ease" }}>
     <Header />
     <div style={{ padding: "8px 20px 0" }}>
@@ -326,7 +326,7 @@ function Home({ onSearch, onPickDest, goProfile }) {
     <div style={{ padding: "22px 0 0 20px" }}>
       <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 17, marginBottom: 12 }}>Идеи для путешествий ✨</div>
       <div className="carousel" style={{ display: "flex", gap: 12, overflowX: "auto", paddingRight: 20, paddingBottom: 4, scrollSnapType: "x mandatory" }}>
-        {ideas.map(([name, via, save, g, code, id]) => (<div key={name} onClick={() => onPickDest(id)} className="press" style={{ minWidth: 160, cursor: "pointer", scrollSnapAlign: "start" }}><Porthole grad={g} h={110} label={name} sub={via} codeRight={"→ " + code} style={{ borderRadius: 16 }} /><div style={{ marginTop: 8, fontSize: 11, color: T.subd }}>Скидка</div><div style={{ fontSize: 15, fontWeight: 800, color: T.green, fontFamily: "Sora,sans-serif" }}>{save}</div></div>))}
+        {ideas.map(([name, via, save, g, code, id]) => (<div key={name} onClick={() => onPickDest(id)} className="press" style={{ minWidth: 160, cursor: "pointer", scrollSnapAlign: "start" }}><Porthole image={g} h={110} label={name} sub={via} codeRight={"→ " + code} style={{ borderRadius: 16 }} /><div style={{ marginTop: 8, fontSize: 11, color: T.subd }}>Скидка</div><div style={{ fontSize: 15, fontWeight: 800, color: T.green, fontFamily: "Sora,sans-serif" }}>{save}</div></div>))}
       </div>
     </div>
     <div style={{ padding: "15px 20px 0" }}>
