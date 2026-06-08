@@ -93,7 +93,7 @@ const MON_NOM = ["Январь", "Февраль", "Март", "Апрель", "
 const WD = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 /* Названия авиакомпаний по IATA-коду. Добавить новую — просто новая строка КОД:"Название".
    ЛОГОТИПЫ: см. компонент AirlineLogo ниже — там описано, как подставить картинки логотипов. */
-const AIRLINES = { SU: "Аэрофлот", S7: "S7 Airlines", U6: "Уральские авиалинии", DP: "Победа", UT: "ЮТэйр", N4: "Nordwind", 5N: "Smartavia", WZ: "Red Wings",
+const AIRLINES = { SU: "Аэрофлот", S7: "S7 Airlines", U6: "Уральские авиалинии", DP: "Победа", UT: "ЮТэйр", N4: "Nordwind", "5N": "Smartavia", WZ: "Red Wings",
   TK: "Turkish Airlines", PC: "Pegasus", LH: "Lufthansa", AF: "Air France", KL: "KLM", BA: "British Airways", AY: "Finnair", LX: "Swiss", OS: "Austrian", AZ: "ITA Airways", IB: "Iberia", VY: "Vueling", W6: "Wizz Air", FR: "Ryanair", U2: "easyJet",
   EK: "Emirates", QR: "Qatar Airways", FZ: "flydubai", EY: "Etihad", WY: "Oman Air", GF: "Gulf Air", SV: "Saudia", MS: "EgyptAir", ET: "Ethiopian",
   CA: "Air China", MU: "China Eastern", CZ: "China Southern", CX: "Cathay Pacific", HX: "Hong Kong Airlines", SQ: "Singapore Airlines", TR: "Scoot", MH: "Malaysia Airlines", AK: "AirAsia", D7: "AirAsia X", TG: "Thai Airways", GA: "Garuda", KE: "Korean Air", OZ: "Asiana", JL: "JAL", NH: "ANA",
