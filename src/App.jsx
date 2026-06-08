@@ -302,13 +302,14 @@ function Home({ onSearch, onPickDest, goProfile }) {
         <div style={{ flex: 1 }}><h1 style={{ fontFamily: "Sora,sans-serif", fontSize: 30, lineHeight: 1.08, margin: 0, fontWeight: 800, color: T.text }}>Куда<br />хочется<br /><span style={{ background: "linear-gradient(90deg,#48dcdc,#7c5cff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>отправиться?</span></h1><p style={{ color: T.sub, fontSize: 13, marginTop: 12, lineHeight: 1.4 }}>Найдём лучшие маршруты,<br />о которых вы не знали</p></div>
 <div
   style={{
-    width: 130,
-    height: 170,
+    width: 170,
+    height: 150,
     borderRadius: 22,
     overflow: "hidden",
     backgroundImage: "url('/graphics/main.png')",
-    backgroundSize: "cover",
-    backgroundPosition: "center -13px"
+    backgroundSize: "contain",
+    backgroundPosition: "center center",
+    backgroundRepeat: "no-repeat"
   }}
 />
       </div>
