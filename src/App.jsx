@@ -169,7 +169,7 @@ function Porthole({ grad = GRAD.sunset, image, h = 150, label, sub, codeRight, s
   /* ФОТО-ЗАГЛУШКА: замените `background: grad` ниже на backgroundImage:url(...) для реальных фото */
   return <div style={{ position: "relative", borderRadius: 18, overflow: "hidden", height: h, background: image ? undefined : grad, backgroundImage: image ? `url(${image})` : undefined, backgroundSize: "cover", backgroundPosition: "center", boxShadow: "inset 0 0 40px rgba(0,0,0,.35), inset 0 0 0 3px rgba(255,255,255,.08)", ...style }}>
     <div style={{ position: "absolute", inset: 0, background: "radial-gradient(120% 80% at 70% 20%, rgba(255,255,255,.25), transparent 60%)" }} />
-    <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "55%", background: "linear-gradient(transparent, rgba(5,5,20,.85))" }} />
+    <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "60%", background: "linear-gradient(transparent, rgba(5,5,20,.9))" }} />
     {label && <div style={{ position: "absolute", left: 12, bottom: 10 }}><div style={{ color: "#fff", fontWeight: 700, fontSize: 15, fontFamily: "Sora,sans-serif" }}>{label}</div>{sub && <div style={{ color: "rgba(255,255,255,.8)", fontSize: 12 }}>{sub}</div>}</div>}
     {codeRight && <div style={{ position: "absolute", right: 10, bottom: 10, color: "#fff", fontWeight: 700, fontSize: 12, opacity: .9 }}>{codeRight}</div>}
   </div>;
