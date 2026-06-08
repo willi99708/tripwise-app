@@ -320,7 +320,7 @@ function Home({ onSearch, onPickDest, goProfile }) {
         <div style={{ width: 38, height: 38, borderRadius: 12, background: GRAD.cta, display: "grid", placeItems: "center" }}><Icon d={I.spark} size={18} color="#fff" /></div>
       </div>
     </div>
-    <div style={{ padding: "21px 20px 0", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
+    <div style={{ padding: "21px 32px 0", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
       {adv.map(([t, s, g, ic]) => (<div key={t} style={{ textAlign: "center" }}><div style={{ height: 52, borderRadius: 14, background: g, display: "grid", placeItems: "center", marginBottom: 6 }}><Icon d={ic} size={20} color="#fff" /></div><div style={{ fontSize: 10.5, color: T.text, fontWeight: 700, lineHeight: 1.15 }}>{t}</div><div style={{ fontSize: 9.5, color: T.subd, marginTop: 2 }}>{s}</div></div>))}
     </div>
     <div style={{ padding: "22px 0 0 20px" }}>
