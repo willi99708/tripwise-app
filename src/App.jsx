@@ -31,6 +31,7 @@ const gradFor = (code) => GP[((code || "X").charCodeAt(0) + (code || "X").charCo
 const CUR = { USM: "samui", DPS: "bali", MLE: "maldives", HND: "tokyo", HKT: "phuket" };
 const RAW_AIRPORTS = [
   ["MOW", "Москва", "Россия", "🇷🇺"], ["LED", "Санкт-Петербург", "Россия", "🇷🇺"], ["AER", "Сочи", "Россия", "🇷🇺"],
+  ["MRV", "Минеральные Воды", "Россия", "🇷🇺"], ["AAQ", "Анапа", "Россия", "🇷🇺"], ["GDZ", "Геленджик", "Россия", "🇷🇺"],
   ["SVX", "Екатеринбург", "Россия", "🇷🇺"], ["OVB", "Новосибирск", "Россия", "🇷🇺"], ["KZN", "Казань", "Россия", "🇷🇺"],
   ["KRR", "Краснодар", "Россия", "🇷🇺"], ["VVO", "Владивосток", "Россия", "🇷🇺"], ["KGD", "Калининград", "Россия", "🇷🇺"],
   ["MSQ", "Минск", "Беларусь", "🇧🇾"], ["ALA", "Алматы", "Казахстан", "🇰🇿"], ["NQZ", "Астана", "Казахстан", "🇰🇿"],
@@ -347,7 +348,7 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
   const codesOf = (segs) => (segs || []).map((s, idx) => idx === 0 ? [s.fromCode, s.toCode] : [s.toCode]).flat();
   const outSegs = r.roundTrip ? ((r.outbound && r.outbound.segments) || r.segments.filter(s => s.direction !== "return")) : r.segments;
   const retSegs = r.roundTrip ? ((r.return && r.return.segments) || r.segments.filter(s => s.direction === "return")) : [];
-  const CodeLine = ({ segs, dir }) => { const cs = codesOf(segs); if (!cs.length) return null; return <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>{cs.map((c, idx) => (<React.Fragment key={idx}>{idx > 0 && <svg width="13" height="13" viewBox="0 0 24 24" style={{ transform: `rotate(${dir === "ret" ? 270 : 90}deg)`, flexShrink: 0 }}><path d={I.plane} fill={T.subd} /></svg>}<span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{c}</span></React.Fragment>))}</div>; };
+  const CodeLine = ({ segs, dir }) => { const cs = codesOf(segs); if (!cs.length) return null; const planeIcon = dir === "ret" ? "/graphics/plane_l.png" : "/graphics/plane_r.png"; return <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>{cs.map((c, idx) => (<React.Fragment key={idx}>{idx > 0 && <img src={planeIcon} alt="" style={{ width: 14, height: 14, objectFit: "contain", flexShrink: 0, opacity: 0.8 }} />}<span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{c}</span></React.Fragment>))}</div>; };
   return <div onClick={onOpen} className="press card-in" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 20, padding: 14, cursor: "pointer", animationDelay: `${i * 70}ms` }}>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{(r.picks || [r.badge]).map(p => { const l = LABELS[p]; return l ? <Badge key={p} label={l.t} color={l.c} icon={l.icon} /> : null; })}</div>
@@ -355,7 +356,7 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
     </div>
     <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
       <div style={{ flex: 1 }}>
-        <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, fontSize: 15.5, color: T.text, lineHeight: 1.25 }}>{r.title || (r.stopover ? `Через ${r.stopover.city}` : "Маршрут")}</div>
+        <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, fontSize: 15.5, color: T.text, lineHeight: 1.25 }}>{r.title || (r.stopover ? `Через ${r.stopover.city}` : "План путешествия")}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 10 }}>
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
             <CodeLine segs={outSegs} dir="out" />
@@ -383,7 +384,7 @@ function Results({ query, routes, loading, error, onRetry, onBack, onEdit, onOpe
     </div>
     {error ? <div style={{ textAlign: "center", padding: "40px 20px" }}><div style={{ fontSize: 15, color: T.text, fontWeight: 700 }}>Не удалось загрузить данные</div><div style={{ fontSize: 13, marginTop: 6, marginBottom: 16, color: T.subd }}>Проверьте соединение и попробуйте ещё раз</div><Btn onClick={onRetry}>Повторить</Btn></div> : <>
     <div style={{ padding: "9px 20px 0" }}>
-      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 20, color: T.text }}>Нашли <span style={{ color: T.violet }}>{loading ? "…" : `${routes.length} ${plural(routes.length, "хитрый способ", "хитрых способа", "хитрых способов")}`}</span> добраться</div>
+      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 20, color: T.text }}>{loading ? "Ищем лучшие варианты…" : <>Нашли <span style={{ color: T.violet }}>{routes.length} {plural(routes.length, "хитрый способ", "хитрых способа", "хитрых способов")}</span> добраться</>}</div>
       <div style={{ color: T.subd, fontSize: 12.5, marginTop: 4 }}>Показываем только лучшее — не сотни билетов.</div>
     </div>
     <div style={{ padding: "16px 20px 8px", display: "flex", flexDirection: "column", gap: 14 }}>
@@ -405,16 +406,13 @@ function AirlineLogo({ code }) { const colors = ["#7c5cff", "#48dcdc", "#39d98a"
 function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels }) {
   const dur = legDur(r.segments);
   const segs = r.segments || [];
-  const carriers = [...new Set(segs.map(s => s.airline).filter(Boolean))];
-  const flightNos = segs.map(s => s.flightNumber).filter(Boolean);
-  const multiAir = carriers.length > 1;
   const twoTicketNote = (segs.length === 2 && (r.notes || []).some(n => /раздельны|отдельных билета|два отдельных/i.test(n))) ? "Два отдельных билета" : null;
   return <div style={{ animation: "slideIn .28s ease" }}>
     <Header onBack={onBack} onEdit={onEdit} title={`${query.origin} → ${query.destName}`} subtitle={query.datesLabel} />
     <div style={{ padding: "9px 20px 0" }}>
       <div style={{ position: "relative", borderRadius: 22, overflow: "hidden", height: 150, background: GRAD.sunset, padding: 16, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent,rgba(5,5,20,.7))" }} />
-        <div style={{ position: "relative" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 22, color: "#fff" }}>{r.stopover ? stopLabel(r.stopover) : (r.title || "Маршрут")}</div>{r.stopover && <div style={{ background: "linear-gradient(90deg,#48dcdc,#7c5cff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 800, fontSize: 20, fontFamily: "Sora,sans-serif" }}>почти бесплатно</div>}</div>
+        <div style={{ position: "relative" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 22, color: "#fff" }}>{r.stopover ? stopLabel(r.stopover) : (r.title || "План путешествия")}</div>{r.stopover && <div style={{ background: "linear-gradient(90deg,#48dcdc,#7c5cff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 800, fontSize: 20, fontFamily: "Sora,sans-serif" }}>почти бесплатно</div>}</div>
       </div>
     </div>
     <div style={{ padding: "12px 20px 0", display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -440,10 +438,6 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels }) 
         <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 16 }}>{segs.length > 0 ? "Маршрут по сегментам" : ""}</div>
         {twoTicketNote && <span style={{ fontSize: 11, color: T.cyan, fontWeight: 700 }}>{twoTicketNote}</span>}
       </div>
-      {multiAir && <div style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 12px", marginBottom: 10 }}>
-        <AirlineLogo code={"✈"} />
-        <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{carriers.map(airlineName).join(" + ")}</div>{flightNos.length > 0 && <div style={{ fontSize: 11, color: T.subd }}>{flightNos.join(" + ")}</div>}</div>
-      </div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {r.segments.map((s, i) => (<div key={i}>
           <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 14 }}>
@@ -666,7 +660,7 @@ function Hotels({ setToast }) {
               <span style={{ flex: 1, fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.violet, letterSpacing: 1 }}>{p.code}</span>
               <div onClick={() => copy(p)} className="press" style={{ cursor: "pointer", padding: 6, borderRadius: 8, background: T.violet + "22" }}><Icon d={I.copy} size={18} color={T.violet} /></div>
             </div>
-            <div style={{ fontSize: 11, color: T.subd, marginTop: 4 }}>Скидка до {rub(p.discountRub)} · действует до {p.endDate}{(p.stayFrom && p.stayTo) ? ` · на проживания с ${ddmm(p.stayFrom)} по ${ddmm(p.stayTo)}` : ""}</div>
+            <div style={{ fontSize: 11, color: T.subd, marginTop: 4 }}>Действует до {p.endDate}{(p.stayFrom && p.stayTo) ? ` · на проживания с ${ddmm(p.stayFrom)} по ${ddmm(p.stayTo)}` : ""}</div>
           </div>
         )) : <div style={{ color: T.subd, fontSize: 13, textAlign: "center", padding: 12 }}>Активных промокодов пока нет</div>}
       </div>
