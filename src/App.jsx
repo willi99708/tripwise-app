@@ -98,7 +98,8 @@ const AIRLINES = { SU: "Аэрофлот", S7: "S7 Airlines", U6: "Уральс�
   EK: "Emirates", QR: "Qatar Airways", FZ: "flydubai", EY: "Etihad", WY: "Oman Air", GF: "Gulf Air", SV: "Saudia", MS: "EgyptAir", ET: "Ethiopian",
   CA: "Air China", MU: "China Eastern", CZ: "China Southern", CX: "Cathay Pacific", HX: "Hong Kong Airlines", SQ: "Singapore Airlines", TR: "Scoot", MH: "Malaysia Airlines", AK: "AirAsia", D7: "AirAsia X", TG: "Thai Airways", GA: "Garuda", KE: "Korean Air", OZ: "Asiana", JL: "JAL", NH: "ANA",
   VN: "Vietnam Airlines", VJ: "VietJet", AI: "Air India", "6E": "IndiGo", UL: "SriLankan", PG: "Bangkok Airways",
-  HY: "Uzbekistan Airways", KC: "Air Astana", J2: "AZAL", PS: "МАУ", B2: "Belavia" };
+  HY: "Uzbekistan Airways", KC: "Air Astana", J2: "AZAL", PS: "МАУ", B2: "Belavia",
+  JQ: "Jetstar", QF: "Qantas", VA: "Virgin Australia", NZ: "Air New Zealand", BR: "EVA Air", CI: "China Airlines", PR: "Philippine Airlines", "5J": "Cebu Pacific", ID: "Batik Air", QZ: "AirAsia Indonesia", FD: "Thai AirAsia", SL: "Thai Lion Air", DD: "Nok Air", OD: "Batik Malaysia", "9C": "Spring Airlines", HU: "Hainan Airlines", MF: "Xiamen Air", "3U": "Sichuan Airlines", SC: "Shandong Airlines", G9: "Air Arabia", XY: "flynas", J9: "Jazeera", WF: "Widerøe", DY: "Norwegian", SK: "SAS", A3: "Aegean", RO: "TAROM", JU: "Air Serbia", OK: "Czech Airlines", LO: "LOT", SN: "Brussels Airlines", TP: "TAP Portugal", EW: "Eurowings", HV: "Transavia", DE: "Condor" };
 const airlineName = (c) => AIRLINES[c] || (c ? c : "Авиакомпания");
 
 const MOCK_ROUTES = [
@@ -142,6 +143,13 @@ const dayWord = (n) => { const a = Math.abs(n) % 100, b = a % 10; if (a > 10 && 
 const PREP = { "Куала-Лумпур": "Куала-Лумпуре", "Сингапур": "Сингапуре", "Стамбул": "Стамбуле", "Дубай": "Дубае", "Пекин": "Пекине", "Бангкок": "Бангкоке", "Сеул": "Сеуле", "Доха": "Дохе", "Гонконг": "Гонконге", "Абу-Даби": "Абу-Даби" };
 const prep = (c) => PREP[c] || c;
 const stopLabel = (s) => `${s.nights} ${dayWord(s.nights)} в ${prep(s.city)}`;
+// безопасное хранилище: на Vercel/в Telegram работает, в песочнице — no-op
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("tw_" + k); return v != null ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("tw_" + k, JSON.stringify(v)); } catch (e) { } },
+};
+// склонение существительного: plural(1,'способ','способа','способов')
+const plural = (n, one, few, many) => { const a = Math.abs(n) % 100, b = a % 10; if (a > 10 && a < 20) return many; if (b === 1) return one; if (b >= 2 && b <= 4) return few; return many; };
 
 function Icon({ d, size = 20, color = T.violet }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{d}</svg>; }
 const I = {
@@ -169,10 +177,11 @@ function Porthole({ grad = GRAD.sunset, h = 150, label, sub, codeRight, style })
 function Badge({ label, color = T.violet, icon }) { return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 999, background: color + "22", border: `1px solid ${color}55`, color, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>{icon && <span style={{ fontSize: 11 }}>{icon}</span>}{label}</span>; }
 function Btn({ children, onClick, grad = GRAD.cta, style }) { return <button onClick={onClick} className="press" style={{ border: "none", cursor: "pointer", color: "#fff", fontWeight: 700, fontFamily: "Sora,sans-serif", fontSize: 15, borderRadius: 16, padding: "16px 20px", width: "100%", background: grad, boxShadow: "0 10px 30px -8px rgba(124,92,255,.6)", ...style }}>{children}</button>; }
 function Logo() { return <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.text, letterSpacing: .2 }}>TripWise<span style={{ color: T.violet }}>AI</span></div>; }
-function Header({ onBack, title, subtitle }) {
+function Header({ onBack, title, subtitle, onEdit }) {
   return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px 8px", position: "relative", minHeight: 30 }}>
-    {onBack && <div onClick={onBack} className="press" style={{ position: "absolute", left: 20, top: 16, transform: "translateY(20px)", zIndex: 5, cursor: "pointer" }}><Icon d={I.back} size={22} color={T.text} /></div>}
-    <div style={{ transform: title ? "translateY(-4px)" : "translateY(-15px)" }}>{title ? <div style={{ textAlign: "center", maxWidth: 240 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>{subtitle && <div style={{ fontSize: 11, color: T.subd, marginTop: 2 }}>{subtitle}</div>}</div> : <Logo />}</div>
+    {onBack && <div onClick={onBack} className="press" style={{ position: "absolute", left: 20, top: 16, transform: "translateY(25px)", zIndex: 5, cursor: "pointer" }}><Icon d={I.back} size={22} color={T.text} /></div>}
+    <div style={{ transform: title ? "translateY(-4px)" : "translateY(-10px)" }}>{title ? <div style={{ textAlign: "center", maxWidth: 220 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>{subtitle && <div style={{ fontSize: 11, color: T.subd, marginTop: 2 }}>{subtitle}</div>}</div> : <Logo />}</div>
+    {onEdit && <span onClick={onEdit} className="press" style={{ position: "absolute", right: 20, top: 16, transform: "translateY(25px)", color: T.violet, fontSize: 13, fontWeight: 700, zIndex: 5, cursor: "pointer" }}>Изменить</span>}
   </div>;
 }
 function BottomNav({ tab, setTab, bottomStr = "0px" }) {
@@ -257,10 +266,10 @@ function SearchSheet({ form, setForm, onClose, onSubmit, setToast }) {
   const [picker, setPicker] = useState(null); const [cal, setCal] = useState(false);
   const datesLabel = form.dep ? (form.round && form.ret ? `${fmtShort(form.dep)} — ${fmtShort(form.ret)}` : fmtShort(form.dep)) : "Выберите даты";
   const rows = [
-    ["Откуда", form.origin.city, I.pin, () => setPicker("origin"), true],
-    ["Куда", `${form.dest.city}, ${form.dest.country}`, I.pin, () => setPicker("dest")],
+    ["Откуда", form.origin ? form.origin.city : "Выберите аэропорт", I.pin, () => setPicker("origin"), true],
+    ["Куда", form.dest ? `${form.dest.city}, ${form.dest.country}` : "Выберите направление", I.pin, () => setPicker("dest")],
     ["Когда", datesLabel, I.cal, () => setCal(true), false, form.round ? "Туда и обратно" : "В одну сторону"],
-    ["Пассажиры и класс", `${form.adults} ${form.adults === 1 ? "взрослый" : "взрослых"}, Эконом`, I.user, null],
+    ["Пассажиры и класс", `${form.adults} ${plural(form.adults, "взрослый", "взрослых", "взрослых")}, Эконом`, I.user, null],
   ];
   const valid = form.origin && form.dest && form.dep && (!form.round || form.ret);
   return <>
@@ -357,13 +366,13 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
 function Results({ query, routes, loading, error, onRetry, onBack, onEdit, onOpen, isLiked, onLike }) {
   return <div style={{ animation: "slideIn .28s ease" }}>
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 8px", position: "relative" }}>
-      <div onClick={onBack} className="press" style={{ cursor: "pointer", transform: "translateY(-4px)", zIndex: 5 }}><Icon d={I.back} size={22} color={T.text} /></div>
+      <div onClick={onBack} className="press" style={{ cursor: "pointer", transform: "translateY(1px)", zIndex: 5 }}><Icon d={I.back} size={22} color={T.text} /></div>
       <div style={{ position: "absolute", left: 0, right: 0, textAlign: "center", transform: "translateY(-4px)", pointerEvents: "none" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>{query.origin} → {query.destName}</div><div style={{ fontSize: 11, color: T.subd }}>{query.datesLabel}</div></div>
-      <span onClick={onBack} className="press" style={{ color: T.violet, fontSize: 13, fontWeight: 700, cursor: "pointer", transform: "translateY(-4px)", zIndex: 5 }}>Изменить</span>
+      <span onClick={onEdit} className="press" style={{ color: T.violet, fontSize: 13, fontWeight: 700, cursor: "pointer", transform: "translateY(1px)", zIndex: 5 }}>Изменить</span>
     </div>
     {error ? <div style={{ textAlign: "center", padding: "40px 20px" }}><div style={{ fontSize: 15, color: T.text, fontWeight: 700 }}>Не удалось загрузить данные</div><div style={{ fontSize: 13, marginTop: 6, marginBottom: 16, color: T.subd }}>Проверьте соединение и попробуйте ещё раз</div><Btn onClick={onRetry}>Повторить</Btn></div> : <>
-    <div style={{ padding: "4px 20px 0" }}>
-      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 20, color: T.text }}>Нашли <span style={{ color: T.violet }}>{loading ? "…" : routes.length} хитрых</span> способов добраться</div>
+    <div style={{ padding: "9px 20px 0" }}>
+      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 20, color: T.text }}>Нашли <span style={{ color: T.violet }}>{loading ? "…" : `${routes.length} ${plural(routes.length, "хитрый способ", "хитрых способа", "хитрых способов")}`}</span> добраться</div>
       <div style={{ color: T.subd, fontSize: 12.5, marginTop: 4 }}>Показываем только лучшее — не сотни билетов.</div>
     </div>
     <div style={{ padding: "16px 20px 8px", display: "flex", flexDirection: "column", gap: 14 }}>
@@ -382,11 +391,16 @@ function Empty({ onEdit }) { return <div style={{ textAlign: "center", padding: 
       <img src={AIRLINE_LOGO[code]} style={{width:30,height:30,borderRadius:8,objectFit:"cover"}}/>,
       иначе оставить текущую заглушку с буквами. */
 function AirlineLogo({ code }) { const colors = ["#7c5cff", "#48dcdc", "#39d98a", "#f5c451", "#ff6db0", "#f59640"]; const c = colors[(code || "X").charCodeAt(0) % colors.length]; return <div style={{ width: 30, height: 30, borderRadius: 8, background: c + "26", border: `1px solid ${c}55`, display: "grid", placeItems: "center", color: c, fontWeight: 800, fontSize: 11, fontFamily: "Sora,sans-serif" }}>{(code || "✈").slice(0, 2)}</div>; }
-function Detail({ r, query, onBack, liked, onLike, onShare, goHotels }) {
+function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels }) {
   const dur = legDur(r.segments);
+  const segs = r.segments || [];
+  const carriers = [...new Set(segs.map(s => s.airline).filter(Boolean))];
+  const flightNos = segs.map(s => s.flightNumber).filter(Boolean);
+  const multiAir = carriers.length > 1;
+  const twoTicketNote = (segs.length === 2 && (r.notes || []).some(n => /раздельны|отдельных билета|два отдельных/i.test(n))) ? "Два отдельных билета" : null;
   return <div style={{ animation: "slideIn .28s ease" }}>
-    <Header onBack={onBack} title={`${query.origin} → ${query.destName}`} subtitle={query.datesLabel} />
-    <div style={{ padding: "4px 20px 0" }}>
+    <Header onBack={onBack} onEdit={onEdit} title={`${query.origin} → ${query.destName}`} subtitle={query.datesLabel} />
+    <div style={{ padding: "9px 20px 0" }}>
       <div style={{ position: "relative", borderRadius: 22, overflow: "hidden", height: 150, background: GRAD.sunset, padding: 16, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent,rgba(5,5,20,.7))" }} />
         <div style={{ position: "relative" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 22, color: "#fff" }}>{r.stopover ? stopLabel(r.stopover) : (r.title || "Маршрут")}</div>{r.stopover && <div style={{ background: "linear-gradient(90deg,#48dcdc,#7c5cff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 800, fontSize: 20, fontFamily: "Sora,sans-serif" }}>почти бесплатно</div>}</div>
@@ -411,7 +425,14 @@ function Detail({ r, query, onBack, liked, onLike, onShare, goHotels }) {
       </div>
     </div>
     <div style={{ padding: "18px 20px 0" }}>
-      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 16, marginBottom: 10 }}>{r.segments && r.segments.length > 0 ? "Маршрут по сегментам" : ""}</div>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
+        <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 16 }}>{segs.length > 0 ? "Маршрут по сегментам" : ""}</div>
+        {twoTicketNote && <span style={{ fontSize: 11, color: T.cyan, fontWeight: 700 }}>{twoTicketNote}</span>}
+      </div>
+      {multiAir && <div style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 12px", marginBottom: 10 }}>
+        <AirlineLogo code={"✈"} />
+        <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{carriers.map(airlineName).join(" + ")}</div>{flightNos.length > 0 && <div style={{ fontSize: 11, color: T.subd }}>{flightNos.join(" + ")}</div>}</div>
+      </div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {r.segments.map((s, i) => (<div key={i}>
           <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 14 }}>
@@ -424,7 +445,7 @@ function Detail({ r, query, onBack, liked, onLike, onShare, goHotels }) {
               <div><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{depOf(s)}</div><div style={{ fontSize: 11, color: T.subd }}>{s.fromCode}</div></div>
               <div style={{ flex: 1, textAlign: "center", fontSize: 10.5, color: T.subd }}>{hm(s.durationMin || 0)}<div style={{ height: 1, background: T.line, margin: "5px 0" }} />{(s.transfers || 0) > 0 ? `${s.transfers} ${s.transfers === 1 ? "пересадка" : "пересадки"}` : "прямой"}</div>
               <div style={{ textAlign: "right" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{arrOf(s)}</div><div style={{ fontSize: 11, color: T.subd }}>{s.toCode}</div></div>
-              <a href={s.deepLink || (r.bookingLinks && r.bookingLinks[i] && r.bookingLinks[i].url) || "#"} target="_blank" rel="noreferrer" className="press" style={{ textDecoration: "none" }}><div style={{ background: GRAD.cta, borderRadius: 12, padding: "8px 12px", color: "#fff", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap" }}>{rub(s.priceLive || s.priceEstimate)}</div></a>
+              {(s.priceLive || s.priceEstimate) ? <a href={s.deepLink || (r.bookingLinks && r.bookingLinks[i] && r.bookingLinks[i].url) || undefined} target="_blank" rel="noreferrer" className="press" style={{ textDecoration: "none" }}><div style={{ background: GRAD.cta, borderRadius: 12, padding: "8px 12px", color: "#fff", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap" }}>{rub(s.priceLive || s.priceEstimate)}</div></a> : null}
             </div>
           </div>
           {r.stopover && i === 0 && r.segments.length > 1 && (
@@ -438,11 +459,11 @@ function Detail({ r, query, onBack, liked, onLike, onShare, goHotels }) {
             </div>)}
         </div>))}
       </div>
-      {(() => { const notes = (r.notes || []).filter(n => (r.segments || []).length <= 2 || !/раздельны|отдельных билета/i.test(n)); return notes.length > 0 ? <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>{notes.map((n, i) => <Badge key={i} label={n} color={T.cyan} />)}</div> : null; })()}
+      {(() => { const notes = (r.notes || []).filter(n => !/раздельны|отдельных билета|два отдельных|один билет туда-обратно/i.test(n)); return notes.length > 0 ? <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>{notes.map((n, i) => <Badge key={i} label={n} color={T.cyan} />)}</div> : null; })()}
     </div>
-    {r.segments && r.segments.length === 0 && r.bookingLinks && r.bookingLinks.length > 0 && (
-      <div style={{ padding: "8px 20px 0" }}>
-        <a href={r.bookingLinks[0].url} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Btn>Купить билет · {rub(r.total)}</Btn></a>
+    {(r.agent || (r.segments && r.segments.length === 0)) && r.bookingLinks && r.bookingLinks.length > 0 && (
+      <div style={{ padding: "12px 20px 0" }}>
+        <a href={r.bookingLinks[0].url} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Btn>Купить билет туда-обратно · {rub(r.total)}</Btn></a>
       </div>)}
     <div style={{ padding: "16px 20px 8px", display: "flex", gap: 10 }}>
       <div onClick={() => onLike(r)} className="press" style={{ width: 52, borderRadius: 16, border: `1px solid ${T.line}`, display: "grid", placeItems: "center", background: T.card, cursor: "pointer" }}><Icon d={I.heart} size={20} color={liked ? T.pink : T.subd} /></div>
@@ -503,9 +524,11 @@ function FilterBox({ ph, v, set }) { return <div style={{ display: "flex", align
 function Traveler({ onBack, safeTop, bottomStr = "0px" }) {
   const [tab, setTab] = useState("cit"); const [q, setQ] = useState("");
   const allCit = [["🇷🇺", "Россия"], ["🇰🇿", "Казахстан"], ["🇦🇺", "Австралия"], ["🇦🇹", "Австрия"], ["🇦🇿", "Азербайджан"], ["🇦🇱", "Албания"], ["🇦🇷", "Аргентина"], ["🇦🇲", "Армения"], ["🇧🇾", "Беларусь"], ["🇩🇪", "Германия"], ["🇬🇪", "Грузия"]];
-  const [cit, setCit] = useState({ "Россия": true, "Казахстан": true });
+  const [cit, setCit] = useState(() => store.get("cit", { "Россия": true, "Казахстан": true }));
+  useEffect(() => { store.set("cit", cit); }, [cit]);
   const allVisas = [["🇪🇺", "Шенгенская зона", "26 стран"], ["🇺🇸", "США"], ["🇨🇦", "Канада"], ["🇬🇧", "Великобритания"], ["🇯🇵", "Япония"], ["🇨🇳", "Китай"], ["🇦🇺", "Австралия"], ["🇳🇿", "Новая Зеландия"], ["🇰🇷", "Южная Корея"], ["🇹🇭", "Таиланд"], ["🇹🇷", "Турция"], ["🇦🇪", "ОАЭ"]];
-  const [vis, setVis] = useState({ "Шенгенская зона": true, "США": true, "Канада": true });
+  const [vis, setVis] = useState(() => store.get("vis", { "Шенгенская зона": true, "США": true, "Канада": true }));
+  useEffect(() => { store.set("vis", vis); }, [vis]);
   const f = (arr) => arr.filter(x => x[1].toLowerCase().includes(q.toLowerCase()));
   return <div style={{ position: "fixed", inset: 0, zIndex: 50, background: T.bg2, display: "flex", flexDirection: "column", maxWidth: 420, margin: "0 auto", paddingTop: safeTop || 0, animation: "slideIn .28s ease" }}>
     <Header onBack={onBack} title="Путешественник" />
@@ -553,7 +576,7 @@ function RoutesScreen({ onPickDest, onSearch, saved, onUnlike, onOpenSaved, rece
       </div>)) : <div style={{ color: T.subd, fontSize: 13, padding: "8px 2px" }}>Пока пусто — лайкните маршрут в результатах поиска</div>}
     </Section>
     <Section title="Последние поиски" action={recent.length ? "Очистить" : null} onAction={onClearRecent}>
-      {recent.length ? recent.map((s, i) => (<div key={i} onClick={() => onRunRecent(s)} className="press" style={{ display: "flex", alignItems: "center", gap: 12, background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 12, marginBottom: 8, cursor: "pointer" }}><Icon d={I.clock} size={18} color={T.violet} /><div style={{ flex: 1 }}><div style={{ fontSize: 13.5, fontWeight: 700, color: T.text }}>{s.name}</div><div style={{ fontSize: 11, color: T.subd }}>{s.dates} • 1 взрослый • Эконом</div></div></div>)) : <div style={{ color: T.subd, fontSize: 13, padding: "8px 2px" }}>История пуста</div>}
+      {recent.length ? recent.map((s, i) => (<div key={i} onClick={() => onRunRecent(s)} className="press" style={{ display: "flex", alignItems: "center", gap: 12, background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 12, marginBottom: 8, cursor: "pointer" }}><Icon d={I.clock} size={18} color={T.violet} /><div style={{ flex: 1 }}><div style={{ fontSize: 13.5, fontWeight: 700, color: T.text }}>{s.name}</div><div style={{ fontSize: 11, color: T.subd }}>{s.dates} • {(s.form && s.form.adults) || 1} {plural((s.form && s.form.adults) || 1, "взрослый", "взрослых", "взрослых")} • Эконом</div></div></div>)) : <div style={{ color: T.subd, fontSize: 13, padding: "8px 2px" }}>История пуста</div>}
     </Section>
     <div style={{ padding: "16px 20px 8px" }}><Btn onClick={onSearch}>＋ Найти новый маршрут</Btn></div>
   </div>;
@@ -576,27 +599,38 @@ function RoutesScreen({ onPickDest, onSearch, saved, onUnlike, onOpenSaved, rece
   ║  в массив SERVICES.                                                    ║
   ╚══════════════════════════════════════════════════════════════════════╝
 */
+/*
+  ПОЛЯ ПРОМОКОДА (все, кроме обязательных, можно опускать):
+    header      — заголовок-предложение над кодом (обяз.)
+    code        — сам промокод (обяз.)
+    discountRub — скидка в рублях, для сортировки (обяз.)
+    endDate     — действует до (YYYY-MM-DD), показываем только если >= сегодня (обяз.)
+    stayFrom/stayTo — даты проживания (YYYY-MM-DD): покажем «на проживания с дд/мм по дд/мм»
+    url         — КУДА вести при копировании этого кода (если не задан — общий url сервиса).
+                  Иконка копирования и подменяет ссылку у нижней кнопки «Перейти…».
+*/
 const SERVICES = [
   { id: "yandex", name: "Яндекс Путешествия", desc: "Отели по всему миру", grad: GRAD.ocean, url: "https://travel.yandex.ru",
     promos: [
-      { header: "Скидка 5000 ₽ на бронирование от 50 000₽", code: "NETSIL20", discountRub: 5000, endDate: "2026-06-30" },
-      { header: "Скидка 3000 ₽ на бронирование от 30 000₽", code: "ETO-FACT", discountRub: 3000, endDate: "2026-06-30" },
-      { header: "Скидка 10%, но не более 1500₽ на отели Чувашии", code: "CHVSH", discountRub: 1500, endDate: "2026-07-31" },
+      { header: "Скидка на первое бронирование отеля", code: "TRIPWISE20", discountRub: 5000, endDate: "2026-12-31", stayFrom: "2026-06-01", stayTo: "2026-12-31", url: "https://travel.yandex.ru/hotels/" },
+      { header: "Промокод на отели Чувашии", code: "CHUVASHIA10", discountRub: 1500, endDate: "2026-09-30", stayFrom: "2026-07-01", stayTo: "2026-09-30", url: "https://travel.yandex.ru/hotels/cheboksary/" },
     ] },
   { id: "ostrovok", name: "Островок", desc: "Кэшбэк на бронирования", grad: GRAD.sunset, url: "https://ostrovok.ru",
     promos: [
-      { header: "Скидка на отели в Азии", code: "OSTROVOK15", discountRub: 3000, endDate: "2026-11-15" },
+      { header: "Скидка на отели в Азии", code: "OSTROVOK15", discountRub: 3000, endDate: "2026-11-15", stayFrom: "2026-08-01", stayTo: "2026-11-30" },
     ] },
   { id: "bali", name: "Bali Resorts", desc: "Спецпредложение на виллы", grad: GRAD.city, url: "https://example.com",
     promos: [
-      { header: "Скидка на виллы с бассейном", code: "BALI25", discountRub: 8000, endDate: "2026-10-01" },
+      { header: "Скидка на виллы с бассейном", code: "BALI25", discountRub: 8000, endDate: "2026-10-01", stayFrom: "2026-09-01", stayTo: "2026-10-31" },
       // пример истёкшего — НЕ покажется: { header:"Старая акция", code:"OLD", discountRub:9999, endDate:"2025-01-01" },
     ] },
 ];
+const ddmm = (s) => { if (!s) return ""; const p = String(s).split("-"); return p.length === 3 ? `${p[2]}/${p[1]}` : s; };
 function Hotels({ setToast }) {
   const [svc, setSvc] = useState(null);
+  const [goUrl, setGoUrl] = useState(null); // ссылка нижней кнопки, подменяется при копировании
   const today = new Date().toISOString().slice(0, 10);
-  const copy = async (code) => { try { await navigator.clipboard.writeText(code); setToast("Промокод скопирован"); } catch (e) { setToast("Не удалось скопировать"); } };
+  const copy = async (p) => { try { await navigator.clipboard.writeText(p.code); setGoUrl(p.url || null); setToast("Промокод скопирован"); } catch (e) { setToast("Не удалось скопировать"); } };
   const activePromos = (s) => (s.promos || []).filter(p => p.endDate >= today).sort((a, b) => b.discountRub - a.discountRub);
   return <div style={{ animation: "fadeUp .3s ease" }}>
     <Header />
@@ -605,7 +639,7 @@ function Hotels({ setToast }) {
       <div style={{ color: T.subd, fontSize: 12.5, marginTop: 4, marginBottom: 16 }}>Выберите сервис — внутри активные промокоды.</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {SERVICES.map((s, i) => { const n = activePromos(s).length; return (
-          <div key={s.id} onClick={() => setSvc(s)} className="press card-in" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, overflow: "hidden", cursor: "pointer", animationDelay: `${i * 70}ms` }}>
+          <div key={s.id} onClick={() => { setSvc(s); setGoUrl(null); }} className="press card-in" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, overflow: "hidden", cursor: "pointer", animationDelay: `${i * 70}ms` }}>
             <Porthole grad={s.grad} h={110} style={{ borderRadius: 0 }} />
             <div style={{ padding: 14, display: "flex", alignItems: "center", gap: 12 }}><div style={{ flex: 1 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>{s.name}</div><div style={{ fontSize: 12, color: T.subd }}>{s.desc}</div></div><Badge label={n ? `${n} промо` : "скоро"} color={n ? T.green : T.subd} /></div>
           </div>); })}
@@ -619,13 +653,13 @@ function Hotels({ setToast }) {
             <div style={{ fontSize: 13, color: T.text, fontWeight: 600, marginBottom: 8 }}>{p.header}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px dashed ${T.violet}`, borderRadius: 12, padding: "14px 16px" }}>
               <span style={{ flex: 1, fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.violet, letterSpacing: 1 }}>{p.code}</span>
-              <div onClick={() => copy(p.code)} className="press" style={{ cursor: "pointer", padding: 6, borderRadius: 8, background: T.violet + "22" }}><Icon d={I.copy} size={18} color={T.violet} /></div>
+              <div onClick={() => copy(p)} className="press" style={{ cursor: "pointer", padding: 6, borderRadius: 8, background: T.violet + "22" }}><Icon d={I.copy} size={18} color={T.violet} /></div>
             </div>
-            <div style={{ fontSize: 11, color: T.subd, marginTop: 4 }}>Скидка до {rub(p.discountRub)} · действует до {p.endDate}</div>
+            <div style={{ fontSize: 11, color: T.subd, marginTop: 4 }}>Скидка до {rub(p.discountRub)} · действует до {p.endDate}{(p.stayFrom && p.stayTo) ? ` · на проживания с ${ddmm(p.stayFrom)} по ${ddmm(p.stayTo)}` : ""}</div>
           </div>
         )) : <div style={{ color: T.subd, fontSize: 13, textAlign: "center", padding: 12 }}>Активных промокодов пока нет</div>}
       </div>
-      <div style={{ marginTop: 16 }}><Btn onClick={() => { try { window.open(svc.url, "_blank"); } catch (e) { } setToast(`Открываем ${svc.name}…`); }}>Перейти в {svc.name}</Btn></div>
+      <div style={{ marginTop: 16 }}><Btn onClick={() => { try { window.open(goUrl || svc.url, "_blank"); } catch (e) { } setToast(`Открываем ${svc.name}…`); }}>Перейти в {svc.name}</Btn></div>
     </Overlay>}
   </div>;
 }
@@ -637,7 +671,8 @@ export default function App() {
   const [sheet, setSheet] = useState(false);
   const [traveler, setTraveler] = useState(false);
   const [editName, setEditName] = useState(false);
-  const [name, setName] = useState("TripWise tester");
+  const [name, setName] = useState(() => store.get("name", "TripWise tester"));
+  useEffect(() => { store.set("name", name); }, [name]);
   const [inset, setInset] = useState({ top: 0, bottomStr: "env(safe-area-inset-bottom)" });
   const safeTop = inset.top;
   const [toast, setToastRaw] = useState(null);
@@ -672,25 +707,39 @@ export default function App() {
     return () => { try { ["viewportChanged", "safeAreaChanged", "contentSafeAreaChanged"].forEach((ev) => tg.offEvent && tg.offEvent(ev, recalc)); } catch (e) { } };
   }, []);
 
-  const [form, setForm] = useState({ origin: AIRPORTS.find(a => a.code === "MOW"), dest: byDest("samui"), round: true, dep: new Date(2026, 9, 12), ret: new Date(2026, 9, 26), adults: 1 });
-  const [query, setQuery] = useState({ origin: "Москва", destName: "Самуи", destinationId: "samui", adults: 1, datesLabel: "12 окт — 26 окт" });
+  const [form, setForm] = useState({ origin: null, dest: null, round: true, dep: null, ret: null, adults: 1 });
+  const [query, setQuery] = useState({ origin: "", destName: "", destinationId: "", adults: 1, datesLabel: "" });
   const [routes, setRoutes] = useState([]); const [loading, setLoading] = useState(false); const [selected, setSelected] = useState(null);
   const [searchError, setSearchError] = useState(false);
 
-  const [saved, setSaved] = useState(() => { try { const s = localStorage.getItem("tw_saved"); return s ? JSON.parse(s) : []; } catch (e) { return []; } });
-  useEffect(() => { try { localStorage.setItem("tw_saved", JSON.stringify(saved)); } catch (e) { } }, [saved]);
-  const [recent, setRecent] = useState([
-    { name: "Москва — Самуи", dates: "12 окт — 26 окт", form: { origin: AIRPORTS.find(a => a.code === "MOW"), dest: byDest("samui"), round: true, dep: new Date(2026, 9, 12), ret: new Date(2026, 9, 26), adults: 1 } },
-  ]);
+  const [saved, setSaved] = useState(() => store.get("saved", []));
+  useEffect(() => { store.set("saved", saved); }, [saved]);
+  const [recent, setRecent] = useState(() => store.get("recent", []));
+  useEffect(() => { store.set("recent", recent); }, [recent]);
+
+  // открыть конкретный маршрут по ссылке-шарингу (#r=base64)
+  useEffect(() => {
+    try {
+      const h = (typeof location !== "undefined" && location.hash) || "";
+      const m = h.match(/[#&]r=([^&]+)/);
+      if (m) {
+        const data = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
+        if (data && data.r) { setQuery(q => ({ ...q, ...data.q })); setSelected(data.r); setTab("routes"); setStack(["results", "detail"]); }
+        try { history.replaceState(null, "", location.pathname); } catch (e) { }
+      }
+    } catch (e) { }
+  }, []);
 
   const top = stack[stack.length - 1];
   const datesLabel = (f) => f.dep ? (f.round && f.ret ? `${fmtShort(f.dep)} — ${fmtShort(f.ret)}` : fmtShort(f.dep)) : "";
 
   const runSearch = async (f) => {
     const ff = f || form;
+    if (!ff.origin || !ff.dest || !ff.dep) { setSheet(true); setToast("Заполните откуда, куда и дату"); return; }
     const nq = { origin: ff.origin.city, destName: ff.dest.city, destinationId: ff.dest.destId || ff.dest.code, adults: ff.adults, datesLabel: datesLabel(ff) };
     setQuery(nq); setSheet(false); setTab("routes"); setStack(["results"]); setLoading(true); setSearchError(false);  // <- переходим в «Маршруты»
-    setRecent((p) => [{ name: `${nq.origin} — ${nq.destName}`, dates: nq.datesLabel, form: ff }, ...p.filter(x => x.name !== `${nq.origin} — ${nq.destName}`)].slice(0, 7));
+    const recForm = { origin: ff.origin, dest: ff.dest, round: ff.round, dep: iso(ff.dep), ret: ff.ret ? iso(ff.ret) : null, adults: ff.adults };
+    setRecent((p) => [{ name: `${nq.origin} — ${nq.destName}`, dates: nq.datesLabel, form: recForm }, ...p.filter(x => x.name !== `${nq.origin} — ${nq.destName}`)].slice(0, 7));
     try {
       const res = await apiSearch({ origin: ff.origin.city, originCode: ff.origin.code, destinationId: ff.dest.destId || undefined, destCode: ff.dest.code, destName: ff.dest.city, dateFrom: iso(ff.dep), dateTo: ff.round && ff.ret ? iso(ff.ret) : undefined, style: "stopover", tier: "free", roundTrip: !!(ff.round && ff.ret), passengers: { adults: ff.adults } });
       setRoutes(res);
@@ -705,23 +754,29 @@ export default function App() {
     else { setSaved(p => [{ id, name: `${query.origin} — ${query.destName}`, dates: query.datesLabel, price: r.total, emoji: "🛫", route: r, query }, ...p]); setToast("Добавлено в «Маршруты»"); }
   };
   const shareRoute = (r) => {
-    const link = "https://t.me/tripwiseai_bot"; // заменить на реального бота
+    const bot = "https://t.me/tripwiseai_bot"; // заменить на реального бота
+    let weblink = bot;
+    try {
+      const payload = { q: { origin: query.origin, destName: query.destName, destinationId: query.destinationId, adults: query.adults, datesLabel: query.datesLabel }, r };
+      const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+      weblink = `${(typeof location !== "undefined" ? location.origin : "")}/#r=${b64}`;
+    } catch (e) { }
     const text = `${query.origin} → ${query.destName} за ${rub(r.total)} — нашёл в TripWiseAI ✈️`;
     const tg = (typeof window !== "undefined") && window.Telegram && window.Telegram.WebApp;
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(weblink)}&text=${encodeURIComponent(text)}`;
     try {
       if (tg && tg.openTelegramLink) { tg.openTelegramLink(shareUrl); return; }
-      if (typeof navigator !== "undefined" && navigator.share) { navigator.share({ title: "TripWiseAI", text, url: link }); return; }
+      if (typeof navigator !== "undefined" && navigator.share) { navigator.share({ title: "TripWiseAI", text, url: weblink }); return; }
       window.open(shareUrl, "_blank"); setToast("Открываю Telegram…");
-    } catch (e) { try { navigator.clipboard.writeText(text + " " + link); setToast("Ссылка скопирована"); } catch (_) { setToast("Поделиться недоступно"); } }
+    } catch (e) { try { navigator.clipboard.writeText(text + " " + weblink); setToast("Ссылка скопирована"); } catch (_) { setToast("Поделиться недоступно"); } }
   };
   const openSaved = (s) => { setSelected(s.route); setQuery({ ...s.query, datesLabel: s.dates }); setTab("routes"); setStack(["results", "detail"]); };
 
   let main = null;
   if (tab === "routes") {
-    if (top === "detail") main = <Detail r={selected} query={query} onBack={() => setStack(["results"])} liked={isLiked(selected)} onLike={likeRoute} onShare={shareRoute} goHotels={() => setTab("hotels")} />;
+    if (top === "detail") main = <Detail r={selected} query={query} onBack={() => setStack(["results"])} onEdit={() => { setTab("home"); setSheet(true); }} liked={isLiked(selected)} onLike={likeRoute} onShare={shareRoute} goHotels={() => setTab("hotels")} />;
     else if (top === "results") main = <Results query={query} routes={routes} loading={loading} error={searchError} onRetry={() => runSearch()} onEdit={() => { setTab("home"); setSheet(true); }} onBack={() => setStack([])} onOpen={(r) => { setSelected(r); setStack(["results", "detail"]); }} isLiked={isLiked} onLike={likeRoute} />;
-    else main = <RoutesScreen onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved(p => p.filter(x => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => { setForm(s.form); runSearch(s.form); }} />;
+    else main = <RoutesScreen onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved(p => p.filter(x => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => { const f = { ...s.form, dep: s.form.dep ? new Date(s.form.dep) : null, ret: s.form.ret ? new Date(s.form.ret) : null }; setForm(f); runSearch(f); }} />;
   } else if (tab === "home") main = <Home onSearch={() => setSheet(true)} onPickDest={openSheetWithDest} goProfile={() => setTab("profile")} />;
   else if (tab === "hotels") main = <Hotels setToast={setToast} />;
   else if (tab === "profile") main = <Profile name={name} onTraveler={() => setTraveler(true)} onEditName={() => setEditName(true)} setToast={setToast} />;
