@@ -321,7 +321,7 @@ function Home({ onSearch, onPickDest, goProfile }) {
       </div>
     </div>
     <div style={{ padding: "21px 40px 0", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
-      {adv.map(([t, s, g, ic]) => (<div key={t} style={{ textAlign: "center", maxWidth: 42, margin: "0 auto" }}><div style={{ height: 42, borderRadius: 14, background: g, display: "grid", placeItems: "center", marginBottom: 6 }}><Icon d={ic} size={20} color="#fff" /></div><div style={{ fontSize: 10.5, color: T.text, fontWeight: 700, lineHeight: 1.15 }}>{t}</div><div style={{ fontSize: 9.5, color: T.subd, marginTop: 2 }}>{s}</div></div>))}
+      {adv.map(([t, s, g, ic]) => (<div key={t} style={{ textAlign: "center" }}><div style={{ width: 42, height: 42, margin: "0 auto 6px", borderRadius: 14, background: "rgba(255,255,255,0.05)", border: `1px solid ${T.line}`, display: "grid", placeItems: "center" }}><Icon d={ic} size={20} color="#fff" /></div><div style={{ fontSize: 10.5, color: T.text, fontWeight: 700, lineHeight: 1.15 }}>{t}</div><div style={{ fontSize: 9.5, color: T.subd, marginTop: 2 }}>{s}</div></div>))}
     </div>
     <div style={{ padding: "22px 0 0 20px" }}>
       <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 17, marginBottom: 12 }}>Идеи для путешествий ✨</div>
