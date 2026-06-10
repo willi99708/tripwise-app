@@ -483,8 +483,8 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels }) 
         <a href={r.bookingLinks[0].url} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Btn>Купить билет туда-обратно · {rub(r.total)}</Btn></a>
       </div>)}
     <div style={{ padding: "16px 20px 8px", display: "flex", gap: 10 }}>
-      <div onClick={() => onLike(r)} className="press" style={{ width: 52, borderRadius: 16, border: `1px solid ${T.line}`, display: "grid", placeItems: "center", background: T.card, cursor: "pointer" }}><Icon d={I.heart} size={20} color={liked ? T.pink : T.subd} /></div>
       <Btn style={{ flex: 1 }} onClick={() => onShare(r)}>Поделиться маршрутом</Btn>
+      <div onClick={() => onLike(r)} className="press" style={{ width: 52, borderRadius: 16, border: `1px solid ${T.line}`, display: "grid", placeItems: "center", background: T.card, cursor: "pointer" }}><Icon d={I.heart} size={20} color={liked ? T.pink : T.subd} /></div>
     </div>
   </div>;
 }
@@ -715,13 +715,19 @@ export default function App() {
     };
     try {
       tg.ready(); tg.expand();
+      // полноэкранный запуск, как у мини-аппа BotFather (Bot API 8.0+, только мобильные платформы)
+      try {
+        const isMobile = tg.platform === "ios" || tg.platform === "android";
+        if (tg.requestFullscreen && isMobile && (!tg.isVersionAtLeast || tg.isVersionAtLeast("8.0"))) tg.requestFullscreen();
+      } catch (e) { }
+      // запрет свайпа-закрытия (внутренние скроллы приложения не страдают)
       if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
       const u = tg.initDataUnsafe && tg.initDataUnsafe.user; if (u && u.first_name) setName([u.first_name, u.last_name].filter(Boolean).join(" "));
       recalc();
-      ["viewportChanged", "safeAreaChanged", "contentSafeAreaChanged"].forEach((ev) => tg.onEvent && tg.onEvent(ev, recalc));
-      setTimeout(recalc, 400);
+      ["viewportChanged", "safeAreaChanged", "contentSafeAreaChanged", "fullscreenChanged"].forEach((ev) => tg.onEvent && tg.onEvent(ev, recalc));
+      setTimeout(() => { recalc(); if (tg.disableVerticalSwipes) tg.disableVerticalSwipes(); }, 400);
     } catch (e) { }
-    return () => { try { ["viewportChanged", "safeAreaChanged", "contentSafeAreaChanged"].forEach((ev) => tg.offEvent && tg.offEvent(ev, recalc)); } catch (e) { } };
+    return () => { try { ["viewportChanged", "safeAreaChanged", "contentSafeAreaChanged", "fullscreenChanged"].forEach((ev) => tg.offEvent && tg.offEvent(ev, recalc)); } catch (e) { } };
   }, []);
 
   const [form, setForm] = useState({ origin: null, dest: null, round: true, dep: null, ret: null, adults: 1 });
@@ -736,25 +742,34 @@ export default function App() {
 
   // открыть конкретный маршрут по ссылке-шарингу: start_param из Telegram (t.me/.../app?startapp=...) или #r= в браузере
   const pendingOpenId = useRef(null);
+  const lastSearchRef = useRef(null); // параметры последнего успешного поиска — для шеринга
   const b64urlEnc = (s) => btoa(unescape(encodeURIComponent(s))).split("+").join("-").split("/").join("_").replace(/=+$/, "");
   const b64urlDec = (s) => decodeURIComponent(escape(atob(s.split("-").join("+").split("_").join("/"))));
+  const deepLinkDone = useRef(false);
   useEffect(() => {
-    try {
-      const tg = (typeof window !== "undefined") && window.Telegram && window.Telegram.WebApp;
-      const sp = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || "";
-      const h = (typeof location !== "undefined" && location.hash) || "";
-      const m = h.match(/[#&]r=([^&]+)/);
-      const raw = sp || (m && m[1]) || "";
-      if (!raw) return;
-      const d = JSON.parse(b64urlDec(raw)); // {oc,dc,df,dt,a,id}
-      const o = AIRPORTS.find(a => a.code === d.oc), ds = AIRPORTS.find(a => a.code === d.dc);
-      if (o && ds && d.df) {
-        const f = { origin: o, dest: ds, round: !!d.dt, dep: new Date(d.df), ret: d.dt ? new Date(d.dt) : null, adults: d.a || 1 };
-        setForm(f); pendingOpenId.current = d.id || null;
-        setTimeout(() => runSearch(f), 0); // после маунта
-      }
-      try { history.replaceState(null, "", location.pathname); } catch (e) { }
-    } catch (e) { }
+    const tryOpen = () => {
+      if (deepLinkDone.current) return;
+      try {
+        const tg = (typeof window !== "undefined") && window.Telegram && window.Telegram.WebApp;
+        const sp = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || "";
+        const h = (typeof location !== "undefined" && location.hash) || "";
+        const m = h.match(/[#&]r=([^&]+)/);
+        const raw = sp || (m && m[1]) || "";
+        if (!raw) return;
+        const d = JSON.parse(b64urlDec(raw)); // {oc,dc,df,dt,a,id}
+        const o = AIRPORTS.find(a => a.code === d.oc), ds = AIRPORTS.find(a => a.code === d.dc);
+        if (o && ds && d.df) {
+          deepLinkDone.current = true;
+          const f = { origin: o, dest: ds, round: !!d.dt, dep: new Date(d.df), ret: d.dt ? new Date(d.dt) : null, adults: d.a || 1 };
+          setForm(f); pendingOpenId.current = d.id || null;
+          setTimeout(() => runSearch(f), 0); // после маунта
+        }
+        try { history.replaceState(null, "", location.pathname); } catch (e) { }
+      } catch (e) { }
+    };
+    tryOpen();
+    const t = setTimeout(tryOpen, 700); // ретрай: WebApp мог не успеть отдать start_param
+    return () => clearTimeout(t);
   }, []);
 
   const top = stack[stack.length - 1];
@@ -764,6 +779,7 @@ export default function App() {
     const ff = f || form;
     if (!ff.origin || !ff.dest || !ff.dep) { setSheet(true); setToast("Заполните откуда, куда и дату"); return; }
     const nq = { origin: ff.origin.city, destName: ff.dest.city, destinationId: ff.dest.destId || ff.dest.code, adults: ff.adults, datesLabel: datesLabel(ff) };
+    lastSearchRef.current = { oc: ff.origin.code, dc: ff.dest.code, df: iso(ff.dep), dt: (ff.round && ff.ret) ? iso(ff.ret) : "", a: ff.adults || 1 };
     setQuery(nq); setSheet(false); setTab("routes"); setStack(["results"]); setLoading(true); setSearchError(false);  // <- переходим в «Маршруты»
     const recForm = { origin: ff.origin, dest: ff.dest, round: ff.round, dep: iso(ff.dep), ret: ff.ret ? iso(ff.ret) : null, adults: ff.adults };
     setRecent((p) => [{ name: `${nq.origin} — ${nq.destName}`, dates: nq.datesLabel, form: recForm }, ...p.filter(x => x.name !== `${nq.origin} — ${nq.destName}`)].slice(0, 7));
@@ -786,17 +802,25 @@ export default function App() {
     const tg = (typeof window !== "undefined") && window.Telegram && window.Telegram.WebApp;
     if (!tg || !tg.BackButton) return;
     const canBack = stack.length > 0 || sheet || traveler || editName;
+    let fired = false; // защита от двойного срабатывания (две подписки)
     const onBack = () => {
+      if (fired) return; fired = true; setTimeout(() => { fired = false; }, 300);
       if (editName) return setEditName(false);
       if (traveler) return setTraveler(false);
       if (sheet) return setSheet(false);
       setStack((p) => p.slice(0, -1));
     };
     try {
-      if (canBack) { tg.BackButton.show(); tg.onEvent("backButtonClicked", onBack); }
-      else tg.BackButton.hide();
+      if (canBack) {
+        tg.BackButton.show();
+        if (tg.BackButton.onClick) tg.BackButton.onClick(onBack);
+        if (tg.onEvent) tg.onEvent("backButtonClicked", onBack);
+      } else tg.BackButton.hide();
     } catch (e) { }
-    return () => { try { tg.offEvent("backButtonClicked", onBack); } catch (e) { } };
+    return () => {
+      try { if (tg.BackButton.offClick) tg.BackButton.offClick(onBack); } catch (e) { }
+      try { if (tg.offEvent) tg.offEvent("backButtonClicked", onBack); } catch (e) { }
+    };
   }, [stack, sheet, traveler, editName]);
   const isLiked = (r) => !!saved.find(x => x.id === ("liked-" + r.id));
   const likeRoute = (r) => {
@@ -808,9 +832,8 @@ export default function App() {
     let weblink = "https://t.me/TripWiseAI_bot/app";
     try {
       // компактный payload (startapp ограничен 512 симв.): параметры поиска + id маршрута
-      const f = form || {};
-      const payload = { oc: (f.origin && f.origin.code) || "", dc: (f.dest && f.dest.code) || "", df: f.dep ? iso(f.dep) : "", dt: (f.round && f.ret) ? iso(f.ret) : "", a: f.adults || 1, id: r.id };
-      weblink = `https://t.me/TripWiseAI_bot/app?startapp=${b64urlEnc(JSON.stringify(payload))}`;
+      const ls = lastSearchRef.current || { oc: (form.origin && form.origin.code) || "", dc: (form.dest && form.dest.code) || "", df: form.dep ? iso(form.dep) : "", dt: (form.round && form.ret) ? iso(form.ret) : "", a: form.adults || 1 };
+      if (ls.oc && ls.dc && ls.df) weblink = `https://t.me/TripWiseAI_bot/app?startapp=${b64urlEnc(JSON.stringify({ ...ls, id: r.id }))}`;
     } catch (e) { }
     const text = `${query.origin} → ${query.destName} за ${rub(r.total)} — нашёл в TripWiseAI ✈️`;
     const tg = (typeof window !== "undefined") && window.Telegram && window.Telegram.WebApp;
