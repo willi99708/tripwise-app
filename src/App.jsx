@@ -34,6 +34,7 @@ const RAW_AIRPORTS = [
   ["MRV", "Минеральные Воды", "Россия", "🇷🇺"], ["AAQ", "Анапа", "Россия", "🇷🇺"], ["GDZ", "Геленджик", "Россия", "🇷🇺"],
   ["SVX", "Екатеринбург", "Россия", "🇷🇺"], ["OVB", "Новосибирск", "Россия", "🇷🇺"], ["KZN", "Казань", "Россия", "🇷🇺"],
   ["KRR", "Краснодар", "Россия", "🇷🇺"], ["VVO", "Владивосток", "Россия", "🇷🇺"], ["KGD", "Калининград", "Россия", "🇷🇺"],
+  ["UFA", "Уфа", "Россия", "🇷🇺"],
   ["MSQ", "Минск", "Беларусь", "🇧🇾"], ["ALA", "Алматы", "Казахстан", "🇰🇿"], ["NQZ", "Астана", "Казахстан", "🇰🇿"],
   ["TAS", "Ташкент", "Узбекистан", "🇺🇿"], ["GYD", "Баку", "Азербайджан", "🇦🇿"], ["EVN", "Ереван", "Армения", "🇦🇲"],
   ["TBS", "Тбилиси", "Грузия", "🇬🇪"], ["IST", "Стамбул", "Турция", "🇹🇷"], ["AYT", "Анталья", "Турция", "🇹🇷"],
@@ -723,17 +724,15 @@ export default function App() {
     };
     try {
       tg.ready(); tg.expand();
-      // полноэкранный запуск, как у мини-аппа BotFather (Bot API 8.0+, только мобильные платформы)
-      try {
-        const isMobile = tg.platform === "ios" || tg.platform === "android";
-        if (tg.requestFullscreen && isMobile && (!tg.isVersionAtLeast || tg.isVersionAtLeast("8.0"))) tg.requestFullscreen();
-      } catch (e) { }
-      // запрет свайпа-закрытия (внутренние скроллы приложения не страдают)
-      if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
+      const isMobile = tg.platform === "ios" || tg.platform === "android";
+      const goFullscreen = () => { try { if (tg.requestFullscreen && isMobile && (!tg.isVersionAtLeast || tg.isVersionAtLeast("8.0")) && !tg.isFullscreen) tg.requestFullscreen(); } catch (e) { } };
+      const noSwipe = () => { try { if (tg.disableVerticalSwipes) tg.disableVerticalSwipes(); } catch (e) { } };
+      goFullscreen(); noSwipe();
       const u = tg.initDataUnsafe && tg.initDataUnsafe.user; if (u && u.first_name) setName([u.first_name, u.last_name].filter(Boolean).join(" "));
       recalc();
       ["viewportChanged", "safeAreaChanged", "contentSafeAreaChanged", "fullscreenChanged"].forEach((ev) => tg.onEvent && tg.onEvent(ev, recalc));
-      setTimeout(() => { recalc(); if (tg.disableVerticalSwipes) tg.disableVerticalSwipes(); }, 400);
+      // некоторые клиенты готовы дать fullscreen/swipe-lock не сразу после ready — повторяем
+      [150, 500, 1200].forEach((ms) => setTimeout(() => { recalc(); goFullscreen(); noSwipe(); }, ms));
     } catch (e) { }
     return () => { try { ["viewportChanged", "safeAreaChanged", "contentSafeAreaChanged", "fullscreenChanged"].forEach((ev) => tg.offEvent && tg.offEvent(ev, recalc)); } catch (e) { } };
   }, []);
