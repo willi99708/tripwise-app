@@ -414,7 +414,15 @@ function Empty({ onEdit }) { return <div style={{ textAlign: "center", padding: 
    3) в AirlineLogo: если AIRLINE_LOGO[code] есть — вернуть
       <img src={AIRLINE_LOGO[code]} style={{width:30,height:30,borderRadius:8,objectFit:"cover"}}/>,
       иначе оставить текущую заглушку с буквами. */
-function AirlineLogo({ code }) { const colors = ["#7c5cff", "#48dcdc", "#39d98a", "#f5c451", "#ff6db0", "#f59640"]; const c = colors[(code || "X").charCodeAt(0) % colors.length]; return <div style={{ width: 30, height: 30, borderRadius: 8, background: c + "26", border: `1px solid ${c}55`, display: "grid", placeItems: "center", color: c, fontWeight: 800, fontSize: 11, fontFamily: "Sora,sans-serif" }}>{(code || "✈").slice(0, 2)}</div>; }
+/* ЛОГОТИПЫ АВИАКОМПАНИЙ: положи PNG в public/graphics/airlines/ с именем = код перевозчика
+   (например SU.png, TK.png, DP.png). Файл есть — покажется логотип; файла нет — цветной кружок с кодом. */
+function AirlineLogo({ code }) {
+  const colors = ["#7c5cff", "#48dcdc", "#39d98a", "#f5c451", "#ff6db0", "#f59640"]; const c = colors[(code || "X").charCodeAt(0) % colors.length];
+  return <div style={{ position: "relative", width: 30, height: 30, borderRadius: 8, background: c + "26", border: `1px solid ${c}55`, display: "grid", placeItems: "center", color: c, fontWeight: 800, fontSize: 11, fontFamily: "Sora,sans-serif", overflow: "hidden" }}>
+    {(code || "✈").slice(0, 2)}
+    {code && <img src={`/graphics/airlines/${String(code).toUpperCase()}.png`} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} />}
+  </div>;
+}
 function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels }) {
   const dur = legDur(r.segments);
   const segs = r.segments || [];
@@ -455,7 +463,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels }) 
           <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
               <AirlineLogo code={s.airline} />
-              <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{airlineName(s.airline)}</div><div style={{ fontSize: 11, color: T.subd }}>{s.flightNumber || (s.mode === "ferry" ? "Паром" : "рейс уточняется")}</div></div>
+              <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{airlineName(s.airline) || "Авиакомпания"}</div><div style={{ fontSize: 11, color: T.subd }}>{s.flightNumber || (s.mode === "ferry" ? "Паром" : "номер рейса — в билете")}</div></div>
               {s.mode === "ferry" ? <Badge label="паром" color={T.cyan} /> : (r.segments.length === 1 && (s.transfers || 0) === 0 ? <Badge label="Прямой рейс" color={T.green} /> : (r.segments.length === 1 ? null : <Badge label={`Рейс ${i + 1}`} color={T.violet} />))}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
