@@ -155,6 +155,10 @@ const plural = (n, one, few, many) => { const a = Math.abs(n) % 100, b = a % 10;
 
 function Icon({ d, size = 20, color = T.violet }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{d}</svg>; }
 const I = {
+  doc: <><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6M9 13h6M9 17h4" /></>,
+  armchair: <><path d="M6 11V7a3 3 0 013-3h6a3 3 0 013 3v4" /><path d="M4 11a2 2 0 012 2v2h12v-2a2 2 0 114 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4a2 2 0 012-2z" /></>,
+  sim: <><rect x="5" y="3" width="14" height="18" rx="2" /><rect x="9" y="12" width="6" height="5" rx="1" /></>,
+  car: <><path d="M5 15l1.2-4.5A2 2 0 018.1 9h7.8a2 2 0 011.9 1.5L19 15" /><rect x="3.5" y="15" width="17" height="4" rx="1.2" /><circle cx="7.5" cy="19.5" r="1.2" /><circle cx="16.5" cy="19.5" r="1.2" /></>,
   user: <><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" /></>, pin: <><path d="M12 21s7-6 7-11a7 7 0 10-14 0c0 5 7 11 7 11z" /><circle cx="12" cy="10" r="2.5" /></>,
   cal: <><rect x="3" y="4" width="18" height="18" rx="3" /><path d="M3 10h18M8 2v4M16 2v4" /></>, swap: <><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" /></>,
   back: <><path d="M15 18l-6-6 6-6" /></>, arrow: <><path d="M5 12h14M13 6l6 6-6 6" /></>, clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
@@ -187,9 +191,9 @@ function Header({ onBack, title, subtitle, onEdit }) {
   </div>;
 }
 function BottomNav({ tab, setTab, bottomStr = "0px" }) {
-  const items = [["home", "Главная", I.home], ["routes", "Маршруты", I.route], ["hotels", "Отели", I.hotel], ["profile", "Профиль", I.user]];
+  const items = [["home", "Главная", I.home], ["routes", "Путешествия", I.route], ["hotels", "Отели", I.hotel], ["docs", "Документы", I.doc], ["profile", "Профиль", I.user]];
   return <div style={{ flexShrink: 0, minHeight: 64, paddingBottom: `max(${bottomStr}, 12px)`, display: "flex", background: "rgba(10,10,24,.92)", backdropFilter: "blur(12px)", borderTop: `1px solid ${T.line}` }}>
-    {items.map(([k, label, ic]) => (<button key={k} onClick={() => setTab(k)} className="press" style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, paddingTop: 8, color: tab === k ? T.violet : T.subd }}><Icon d={ic} size={22} color={tab === k ? T.violet : T.subd} /><span style={{ fontSize: 11, fontWeight: tab === k ? 700 : 500 }}>{label}</span></button>))}
+    {items.map(([k, label, ic]) => (<button key={k} onClick={() => setTab(k)} className="press" style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, paddingTop: 8, color: tab === k ? T.violet : T.subd }}><Icon d={ic} size={22} color={tab === k ? T.violet : T.subd} /><span style={{ fontSize: 10, fontWeight: tab === k ? 700 : 500, whiteSpace: "nowrap" }}>{label}</span></button>))}
   </div>;
 }
 function Toast({ msg }) { if (!msg) return null; return <div style={{ position: "fixed", left: "50%", bottom: 86, transform: "translateX(-50%)", zIndex: 100, background: "#1c1c40", border: `1px solid ${T.line2}`, color: T.text, fontSize: 13, fontWeight: 600, padding: "10px 18px", borderRadius: 999, boxShadow: "0 8px 30px rgba(0,0,0,.5)", animation: "fadeUp .25s ease" }}>{msg}</div>; }
@@ -294,11 +298,14 @@ function SearchSheet({ form, setForm, onClose, onSubmit, setToast }) {
 }
 
 /* ================================ Главная =============================== */
-function Home({ onSearch, onPickDest, goProfile }) {
-  const adv = [["Умные маршруты", "Экономим до 20%", "/graphics/smart.png"], ["StopOver-маршруты", "Двойное путешествие", "/graphics/stopover.png"], ["Промокоды на отели", "Скидки до 20%", "/graphics/promo.png"], ["Сервисы путешествий", "Залы, eSIM, страховка", "/graphics/services.png"]];
+function Home({ onSearch, onPickDest, goTab, openServices }) {
+  const tiles = [
+    ["Отели", "Промокоды\nи скидки", I.hotel, () => goTab("hotels")],
+    ["Документы", "Визы, чек-листы\nи помощь ИИ", I.doc, () => goTab("docs")],
+    ["Сервисы", "eSIM, страховка,\nбизнес-залы", I.bag, openServices],
+  ];
   const ideas = [["Бали", "через Сингапур", "20–40%", "/graphics/bali.png", "SIN", "bali"], ["Токио", "через Сеул", "30–50%", "/graphics/tokyo.png", "ICN", "tokyo"], ["Мальдивы", "через Дубай", "25–45%", "/graphics/male.png", "DXB", "maldives"], ["Пхукет", "через Куала-Лумпур", "20–40%", "/graphics/phuket.png", "KUL", "phuket"]];
   return <div style={{ paddingBottom: 16, animation: "fadeUp .3s ease" }}>
-    <Header />
     <div style={{ padding: "18px 30px 0" }}>
       <div style={{ display: "flex", gap: 12 }}>
         <div style={{ flex: 1 }}><h1 style={{ fontFamily: "Sora,sans-serif", fontSize: 30, lineHeight: 1.08, margin: 0, fontWeight: 800, color: T.text }}>Куда<br />хочется<br /><span style={{ background: "linear-gradient(90deg,#48dcdc,#7c5cff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>отправиться?</span></h1><p style={{ color: T.sub, fontSize: 13, marginTop: 12, lineHeight: 1.4 }}>Найдём лучшие маршруты,<br />о которых вы не знали</p></div>
@@ -323,19 +330,30 @@ function Home({ onSearch, onPickDest, goProfile }) {
         <div style={{ width: 38, height: 38, borderRadius: 12, background: GRAD.cta, display: "grid", placeItems: "center" }}><Icon d={I.spark} size={18} color="#fff" /></div>
       </div>
     </div>
-    <div style={{ padding: "28px 40px 0", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
-      {adv.map(([t, s, img]) => (<div key={t} style={{ textAlign: "center" }}><div style={{ width: 45, height: 45, margin: "0 auto 6px", borderRadius: 14, background: "rgba(255,255,255,0.05)", border: `1px solid ${T.line}`, display: "grid", placeItems: "center" }}><img src={img} alt="" style={{ width: 20, height: 20, objectFit: "contain" }} /></div><div style={{ fontSize: 10.5, color: T.text, fontWeight: 700, lineHeight: 1.15 }}>{t}</div><div style={{ fontSize: 9.5, color: T.subd, marginTop: 2 }}>{s}</div></div>))}
+    {/* три продающие плитки-ярлыка (макет): ведут в разделы */}
+    <div style={{ padding: "16px 20px 0", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+      {tiles.map(([t, s, ic, go]) => (
+        <div key={t} onClick={go} className="press" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, padding: "14px 12px 12px", cursor: "pointer", display: "flex", flexDirection: "column", minHeight: 128 }}>
+          <div style={{ width: 42, height: 42, borderRadius: 13, background: T.violet + "1e", border: `1px solid ${T.violet}44`, display: "grid", placeItems: "center" }}><Icon d={ic} size={21} color={T.violet} /></div>
+          <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 14.5, marginTop: 10 }}>{t}</div>
+          <div style={{ fontSize: 10.5, color: T.subd, marginTop: 3, lineHeight: 1.25, whiteSpace: "pre-line", flex: 1 }}>{s}</div>
+          <div style={{ alignSelf: "flex-end", width: 28, height: 28, borderRadius: 999, background: "rgba(255,255,255,.06)", border: `1px solid ${T.line}`, display: "grid", placeItems: "center", marginTop: 8 }}><Icon d={I.arrow} size={13} color={T.sub} /></div>
+        </div>))}
     </div>
-    <div style={{ padding: "22px 0 0 20px" }}>
-      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 17, marginBottom: 12 }}>Идеи для путешествий ✨</div>
+    <div style={{ padding: "24px 0 0 20px" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", paddingRight: 20, marginBottom: 12 }}>
+        <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 17 }}>Идеи для выгодных маршрутов ✨</div>
+        <span onClick={onSearch} className="press" style={{ fontSize: 12, color: T.subd, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>Все направления ›</span>
+      </div>
       <div className="carousel" style={{ display: "flex", gap: 12, overflowX: "auto", paddingRight: 20, paddingBottom: 4, scrollSnapType: "x mandatory" }}>
         {ideas.map(([name, via, save, g, code, id]) => (<div key={name} onClick={() => onPickDest(id)} className="press" style={{ minWidth: 160, cursor: "pointer", scrollSnapAlign: "start" }}><Porthole image={g} h={110} label={name} sub={via} codeRight={"→ " + code} style={{ borderRadius: 16 }} /><div style={{ marginTop: 8, fontSize: 11, color: T.subd }}>Скидка</div><div style={{ fontSize: 15, fontWeight: 800, color: T.green, fontFamily: "Sora,sans-serif" }}>{save}</div></div>))}
       </div>
     </div>
+    {/* тизер комплексного ведения поездки -> «Путешествия» */}
     <div style={{ padding: "15px 20px 0" }}>
-      <div onClick={goProfile} className="press" style={{ display: "flex", alignItems: "center", gap: 14, background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, padding: 16, cursor: "pointer" }}>
-        <div style={{ flex: 1 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>Бизнес-залы, eSIM и страховка</div><div style={{ color: T.subd, fontSize: 12, marginTop: 4 }}>Всё для комфортной поездки</div></div>
-        <div style={{ width: 42, height: 42, borderRadius: 12, background: GRAD.cta, display: "grid", placeItems: "center" }}><Icon d={I.arrow} size={18} color="#fff" /></div>
+      <div onClick={() => goTab("routes")} className="press" style={{ display: "flex", alignItems: "center", gap: 14, background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, padding: 16, cursor: "pointer" }}>
+        <div style={{ flex: 1 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>Подготовьте поездку целиком</div><div style={{ color: T.subd, fontSize: 12, marginTop: 4, lineHeight: 1.35 }}>TripWise поможет с визой, документами, скидками на отели и напомнит о важных датах.</div></div>
+        <div style={{ width: 42, height: 42, borderRadius: 12, background: GRAD.cta, display: "grid", placeItems: "center", flexShrink: 0 }}><Icon d={I.arrow} size={18} color="#fff" /></div>
       </div>
     </div>
   </div>;
@@ -402,21 +420,7 @@ function Results({ query, routes, loading, error, onRetry, onBack, onEdit, onOpe
     </div>
     <div style={{ padding: "16px 20px 8px", display: "flex", flexDirection: "column", gap: 14 }}>
       {loading ? [0, 1, 2].map(i => <Skeleton key={i} />) : (routes.length ? routes.map((r, i) => <RouteCard key={r.id} r={r} i={i} liked={isLiked(r)} onLike={onLike} onOpen={() => onOpen(r)} />) : <Empty onEdit={onEdit} />)}
-    </div>
-    {/* АВТО-ПРОМОКОДЫ: появляются под маршрутами, если подходят под страну/город назначения и дату вылета.
-        Оформление блока ты доработаешь позже — здесь функциональная заготовка. */}
-    {!loading && routes.length > 0 && (() => {
-      const promos = promosForTrip({ country: query.destCountry, city: query.destName, depISO: query.depISO });
-      if (!promos.length) return null;
-      return <div style={{ padding: "4px 20px 16px" }}>
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: T.subd, marginBottom: 8 }}>Промокоды на отели для этой поездки</div>
-        {promos.map((p) => (
-          <div key={p.code} style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px dashed ${T.violet}55`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
-            <div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700, color: T.text }}>{p.header}</div><div style={{ fontSize: 11, color: T.subd }}>{p.service} · промокод {p.code}</div></div>
-            <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 13, color: T.violet }}>{p.code}</div>
-          </div>))}
-      </div>;
-    })()}</>}
+    </div></>}
   </div>;
 }
 function Empty({ onEdit }) { return <div style={{ textAlign: "center", padding: "40px 20px" }}><div style={{ fontSize: 15, color: T.text, fontWeight: 700 }}>Ничего не найдено</div><div style={{ fontSize: 13, marginTop: 6, marginBottom: 16, color: T.subd }}>Попробуйте изменить параметры</div><Btn onClick={onEdit}>Изменить параметры поиска</Btn></div>; }
@@ -431,6 +435,14 @@ function Empty({ onEdit }) { return <div style={{ textAlign: "center", padding: 
       иначе оставить текущую заглушку с буквами. */
 /* ЛОГОТИПЫ АВИАКОМПАНИЙ: положи PNG в public/graphics/airlines/ с именем = код перевозчика
    (например SU.png, TK.png, DP.png). Файл есть — покажется логотип; файла нет — цветной кружок с кодом. */
+/* ЛОГОТИПЫ СЕРВИСОВ: положи PNG в public/graphics/services/ с именем = id сервиса
+   (yandex.png, ostrovok.png, ...). Нет файла — цветной кружок с первой буквой. */
+function ServiceLogo({ id, name }) {
+  return <div style={{ position: "relative", width: 30, height: 30, borderRadius: 9, background: T.violet + "26", border: `1px solid ${T.violet}55`, display: "grid", placeItems: "center", color: T.violet, fontWeight: 800, fontSize: 13, overflow: "hidden", flexShrink: 0 }}>
+    {(name || "?").slice(0, 1)}
+    {id && <img src={`/graphics/services/${id}.png`} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
+  </div>;
+}
 function AirlineLogo({ code }) {
   const colors = ["#7c5cff", "#48dcdc", "#39d98a", "#f5c451", "#ff6db0", "#f59640"]; const c = colors[(code || "X").charCodeAt(0) % colors.length];
   return <div style={{ position: "relative", width: 30, height: 30, borderRadius: 8, background: c + "26", border: `1px solid ${c}55`, display: "grid", placeItems: "center", color: c, fontWeight: 800, fontSize: 11, fontFamily: "Sora,sans-serif", overflow: "hidden" }}>
@@ -450,6 +462,28 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels }) 
         <div style={{ position: "relative" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 22, color: "#fff" }}>{r.stopover ? stopLabel(r.stopover) : (r.title || "План путешествия")}</div>{r.stopover && <div style={{ background: "linear-gradient(90deg,#48dcdc,#7c5cff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 800, fontSize: 20, fontFamily: "Sora,sans-serif" }}>почти бесплатно</div>}</div>
       </div>
     </div>
+    {/* ПРОМОКОДЫ ПОД БАННЕРОМ (макет): чипсы сервисов с макс. скидкой, релевантные этой поездке */}
+    {(() => {
+      const rel = promosForTrip({ country: query.destCountry, city: query.destName, depISO: query.depISO });
+      const bySvc = new Map();
+      for (const p of rel) { const c = bySvc.get(p.serviceId); if (!c || p.discountRub > c.discountRub) bySvc.set(p.serviceId, p); }
+      const chips = [...bySvc.values()];
+      if (!chips.length) return null;
+      return <div style={{ margin: "12px 20px 0", background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, padding: "12px 12px 10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <div style={{ width: 26, height: 26, borderRadius: 8, background: T.violet + "22", border: `1px solid ${T.violet}55`, display: "grid", placeItems: "center", fontSize: 13 }}>🏷️</div>
+          <span style={{ fontSize: 13.5, fontWeight: 800, color: T.text, fontFamily: "Sora,sans-serif" }}>Маршрут нашёлся. Промокоды на жильё тоже.</span>
+        </div>
+        <div className="carousel" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
+          {chips.map((p) => (
+            <div key={p.serviceId} onClick={() => goHotels(p.serviceId)} className="press" style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,.05)", border: `1px solid ${T.line}`, borderRadius: 14, padding: "8px 10px", cursor: "pointer", flexShrink: 0 }}>
+              <ServiceLogo id={p.serviceId} name={p.service} />
+              <div><div style={{ fontSize: 11.5, fontWeight: 700, color: T.text, whiteSpace: "nowrap" }}>{p.service}</div><div style={{ fontSize: 12, fontWeight: 800, color: T.violet, whiteSpace: "nowrap" }}>до {rub(p.discountRub)}</div></div>
+              <Icon d={I.chevR} size={14} color={T.subd} />
+            </div>))}
+        </div>
+      </div>;
+    })()}
     <div style={{ padding: "12px 20px 0", display: "flex", gap: 8, flexWrap: "wrap" }}>
       {(r.picks || [r.badge]).map(p => { const l = LABELS[p]; return l ? <Badge key={p} label={l.t} color={l.c} icon={l.icon} /> : null; })}
       {r.priced && r.savings > 0 && <Badge label={`Экономия ${rub(r.savings)}`} color={T.green} />}
@@ -490,12 +524,9 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels }) 
           </div>
           {r.stopover && i === 0 && r.segments.length > 1 && (
             <div style={{ background: T.card2, border: `1px solid ${T.violet}33`, borderRadius: 14, padding: 12, marginTop: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}><Icon d={I.moon} size={16} color={T.violet} /><span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>Stopover в {r.stopover.city} • {r.stopover.nights} ноч.</span></div>
-              <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-                <Porthole grad={GRAD.city} h={70} style={{ width: 92, borderRadius: 10 }} />
-                <div style={{ flex: 1 }}><Badge label="Рекомендуем" color={T.gold} /><div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginTop: 6 }}>The Ritz-Carlton</div><div style={{ fontSize: 11, color: T.gold }}>★ 4.8 · 500 м до башен Петронас</div></div>
-              </div>
-              <div onClick={goHotels} className="press" style={{ marginTop: 10, textAlign: "center", background: T.violet + "22", border: `1px solid ${T.violet}55`, borderRadius: 10, padding: 8, color: T.violet, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Посмотреть варианты</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}><Icon d={I.moon} size={16} color={T.violet} /><span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{r.stopover.nights} {plural(r.stopover.nights, "ночь", "ночи", "ночей")} в {prep(r.stopover.city)}</span></div>
+              <div style={{ fontSize: 11.5, color: T.subd, marginTop: 6 }}>Жильё подберём со скидкой — промокоды уже в карточке выше</div>
+              <div onClick={() => goHotels(null)} className="press" style={{ marginTop: 10, textAlign: "center", background: T.violet + "22", border: `1px solid ${T.violet}55`, borderRadius: 10, padding: 8, color: T.violet, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Посмотреть варианты</div>
             </div>)}
         </div>))}
       </div>
@@ -514,7 +545,6 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels }) 
 
 /* ================================ Профиль =============================== */
 function Profile({ name, onTraveler, onEditName, setToast }) {
-  const services = [["Страхование", I.shield], ["Бизнес-залы", I.user], ["eSIM", I.bag]];
   return <div style={{ animation: "fadeUp .3s ease" }}>
     <Header />
     <div style={{ padding: "10px 20px 0", display: "flex", alignItems: "center", gap: 14 }}>
@@ -531,9 +561,7 @@ function Profile({ name, onTraveler, onEditName, setToast }) {
     </div>
     <div style={{ padding: "22px 20px 0" }}>
       <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 16, marginBottom: 12 }}>Полезные сервисы</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-        {services.map(([t, ic]) => (<div key={t} onClick={() => setToast(`${t} — в разработке`)} className="press" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 14, cursor: "pointer" }}><Icon d={ic} size={20} color={T.violet} /><div style={{ fontSize: 11.5, color: T.text, fontWeight: 600, marginTop: 8, lineHeight: 1.2 }}>{t}</div><div style={{ fontSize: 9.5, color: T.subd, marginTop: 2 }}>в разработке</div></div>))}
-      </div>
+      <ServiceGrid setToast={setToast} />
     </div>
     <div style={{ padding: "22px 20px 0" }}>
       <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 16, marginBottom: 12 }}>О приложении</div>
@@ -686,14 +714,68 @@ function promosForTrip({ country, city, depISO }) {
     if (p.city && city && p.city !== city) continue;               // другой город
     if (p.stayFrom && depISO && depISO < p.stayFrom) continue;     // вылет раньше окна
     if (p.stayTo && depISO && depISO > p.stayTo) continue;         // вылет позже окна
-    out.push({ ...p, service: s.name, serviceUrl: s.url });
+    out.push({ ...p, service: s.name, serviceId: s.id, serviceUrl: s.url });
   }
   return out.sort((a, b) => b.discountRub - a.discountRub);
 }
+
+/* ПОЛЕЗНЫЕ СЕРВИСЫ (партнёрские). url — впиши реф-ссылку партнёра; пусто = покажем «скоро».
+   from — цена «от», для чипа. Иконка/цвет — оформление плитки. */
+const EXTRA_SERVICES = [
+  { id: "insurance", title: "Страхование", sub: "медицина · рейс · багаж", from: 200, icon: "shield", color: "#7c5cff", url: "" },
+  { id: "lounge", title: "Бизнес-залы", sub: "комфорт в ожидании рейса", from: 1500, icon: "armchair", color: "#48dcdc", url: "" },
+  { id: "esim", title: "eSIM", sub: "интернет в любой стране", from: 99, icon: "sim", color: "#f59640", url: "" },
+  { id: "transfer", title: "Трансфер", sub: "из аэропорта до отеля", from: 700, icon: "car", color: "#39d98a", url: "" },
+];
+function ServiceGrid({ setToast }) {
+  const go = (s) => { if (s.url) { try { window.open(s.url, "_blank"); } catch (e) { } setToast(`Открываем: ${s.title}…`); } else setToast("Скоро подключим партнёра"); };
+  return <>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      {EXTRA_SERVICES.map((s) => (
+        <div key={s.id} onClick={() => go(s)} className="press" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, padding: 12, cursor: "pointer", display: "flex", flexDirection: "column", minHeight: 118 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 12, background: s.color + "22", border: `1px solid ${s.color}55`, display: "grid", placeItems: "center" }}><Icon d={I[s.icon]} size={19} color={s.color} /></div>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: T.text, marginTop: 8, fontFamily: "Sora,sans-serif" }}>{s.title}</div>
+          <div style={{ fontSize: 10.5, color: T.subd, marginTop: 2, flex: 1, lineHeight: 1.3 }}>{s.sub}</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 800, color: s.color, background: s.color + "1a", border: `1px solid ${s.color}44`, borderRadius: 999, padding: "4px 9px" }}>от {s.from} ₽</span>
+            <div style={{ width: 26, height: 26, borderRadius: 999, background: "rgba(255,255,255,.06)", border: `1px solid ${T.line}`, display: "grid", placeItems: "center" }}><Icon d={I.arrow} size={12} color={T.sub} /></div>
+          </div>
+        </div>))}
+    </div>
+    <div style={{ fontSize: 10.5, color: T.subd, marginTop: 8, textAlign: "center" }}>Услуги оказывают партнёры — переход по кнопке</div>
+  </>;
+}
+
+/* Заглушка раздела «Документы» (этап 4 наполнит контентом) */
+function Docs() {
+  const items = [["Нужна ли виза", "по гражданству РФ и стране поездки"], ["Чек-листы документов", "что собрать и в какие сроки"], ["Визовые центры и ссылки", "куда подавать, официальные сайты"], ["Помощь ИИ", "подскажет, как заполнить анкету"]];
+  return <div style={{ animation: "fadeUp .3s ease" }}>
+    <Header />
+    <div style={{ padding: "8px 20px 0" }}>
+      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 20, color: T.text }}>Документы и визы</div>
+      <div style={{ color: T.subd, fontSize: 12.5, marginTop: 4, marginBottom: 16 }}>Раздел готовим к запуску — вот что здесь появится:</div>
+      <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, overflow: "hidden" }}>
+        {items.map(([t, s], i) => (<div key={t} style={{ display: "flex", alignItems: "center", gap: 12, padding: 14, borderTop: i ? `1px solid ${T.line}` : "none" }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: T.violet + "1e", display: "grid", placeItems: "center", flexShrink: 0 }}><Icon d={I.doc} size={17} color={T.violet} /></div>
+          <div style={{ flex: 1 }}><div style={{ fontSize: 13.5, fontWeight: 700, color: T.text }}>{t}</div><div style={{ fontSize: 11, color: T.subd }}>{s}</div></div>
+          <Badge label="скоро" color={T.subd} />
+        </div>))}
+      </div>
+    </div>
+  </div>;
+}
 const ddmm = (s) => { if (!s) return ""; const p = String(s).split("-"); return p.length === 3 ? `${p[2]}/${p[1]}` : s; };
-function Hotels({ setToast }) {
+function Hotels({ setToast, preOpen, onPreDone }) {
   const [svc, setSvc] = useState(null);
   const [goUrl, setGoUrl] = useState(null); // ссылка нижней кнопки, подменяется при копировании
+  // авто-открытие сервиса по клику на промо-чипс из карточки маршрута
+  useEffect(() => {
+    if (preOpen) {
+      const s = SERVICES.find((x) => x.id === preOpen);
+      if (s) { setSvc(s); setGoUrl(null); }
+      onPreDone && onPreDone();
+    }
+  }, [preOpen]);
   const today = new Date().toISOString().slice(0, 10);
   const copy = async (p) => { try { await navigator.clipboard.writeText(p.code); setGoUrl(p.url || null); setToast("Промокод скопирован"); } catch (e) { setToast("Не удалось скопировать"); } };
   const activePromos = (s) => (s.promos || []).filter(p => p.endDate >= today).sort((a, b) => b.discountRub - a.discountRub);
@@ -735,10 +817,12 @@ export default function App() {
   const [stack, setStack] = useState([]); // overlay под вкладкой «Маршруты»: results/detail
   const [sheet, setSheet] = useState(false);
   const [traveler, setTraveler] = useState(false);
+  const [svcOpen, setSvcOpen] = useState(false);      // оверлей «Сервисы» с главной
+  const [hotelsPre, setHotelsPre] = useState(null);    // авто-открытие сервиса промокодов в «Отелях»
   const [editName, setEditName] = useState(false);
   const [name, setName] = useState(() => store.get("name", "TripWise tester"));
   useEffect(() => { store.set("name", name); }, [name]);
-  const [inset, setInset] = useState({ top: 0, bottomStr: "env(safe-area-inset-bottom)" });
+  const [inset, setInset] = useState({ top: 0, bottomStr: "env(safe-area-inset-bottom)", logoTop: null });
   const safeTop = inset.top;
   const [toast, setToastRaw] = useState(null);
   const toastTimer = useRef(null);
@@ -759,7 +843,9 @@ export default function App() {
       // если Telegram прислал инсеты — берём их; иначе гарантированный запас под шапку Telegram (вырез + ~хедер)
       const top = sum > 0 ? Math.max(sum, 48) : "calc(env(safe-area-inset-top) + 52px)";
       const bottomStr = (sa.bottom || 0) > 0 ? `${sa.bottom}px` : "env(safe-area-inset-bottom)";
-      setInset({ top, bottomStr });
+      // вертикальный центр полосы системных кнопок Telegram («Закрыть» слева, меню справа) — для логотипа
+      const logoTop = sum > 0 ? Math.round((sa.top || 0) + Math.max(ci.top || 0, 44) / 2 - 13) : null;
+      setInset({ top, bottomStr, logoTop });
     };
     try {
       tg.ready(); tg.expand();
@@ -847,10 +933,11 @@ export default function App() {
   useEffect(() => {
     const tg = (typeof window !== "undefined") && window.Telegram && window.Telegram.WebApp;
     if (!tg || !tg.BackButton) return;
-    const canBack = stack.length > 0 || sheet || traveler || editName;
+    const canBack = stack.length > 0 || sheet || traveler || editName || svcOpen;
     let fired = false; // защита от двойного срабатывания (две подписки)
     const onBack = () => {
       if (fired) return; fired = true; setTimeout(() => { fired = false; }, 300);
+      if (svcOpen) return setSvcOpen(false);
       if (editName) return setEditName(false);
       if (traveler) return setTraveler(false);
       if (sheet) return setSheet(false);
@@ -867,7 +954,7 @@ export default function App() {
       try { if (tg.BackButton.offClick) tg.BackButton.offClick(onBack); } catch (e) { }
       try { if (tg.offEvent) tg.offEvent("backButtonClicked", onBack); } catch (e) { }
     };
-  }, [stack, sheet, traveler, editName]);
+  }, [stack, sheet, traveler, editName, svcOpen]);
   const isLiked = (r) => !!saved.find(x => x.id === ("liked-" + r.id));
   const likeRoute = (r) => {
     const id = "liked-" + r.id;
@@ -894,11 +981,12 @@ export default function App() {
 
   let main = null;
   if (tab === "routes") {
-    if (top === "detail") main = <Detail r={selected} query={query} onBack={() => setStack(["results"])} onEdit={() => { setTab("home"); setSheet(true); }} liked={isLiked(selected)} onLike={likeRoute} onShare={shareRoute} goHotels={() => setTab("hotels")} />;
+    if (top === "detail") main = <Detail r={selected} query={query} onBack={() => setStack(["results"])} onEdit={() => { setTab("home"); setSheet(true); }} liked={isLiked(selected)} onLike={likeRoute} onShare={shareRoute} goHotels={(svc) => { setHotelsPre(svc || null); setTab("hotels"); }} />;
     else if (top === "results") main = <Results query={query} routes={routes} loading={loading} error={searchError} onRetry={() => runSearch()} onEdit={() => { setTab("home"); setSheet(true); }} onBack={() => setStack([])} onOpen={(r) => { setSelected(r); setStack(["results", "detail"]); }} isLiked={isLiked} onLike={likeRoute} />;
     else main = <RoutesScreen onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved(p => p.filter(x => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => { const f = { ...s.form, dep: s.form.dep ? new Date(s.form.dep) : null, ret: s.form.ret ? new Date(s.form.ret) : null }; setForm(f); runSearch(f); }} />;
-  } else if (tab === "home") main = <Home onSearch={() => setSheet(true)} onPickDest={openSheetWithDest} goProfile={() => setTab("profile")} />;
-  else if (tab === "hotels") main = <Hotels setToast={setToast} />;
+  } else if (tab === "home") main = <Home onSearch={() => setSheet(true)} onPickDest={openSheetWithDest} goTab={setTab} openServices={() => setSvcOpen(true)} />;
+  else if (tab === "hotels") main = <Hotels setToast={setToast} preOpen={hotelsPre} onPreDone={() => setHotelsPre(null)} />;
+  else if (tab === "docs") main = <Docs />;
   else if (tab === "profile") main = <Profile name={name} onTraveler={() => setTraveler(true)} onEditName={() => setEditName(true)} setToast={setToast} />;
 
   return <div style={{ minHeight: "100vh", background: T.bg, display: "flex", justifyContent: "center" }}>
@@ -921,10 +1009,13 @@ export default function App() {
       .app-root{height:100vh;height:100dvh}
     `}</style>
     <div className="app-root" style={{ width: "100%", maxWidth: 420, paddingTop: safeTop, background: `radial-gradient(120% 60% at 80% 0%, #1a1340 0%, ${T.bg} 55%)`, color: T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {tab === "home" && stack.length === 0 && (
+        <div style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", top: inset.logoTop != null ? inset.logoTop + "px" : "calc(env(safe-area-inset-top, 0px) + 14px)", zIndex: 30, pointerEvents: "none" }}><Logo /></div>)}
       <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", paddingTop: 45 }}>{main}</div>
-      <BottomNav tab={tab} setTab={(k) => { if (k === tab && (k === "routes" || k === "profile" || k === "hotels")) setStack([]); if (k === "routes" && tab === "routes") setStack([]); setTab(k); }} bottomStr={inset.bottomStr} />
+      <BottomNav tab={tab} setTab={(k) => { if (k === tab && (k === "routes" || k === "profile" || k === "hotels" || k === "docs")) setStack([]); if (k === "routes" && tab === "routes") setStack([]); setTab(k); }} bottomStr={inset.bottomStr} />
       {sheet && <SearchSheet form={form} setForm={setForm} onClose={() => setSheet(false)} onSubmit={() => runSearch()} setToast={setToast} />}
       {traveler && <Traveler safeTop={safeTop} bottomStr={inset.bottomStr} onBack={() => setTraveler(false)} />}
+      {svcOpen && <Overlay onClose={() => setSvcOpen(false)}><SheetHead title="Сервисы для поездки" onClose={() => setSvcOpen(false)} /><ServiceGrid setToast={setToast} /></Overlay>}
       {editName && <NameEdit name={name} onClose={() => setEditName(false)} onSave={(n) => { setName(n); setEditName(false); setToast("Имя сохранено"); }} />}
       <Toast msg={toast} />
     </div>
