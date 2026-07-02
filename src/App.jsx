@@ -28,7 +28,7 @@ const GP = [GRAD.ocean, GRAD.city, GRAD.sunset, GRAD.night];
 const gradFor = (code) => GP[((code || "X").charCodeAt(0) + (code || "X").charCodeAt(1 || 0)) % GP.length];
 
 /* ---- датасет аэропортов (курированный, ~130). destId — наши «умные» направления ---- */
-const CUR = { USM: "samui", DPS: "bali", MLE: "maldives", HND: "tokyo", HKT: "phuket" };
+const CUR = { USM: "samui", DPS: "bali", MLE: "maldives", HND: "tokyo", HKT: "phuket", ZNZ: "zanzibar", PQC: "phuquoc", CMB: "srilanka", MRU: "mauritius", SEZ: "seychelles", MNL: "philippines" };
 const RAW_AIRPORTS = [
   ["MOW", "Москва", "Россия", "🇷🇺"], ["LED", "Санкт-Петербург", "Россия", "🇷🇺"], ["AER", "Сочи", "Россия", "🇷🇺"],
   ["MRV", "Минеральные Воды", "Россия", "🇷🇺"], ["AAQ", "Анапа", "Россия", "🇷🇺"], ["GDZ", "Геленджик", "Россия", "🇷🇺"],
@@ -402,7 +402,21 @@ function Results({ query, routes, loading, error, onRetry, onBack, onEdit, onOpe
     </div>
     <div style={{ padding: "16px 20px 8px", display: "flex", flexDirection: "column", gap: 14 }}>
       {loading ? [0, 1, 2].map(i => <Skeleton key={i} />) : (routes.length ? routes.map((r, i) => <RouteCard key={r.id} r={r} i={i} liked={isLiked(r)} onLike={onLike} onOpen={() => onOpen(r)} />) : <Empty onEdit={onEdit} />)}
-    </div></>}
+    </div>
+    {/* АВТО-ПРОМОКОДЫ: появляются под маршрутами, если подходят под страну/город назначения и дату вылета.
+        Оформление блока ты доработаешь позже — здесь функциональная заготовка. */}
+    {!loading && routes.length > 0 && (() => {
+      const promos = promosForTrip({ country: query.destCountry, city: query.destName, depISO: query.depISO });
+      if (!promos.length) return null;
+      return <div style={{ padding: "4px 20px 16px" }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: T.subd, marginBottom: 8 }}>Промокоды на отели для этой поездки</div>
+        {promos.map((p) => (
+          <div key={p.code} style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px dashed ${T.violet}55`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
+            <div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700, color: T.text }}>{p.header}</div><div style={{ fontSize: 11, color: T.subd }}>{p.service} · промокод {p.code}</div></div>
+            <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 13, color: T.violet }}>{p.code}</div>
+          </div>))}
+      </div>;
+    })()}</>}
   </div>;
 }
 function Empty({ onEdit }) { return <div style={{ textAlign: "center", padding: "40px 20px" }}><div style={{ fontSize: 15, color: T.text, fontWeight: 700 }}>Ничего не найдено</div><div style={{ fontSize: 13, marginTop: 6, marginBottom: 16, color: T.subd }}>Попробуйте изменить параметры</div><Btn onClick={onEdit}>Изменить параметры поиска</Btn></div>; }
@@ -635,22 +649,47 @@ function RoutesScreen({ onPickDest, onSearch, saved, onUnlike, onOpenSaved, rece
     url         — КУДА вести при копировании этого кода (если не задан — общий url сервиса).
                   Иконка копирования и подменяет ссылку у нижней кнопки «Перейти…».
 */
+/*
+  ПРОМОКОДЫ. Поля каждого промо:
+    header      — заголовок-предложение (обяз.)
+    code        — сам промокод (обяз.)
+    discountRub — скидка в рублях, для сортировки (обяз.)
+    endDate     — КРАЙНИЙ срок бронирования (YYYY-MM-DD): промо доступен, если сегодня <= endDate
+    stayFrom/stayTo — окно ДАТ ПОЕЗДКИ (YYYY-MM-DD): промо подходит, если дата вылета попадает в это окно
+    country     — страна назначения (как в датасете, напр. "Индонезия"); пусто = действует для всех стран
+    city        — город назначения (как в датасете, напр. "Бали"); пусто = любой город страны
+    url         — куда вести (если пусто — общий url сервиса)
+  Промокод сам появится в результатах поиска, если: сегодня<=endDate И страна/город совпали (или пусто=глобальный) И дата вылета в окне stayFrom..stayTo.
+*/
 const SERVICES = [
   { id: "yandex", name: "Яндекс Путешествия", desc: "Отели по всему миру", grad: GRAD.ocean, url: "https://travel.yandex.ru",
     promos: [
-      { header: "Скидка на первое бронирование отеля", code: "TRIPWISE20", discountRub: 5000, endDate: "2026-12-31", stayFrom: "2026-06-01", stayTo: "2026-12-31", url: "https://travel.yandex.ru/hotels/" },
-      { header: "Промокод на отели Чувашии", code: "CHUVASHIA10", discountRub: 1500, endDate: "2026-09-30", stayFrom: "2026-07-01", stayTo: "2026-09-30", url: "https://travel.yandex.ru/hotels/cheboksary/" },
+      { header: "Скидка на первое бронирование отеля", code: "TRIPWISE20", discountRub: 5000, endDate: "2026-12-31", stayFrom: "2026-06-01", stayTo: "2026-12-31", country: "", city: "", url: "https://travel.yandex.ru/hotels/" },
+      { header: "Промокод на отели Чувашии", code: "CHUVASHIA10", discountRub: 1500, endDate: "2026-09-30", stayFrom: "2026-07-01", stayTo: "2026-09-30", country: "Россия", city: "Чебоксары", url: "https://travel.yandex.ru/hotels/cheboksary/" },
     ] },
   { id: "ostrovok", name: "Островок", desc: "Кэшбэк на бронирования", grad: GRAD.sunset, url: "https://ostrovok.ru",
     promos: [
-      { header: "Скидка на отели в Азии", code: "OSTROVOK15", discountRub: 3000, endDate: "2026-11-15", stayFrom: "2026-08-01", stayTo: "2026-11-30" },
+      { header: "Скидка на отели в Азии", code: "OSTROVOK15", discountRub: 3000, endDate: "2026-11-15", stayFrom: "2026-08-01", stayTo: "2026-11-30", country: "", city: "" },
     ] },
   { id: "bali", name: "Bali Resorts", desc: "Спецпредложение на виллы", grad: GRAD.city, url: "https://example.com",
     promos: [
-      { header: "Скидка на виллы с бассейном", code: "BALI25", discountRub: 8000, endDate: "2026-10-01", stayFrom: "2026-09-01", stayTo: "2026-10-31" },
-      // пример истёкшего — НЕ покажется: { header:"Старая акция", code:"OLD", discountRub:9999, endDate:"2025-01-01" },
+      { header: "Скидка на виллы с бассейном", code: "BALI25", discountRub: 8000, endDate: "2026-10-01", stayFrom: "2026-09-01", stayTo: "2026-10-31", country: "Индонезия", city: "Бали" },
     ] },
 ];
+const todayISO = () => new Date().toISOString().slice(0, 10);
+// промокоды, релевантные конкретной поездке (страна/город назначения + дата вылета)
+function promosForTrip({ country, city, depISO }) {
+  const today = todayISO(); const out = [];
+  for (const s of SERVICES) for (const p of (s.promos || [])) {
+    if (p.endDate && p.endDate < today) continue;                  // бронировать уже нельзя
+    if (p.country && country && p.country !== country) continue;   // другая страна
+    if (p.city && city && p.city !== city) continue;               // другой город
+    if (p.stayFrom && depISO && depISO < p.stayFrom) continue;     // вылет раньше окна
+    if (p.stayTo && depISO && depISO > p.stayTo) continue;         // вылет позже окна
+    out.push({ ...p, service: s.name, serviceUrl: s.url });
+  }
+  return out.sort((a, b) => b.discountRub - a.discountRub);
+}
 const ddmm = (s) => { if (!s) return ""; const p = String(s).split("-"); return p.length === 3 ? `${p[2]}/${p[1]}` : s; };
 function Hotels({ setToast }) {
   const [svc, setSvc] = useState(null);
@@ -785,7 +824,7 @@ export default function App() {
   const runSearch = async (f) => {
     const ff = f || form;
     if (!ff.origin || !ff.dest || !ff.dep) { setSheet(true); setToast("Заполните откуда, куда и дату"); return; }
-    const nq = { origin: ff.origin.city, destName: ff.dest.city, destinationId: ff.dest.destId || ff.dest.code, adults: ff.adults, datesLabel: datesLabel(ff) };
+    const nq = { origin: ff.origin.city, destName: ff.dest.city, destCountry: ff.dest.country, destinationId: ff.dest.destId || ff.dest.code, adults: ff.adults, datesLabel: datesLabel(ff), depISO: iso(ff.dep) };
     lastSearchRef.current = { oc: ff.origin.code, dc: ff.dest.code, df: iso(ff.dep), dt: (ff.round && ff.ret) ? iso(ff.ret) : "", a: ff.adults || 1 };
     setQuery(nq); setSheet(false); setTab("routes"); setStack(["results"]); setLoading(true); setSearchError(false);  // <- переходим в «Маршруты»
     const recForm = { origin: ff.origin, dest: ff.dest, round: ff.round, dep: iso(ff.dep), ret: ff.ret ? iso(ff.ret) : null, adults: ff.adults };
