@@ -343,10 +343,7 @@ function Home({ onSearch, onPickDest, goTab, openServices }) {
         </div>))}
     </div>
     <div style={{ padding: "24px 0 0 20px" }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", paddingRight: 20, marginBottom: 12 }}>
-        <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 17 }}>Идеи для выгодных маршрутов ✨</div>
-        <span onClick={onSearch} className="press" style={{ fontSize: 12, color: T.subd, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>Все направления ›</span>
-      </div>
+      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 17, marginBottom: 12 }}>Идеи для выгодных маршрутов ✨</div>
       <div className="carousel" style={{ display: "flex", gap: 12, overflowX: "auto", paddingRight: 20, paddingBottom: 4, scrollSnapType: "x mandatory" }}>
         {ideas.map(([name, via, save, g, code, id]) => (<div key={name} onClick={() => onPickDest(id)} className="press" style={{ minWidth: 160, cursor: "pointer", scrollSnapAlign: "start" }}><Porthole image={g} h={110} label={name} sub={via} codeRight={"→ " + code} style={{ borderRadius: 16 }} /><div style={{ marginTop: 8, fontSize: 11, color: T.subd }}>Скидка</div><div style={{ fontSize: 15, fontWeight: 800, color: T.green, fontFamily: "Sora,sans-serif" }}>{save}</div></div>))}
       </div>
@@ -646,6 +643,41 @@ const DOC_MATRIX = {
   "Филиппины": [DOC_PASS, { id: "ph_etd", name: "eTravel декларация", E: 3, P: 0 }, DOC_INS],
 };
 const DOC_BASE = [DOC_PASS, DOC_INS];
+/* По ситуации: документы на детей (добавляются в комплект, если едут дети) */
+const KID_DOCS = [
+  { id: "kid_birth", name: "Свидетельство о рождении ребёнка", E: 9999, P: 0 },
+  { id: "kid_consent", name: "Согласие на выезд (если ребёнок с одним родителем)", E: 9999, P: 3 },
+];
+/* Карточки документов: тип, описание, что потребуется, официальные ссылки.
+   URL пустые — впиши официальные/партнёрские ссылки, пустые не показываются. */
+const DOC_INFO = {
+  pass6: { type: "info", desc: "Проверьте срок действия загранпаспорта: для большинства стран — минимум 6 месяцев после даты возвращения.", req: ["Загранпаспорт"], links: [] },
+  ins: { type: "online", desc: "Медицинская страховка на весь срок поездки. Оформляется онлайн за несколько минут.", req: ["Паспортные данные", "Даты поездки"], links: [{ label: "Оформить страховку", url: "" }] },
+  evisa_id: { type: "online", desc: "Электронная виза Индонезии (e-VOA). Заполняется онлайн, понадобится оплата картой.", req: ["Скан загранпаспорта", "Фото", "Обратный билет"], links: [{ label: "Официальный сайт eVisa", url: "" }] },
+  ecd: { type: "online", desc: "Электронная таможенная декларация Индонезии. Доступна не раньше чем за 3 дня до прилёта.", req: ["Данные рейса", "Загранпаспорт"], links: [{ label: "Сайт e-CD", url: "" }] },
+  tdac: { type: "online", desc: "Электронная карта прибытия Таиланда. Открывается за 3 дня до прилёта — раньше заполнить нельзя.", req: ["Загранпаспорт", "Номер рейса", "Адрес проживания"], links: [{ label: "Официальный сайт TDAC", url: "" }] },
+  imuga: { type: "online", desc: "Декларация прибытия на Мальдивы. Заполняется онлайн в течение 96 часов до вылета.", req: ["Загранпаспорт", "Данные рейса", "Отель"], links: [{ label: "Сайт Imuga", url: "" }] },
+  jvisa: { type: "paper", desc: "Консульская виза Японии. Подаётся через визовый центр или консульство, потребуется пакет документов.", req: ["Загранпаспорт", "Анкета", "Фото 45×45", "Брони билетов и жилья", "Справка с работы", "Выписка из банка"], links: [{ label: "Визовый центр", url: "" }, { label: "Консульство Японии", url: "" }] },
+  vjw: { type: "online", desc: "Visit Japan Web — регистрация для ускоренного прохождения контроля по прилёте.", req: ["Загранпаспорт", "Данные рейса"], links: [{ label: "Visit Japan Web", url: "" }] },
+  tz_visa: { type: "online", desc: "Электронная виза Танзании (включая Занзибар).", req: ["Скан загранпаспорта", "Фото", "Обратный билет"], links: [{ label: "Сайт eVisa Танзании", url: "" }] },
+  vn_evisa: { type: "online", desc: "Электронная виза Вьетнама.", req: ["Скан загранпаспорта", "Фото"], links: [{ label: "Сайт eVisa Вьетнама", url: "" }] },
+  eta: { type: "online", desc: "Электронное разрешение на въезд в Шри-Ланку (ETA).", req: ["Загранпаспорт", "Данные рейса"], links: [{ label: "Сайт ETA", url: "" }] },
+  mu_form: { type: "online", desc: "Единая форма въезда на Маврикий (All-in-One). Заполняется онлайн перед вылетом.", req: ["Загранпаспорт", "Данные рейса", "Отель"], links: [{ label: "Форма въезда", url: "" }] },
+  sc_ta: { type: "online", desc: "Travel Authorization для въезда на Сейшелы. Оформляется онлайн, есть небольшой сбор.", req: ["Загранпаспорт", "Данные рейса", "Отель"], links: [{ label: "Сайт Travel Authorization", url: "" }] },
+  ph_etd: { type: "online", desc: "Электронная декларация eTravel для въезда на Филиппины. Бесплатно, за 72 часа до вылета.", req: ["Загранпаспорт", "Данные рейса"], links: [{ label: "Сайт eTravel", url: "" }] },
+  schengen: { type: "paper", desc: "Анкета на шенгенскую визу. Подаётся в визовый центр вместе с полным пакетом документов — начинайте заранее.", req: ["Загранпаспорт", "Фото 35×45", "Страховка от 30 000 €", "Брони жилья и билетов", "Финансовые гарантии", "Справка с работы"], links: [{ label: "Визовый центр", url: "" }, { label: "Требования консульства", url: "" }] },
+  kid_birth: { type: "info", desc: "Оригинал или нотариальная копия свидетельства о рождении — могут спросить на границе.", req: ["Свидетельство о рождении"], links: [] },
+  kid_consent: { type: "paper", desc: "Нотариальное согласие второго родителя, если ребёнок выезжает с одним из родителей. Требования зависят от страны.", req: ["Паспортные данные родителей", "Данные ребёнка", "Нотариус"], links: [] },
+};
+const DOC_TYPE_LABEL = { online: "онлайн-форма", paper: "бумажный документ", info: "проверка" };
+/* Единый каталог документов для поиска (сценарий «конкретный документ») */
+const ALL_DOCS = (() => {
+  const m = new Map();
+  for (const [country, arr] of Object.entries(DOC_MATRIX)) for (const dd of arr) if (!m.has(dd.id)) m.set(dd.id, { ...dd, country });
+  m.set("schengen", { id: "schengen", name: "Шенгенская анкета", E: 180, P: 15, country: "Европа (Шенген)" });
+  for (const k of KID_DOCS) if (!m.has(k.id)) m.set(k.id, { ...k, country: "любая страна" });
+  return [...m.values()];
+})();
 const tripDocs = (t) => DOC_MATRIX[t.country] || DOC_BASE;
 const daysTo = (iso) => iso ? Math.max(0, Math.ceil((new Date(iso) - Date.now()) / 86400000)) : null;
 // статус документа по таймингу относительно даты вылета
@@ -720,24 +752,29 @@ function TripCard({ t, onOpen }) {
 
 function TripScreen({ t, onBack, onUpdate, onDelete, onFindTickets, goHotels, goDocs, setToast }) {
   const docs = tripDocs(t), p = tripProgress(t), act = nextAction(t), d = daysTo(t.df);
-  const [open, setOpen] = useState(act.block || "docs");
+  const [blk, setBlk] = useState(act.block || "tickets"); // активная категория
   const [menu, setMenu] = useState(false);
   const [nameDraft, setNameDraft] = useState(t.title);
-  const toggle = (k) => setOpen(open === k ? null : k);
   const upd = (fn) => onUpdate(t.id, fn);
-  const runAct = () => { if (act.act === "search") onFindTickets(t); else if (act.act === "hotels") goHotels(); else if (act.act && act.block) setOpen(act.block); };
+  const runAct = () => { if (act.act === "search") onFindTickets(t); else if (act.act === "hotels") goHotels(); else if (act.block) setBlk(act.block); };
   const nightsAll = (t.df && t.dt) ? Math.max(1, Math.round((new Date(t.dt) - new Date(t.df)) / 86400000)) : null;
   const stopN = (t.route && t.route.stopover && t.route.stopover.nights) || 0;
   const nightsMain = nightsAll != null ? Math.max(1, nightsAll - stopN) : null;
-  const Head = ({ k, icon, title, right }) => (
-    <div onClick={() => toggle(k)} className="press" style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer" }}>
-      <Icon d={icon} size={18} color={T.subd} />
-      <span style={{ fontSize: 14, fontWeight: 700, color: T.text, flex: 1, fontFamily: "Sora,sans-serif" }}>{title}</span>
-      {right}
-      <span style={{ transform: open === k ? "rotate(90deg)" : "none", transition: "transform .15s", display: "inline-flex" }}><Icon d={I.chevR} size={14} color={T.subd} /></span>
-    </div>
-  );
-  const Card = ({ children }) => <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, padding: "12px 12px", marginBottom: 8 }}>{children}</div>;
+  const lodgeTotal = 1 + (t.route && t.route.stopover ? 1 : 0);
+  const lodgeDone = (t.checks.lodgeMain ? 1 : 0) + (t.route && t.route.stopover && t.checks.lodgeStop ? 1 : 0);
+  const docsDone = docs.filter((x) => t.checks.docs[x.id]).length;
+  const svcAdded = t.servicesAdded || [];
+  const svcDone = svcAdded.filter((id) => t.checks.services[id]).length;
+  // статус категории: done — всё закрыто (зелёная галочка), part — начато, none — пусто
+  const TABS = [
+    ["tickets", "Билеты", I.plane, t.route ? (t.checks.tickets ? "done" : "part") : "none"],
+    ["lodging", "Жильё", I.hotel, lodgeDone === lodgeTotal ? "done" : (lodgeDone ? "part" : "none")],
+    ["docs", "Документы", I.doc, docs.length && docsDone === docs.length ? "done" : (docsDone ? "part" : "none")],
+    ["services", "Услуги", I.bag, svcAdded.length ? (svcDone === svcAdded.length ? "done" : "part") : "none"],
+  ];
+  const Mark = ({ s }) => s === "done"
+    ? <span style={{ width: 15, height: 15, borderRadius: 999, background: T.green + "26", border: `1px solid ${T.green}`, display: "grid", placeItems: "center", flexShrink: 0 }}><Icon d={I.check} size={9} color={T.green} /></span>
+    : s === "part" ? <span style={{ width: 7, height: 7, borderRadius: 999, background: T.violet, flexShrink: 0 }} /> : null;
   return <div style={{ animation: "slideIn .28s ease", paddingBottom: 8 }}>
     <div style={{ display: "flex", alignItems: "center", padding: "16px 20px 8px", gap: 10 }}>
       <div onClick={onBack} className="press" style={{ cursor: "pointer", transform: "translateY(25px)" }}><Icon d={I.back} size={22} color={T.text} /></div>
@@ -757,7 +794,7 @@ function TripScreen({ t, onBack, onUpdate, onDelete, onFindTickets, goHotels, go
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent,rgba(5,5,20,.72))" }} />
         <div style={{ position: "relative" }}>
           <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 19, color: "#fff" }}>{t.title}</div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,.85)" }}>{t.dcName}{t.country ? `, ${t.country}` : ""}{t.df ? ` · ${fmtShort(new Date(t.df))}` : ""}{t.dt ? ` — ${fmtShort(new Date(t.dt))}` : ""}{d != null ? ` · через ${d} дн.` : ""}{t.adults > 1 ? ` · ${t.adults} чел.` : ""}</div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,.85)" }}>{t.dcName}{t.country && t.country !== t.dcName ? `, ${t.country}` : ""}{t.df ? ` · ${fmtShort(new Date(t.df))}` : ""}{t.dt ? ` — ${fmtShort(new Date(t.dt))}` : ""}{d != null ? ` · через ${d} дн.` : ""}{t.adults > 1 ? ` · ${t.adults} чел.` : ""}</div>
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 2px 12px" }}>
@@ -771,38 +808,38 @@ function TripScreen({ t, onBack, onUpdate, onDelete, onFindTickets, goHotels, go
           {act.btn && <div onClick={runAct} className="press" style={{ background: GRAD.cta, borderRadius: 11, padding: "9px 13px", color: "#fff", fontSize: 12.5, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{act.btn}</div>}
         </div>
       </div>
-      <Card>
-        <Head k="tickets" icon={I.plane} title="Билеты" right={t.route ? (t.checks.tickets ? <span style={{ fontSize: 11.5, color: T.green, fontWeight: 700 }}>куплены ✓</span> : <span style={{ fontSize: 11.5, color: T.subd }}>выбраны</span>) : <span style={{ fontSize: 11.5, color: T.subd }}>не выбраны</span>} />
-        {open === "tickets" && <div style={{ marginTop: 10, borderTop: `1px solid ${T.line}`, paddingTop: 10 }}>
-          {t.route ? <>
-            <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{t.route.codes}</div>
-            <div style={{ fontSize: 11.5, color: T.subd, marginTop: 2 }}>{t.route.stopover ? `стоповер в ${prep(t.route.stopover.city)} · ${t.route.stopover.nights} ноч. · ` : ""}{rub(t.route.total)}</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 10 }}>
-              <Check on={t.checks.tickets} onClick={() => upd((x) => ({ ...x, checks: { ...x.checks, tickets: !x.checks.tickets } }))} />
-              <span style={{ fontSize: 13, color: T.text, flex: 1 }}>Билеты куплены</span>
-              <span onClick={() => onFindTickets(t)} className="press" style={{ fontSize: 12, color: T.violet, fontWeight: 700, cursor: "pointer" }}>Искать снова</span>
-            </div>
-          </> : <div onClick={() => onFindTickets(t)} className="press" style={{ textAlign: "center", background: T.violet + "22", border: `1px solid ${T.violet}55`, borderRadius: 10, padding: 9, color: T.violet, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Найти билеты</div>}
-        </div>}
-      </Card>
-      <Card>
-        <Head k="lodging" icon={I.hotel} title="Жильё" right={<span style={{ fontSize: 11.5, color: T.subd }}>{(t.checks.lodgeMain ? 1 : 0) + (t.route && t.route.stopover && t.checks.lodgeStop ? 1 : 0)} из {1 + (t.route && t.route.stopover ? 1 : 0)}</span>} />
-        {open === "lodging" && <div style={{ marginTop: 10, borderTop: `1px solid ${T.line}`, paddingTop: 4 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 0" }}>
+      {/* категории одной строкой: тап переключает, зелёная галочка = блок полностью закрыт */}
+      <div className="carousel" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 10 }}>
+        {TABS.map(([k, label, ic, st]) => (
+          <div key={k} onClick={() => setBlk(k)} className="press" style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 11px", borderRadius: 12, border: `1px solid ${blk === k ? T.violet : T.line}`, background: blk === k ? T.violet + "16" : T.card, cursor: "pointer", flexShrink: 0 }}>
+            <Icon d={ic} size={15} color={blk === k ? T.violet : T.subd} />
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: blk === k ? T.violet : T.text, whiteSpace: "nowrap" }}>{label}</span>
+            <Mark s={st} />
+          </div>))}
+      </div>
+      <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, padding: 12, marginBottom: 12 }}>
+        {blk === "tickets" && (t.route ? <>
+          <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{t.route.codes}</div>
+          <div style={{ fontSize: 11.5, color: T.subd, marginTop: 2 }}>{t.route.stopover ? `стоповер в ${prep(t.route.stopover.city)} · ${t.route.stopover.nights} ноч. · ` : ""}{rub(t.route.total)}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 12, borderTop: `1px solid ${T.line}`, paddingTop: 12 }}>
+            <Check on={t.checks.tickets} onClick={() => upd((x) => ({ ...x, checks: { ...x.checks, tickets: !x.checks.tickets } }))} />
+            <span style={{ fontSize: 13, color: T.text, flex: 1 }}>Билеты куплены</span>
+            <span onClick={() => onFindTickets(t)} className="press" style={{ fontSize: 12, color: T.violet, fontWeight: 700, cursor: "pointer" }}>Искать снова</span>
+          </div>
+        </> : <div onClick={() => onFindTickets(t)} className="press" style={{ textAlign: "center", background: T.violet + "22", border: `1px solid ${T.violet}55`, borderRadius: 10, padding: 9, color: T.violet, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Найти билеты</div>)}
+        {blk === "lodging" && <>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "4px 0 8px" }}>
             <Check on={t.checks.lodgeMain} onClick={() => upd((x) => ({ ...x, checks: { ...x.checks, lodgeMain: !x.checks.lodgeMain } }))} />
             <span style={{ fontSize: 13, color: T.text, flex: 1 }}>Отель: {t.dcName}{nightsMain != null ? ` · ${nightsMain} ноч.` : ""}</span>
             <span onClick={goHotels} className="press" style={{ fontSize: 12, color: T.violet, fontWeight: 700, cursor: "pointer" }}>Подобрать</span>
           </div>
-          {t.route && t.route.stopover && <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 0", borderTop: `1px solid ${T.line}` }}>
+          {t.route && t.route.stopover && <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 0 4px", borderTop: `1px solid ${T.line}` }}>
             <Check on={t.checks.lodgeStop} onClick={() => upd((x) => ({ ...x, checks: { ...x.checks, lodgeStop: !x.checks.lodgeStop } }))} />
             <span style={{ fontSize: 13, color: T.text, flex: 1 }}>Отель в {prep(t.route.stopover.city)} · {t.route.stopover.nights} ноч.</span>
             <span onClick={goHotels} className="press" style={{ fontSize: 12, color: T.violet, fontWeight: 700, cursor: "pointer" }}>Подобрать</span>
           </div>}
-        </div>}
-      </Card>
-      <Card>
-        <Head k="docs" icon={I.doc} title="Документы" right={<span style={{ fontSize: 11.5, color: T.subd }}>{docs.filter((x) => t.checks.docs[x.id]).length} из {docs.length}</span>} />
-        {open === "docs" && <div style={{ marginTop: 10, borderTop: `1px solid ${T.line}`, paddingTop: 4 }}>
+        </>}
+        {blk === "docs" && <>
           {docs.map((doc, i) => { const st = docStatus(doc, t.df); return (
             <div key={doc.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 0", borderTop: i ? `1px solid ${T.line}` : "none" }}>
               <Check on={!!t.checks.docs[doc.id]} onClick={() => upd((x) => ({ ...x, checks: { ...x.checks, docs: { ...x.checks.docs, [doc.id]: !x.checks.docs[doc.id] } } }))} />
@@ -810,12 +847,9 @@ function TripScreen({ t, onBack, onUpdate, onDelete, onFindTickets, goHotels, go
               <TimeBadge st={st} />
             </div>); })}
           <div style={{ fontSize: 10.5, color: T.subd, marginTop: 8 }}>Сроки ориентировочные — проверяйте на официальных сайтах</div>
-        </div>}
-      </Card>
-      <Card>
-        <Head k="services" icon={I.bag} title="Услуги" right={<span style={{ fontSize: 11.5, color: T.subd }}>{(t.servicesAdded || []).length ? `${(t.servicesAdded || []).filter((id) => t.checks.services[id]).length} из ${(t.servicesAdded || []).length}` : "по желанию"}</span>} />
-        {open === "services" && <div style={{ marginTop: 10, borderTop: `1px solid ${T.line}`, paddingTop: 4 }}>
-          {EXTRA_SERVICES.map((s, i) => { const added = (t.servicesAdded || []).includes(s.id); return (
+        </>}
+        {blk === "services" && <>
+          {EXTRA_SERVICES.map((s, i) => { const added = svcAdded.includes(s.id); return (
             <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 0", borderTop: i ? `1px solid ${T.line}` : "none" }}>
               {added ? <Check on={!!t.checks.services[s.id]} onClick={() => upd((x) => ({ ...x, checks: { ...x.checks, services: { ...x.checks.services, [s.id]: !x.checks.services[s.id] } } }))} />
                 : <div style={{ width: 22, height: 22, borderRadius: 7, border: `1.5px dashed ${T.line}`, flexShrink: 0 }} />}
@@ -825,9 +859,9 @@ function TripScreen({ t, onBack, onUpdate, onDelete, onFindTickets, goHotels, go
                 : <span onClick={() => upd((x) => ({ ...x, servicesAdded: [...(x.servicesAdded || []), s.id] }))} className="press" style={{ fontSize: 11.5, color: s.color, fontWeight: 700, border: `1px solid ${s.color}55`, background: s.color + "14", borderRadius: 999, padding: "4px 10px", cursor: "pointer" }}>＋ Добавить</span>}
             </div>); })}
           <div style={{ fontSize: 10.5, color: T.subd, marginTop: 8 }}>Добавленные услуги попадают в готовность и напоминания</div>
-        </div>}
-      </Card>
-      <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 4px 0" }}>
+        </>}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "0 4px" }}>
         <Icon d={I.moon} size={16} color={T.subd} />
         <span style={{ fontSize: 12.5, color: T.subd, flex: 1 }}>Напоминания о дедлайнах</span>
         <Badge label="скоро" color={T.subd} />
@@ -1024,21 +1058,131 @@ function ServiceGrid({ setToast }) {
 }
 
 /* Заглушка раздела «Документы» (этап 4 наполнит контентом) */
-function Docs() {
-  const items = [["Нужна ли виза", "по гражданству РФ и стране поездки"], ["Чек-листы документов", "что собрать и в какие сроки"], ["Визовые центры и ссылки", "куда подавать, официальные сайты"], ["Помощь ИИ", "подскажет, как заполнить анкету"]];
-  return <div style={{ animation: "fadeUp .3s ease" }}>
+function Docs({ trips, onOpenTrip, onCreateTrip, setToast }) {
+  const [mode, setMode] = useState("home");   // home | pick | kit
+  const [country, setCountry] = useState(null);
+  const [adults, setAdults] = useState(1);
+  const [kids, setKids] = useState(false);
+  const [df, setDf] = useState("");           // дата вылета (опционально) — включает тайминг
+  const [q, setQ] = useState("");
+  const [doc, setDoc] = useState(null);        // открытая карточка документа
+  const [addOpen, setAddOpen] = useState(false); // «добавить в путешествие»
+  const countries = Object.keys(DOC_MATRIX);
+  const found = q.trim().length >= 2 ? ALL_DOCS.filter((x) => (x.name + " " + x.country).toLowerCase().includes(q.trim().toLowerCase())).slice(0, 6) : [];
+  const popular = ["tdac", "evisa_id", "schengen", "eta"].map((id) => ALL_DOCS.find((x) => x.id === id)).filter(Boolean);
+  const inputSt = { width: "100%", background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "11px 12px", color: T.text, fontSize: 14, outline: "none", boxSizing: "border-box", colorScheme: "dark" };
+  const timingText = (dd) => { if (df) { const st = docStatus(dd, df); return <TimeBadge st={st} />; }
+    const parts = []; if (dd.E < 9999) parts.push(`не раньше чем за ${dd.E} дн.`); if (dd.P > 0) parts.push(`оформляется ~${dd.P} дн.`);
+    return parts.length ? <span style={{ fontSize: 10, color: T.subd, whiteSpace: "nowrap" }}>{parts.join(" · ")}</span> : null; };
+  const DocRow = ({ dd, dim }) => { const info = DOC_INFO[dd.id] || {}; return (
+    <div onClick={() => setDoc(dd)} className="press" style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 0", borderTop: `1px solid ${T.line}`, cursor: "pointer" }}>
+      <div style={{ width: 32, height: 32, borderRadius: 10, background: T.violet + "1a", display: "grid", placeItems: "center", flexShrink: 0 }}><Icon d={I.doc} size={15} color={dim ? T.subd : T.violet} /></div>
+      <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: dim ? T.subd : T.text, lineHeight: 1.25 }}>{dd.name}</div><div style={{ fontSize: 10.5, color: T.subd }}>{DOC_TYPE_LABEL[info.type] || ""}</div></div>
+      {timingText(dd)}
+      <Icon d={I.chevR} size={14} color={T.subd} />
+    </div>); };
+  const createTripFromKit = (c) => {
+    const cc = c || country; if (!cc) return;
+    const dep = df ? new Date(df) : null;
+    onCreateTrip({ id: "t" + Date.now(), title: `${cc}${dep ? " · " + MONTHS_S[dep.getMonth()] : ""}`, dcName: cc, dc: "", country: cc, oc: "", ocName: "", df: df || "", dt: "", adults, route: null, checks: { tickets: false, lodgeMain: false, lodgeStop: false, docs: {}, services: {} }, servicesAdded: [], createdAt: Date.now() });
+    setAddOpen(false);
+  };
+  const matching = (trips || []).filter((t) => t.country === (doc ? doc.country : country));
+  return <div style={{ animation: "fadeUp .3s ease", paddingBottom: 8 }}>
     <Header />
     <div style={{ padding: "8px 20px 0" }}>
-      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 20, color: T.text }}>Документы и визы</div>
-      <div style={{ color: T.subd, fontSize: 12.5, marginTop: 4, marginBottom: 16 }}>Раздел готовим к запуску — вот что здесь появится:</div>
-      <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, overflow: "hidden" }}>
-        {items.map(([t, s], i) => (<div key={t} style={{ display: "flex", alignItems: "center", gap: 12, padding: 14, borderTop: i ? `1px solid ${T.line}` : "none" }}>
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: T.violet + "1e", display: "grid", placeItems: "center", flexShrink: 0 }}><Icon d={I.doc} size={17} color={T.violet} /></div>
-          <div style={{ flex: 1 }}><div style={{ fontSize: 13.5, fontWeight: 700, color: T.text }}>{t}</div><div style={{ fontSize: 11, color: T.subd }}>{s}</div></div>
-          <Badge label="скоро" color={T.subd} />
-        </div>))}
-      </div>
+      {mode === "home" && <>
+        <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 20, color: T.text }}>Документы</div>
+        <div style={{ color: T.subd, fontSize: 12.5, marginTop: 4, marginBottom: 14 }}>Соберём комплект под поездку или поможем с одним документом.</div>
+        {/* Сценарий 1: подбор комплекта */}
+        <div style={{ background: T.card, border: `1.5px solid ${T.violet}55`, borderRadius: 18, padding: 14, marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 11, alignItems: "center" }}>
+            <div style={{ width: 42, height: 42, borderRadius: 13, background: GRAD.cta, display: "grid", placeItems: "center", flexShrink: 0 }}><Icon d={I.doc} size={20} color="#fff" /></div>
+            <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 800, color: T.text, fontFamily: "Sora,sans-serif" }}>Подобрать документы для поездки</div><div style={{ fontSize: 11.5, color: T.subd, marginTop: 2 }}>Пара вопросов — и персональный комплект со сроками</div></div>
+          </div>
+          <div onClick={() => setMode("pick")} className="press" style={{ marginTop: 12, textAlign: "center", background: GRAD.cta, borderRadius: 12, padding: 11, color: "#fff", fontSize: 13.5, fontWeight: 800, cursor: "pointer" }}>Начать</div>
+        </div>
+        {/* Сценарий 2: конкретный документ */}
+        <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, padding: 14 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: T.text, fontFamily: "Sora,sans-serif", marginBottom: 4 }}>Помочь с конкретным документом</div>
+          <div style={{ fontSize: 11.5, color: T.subd, marginBottom: 10 }}>Например: TDAC, eVisa, шенгенская анкета</div>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Название документа или страна" style={inputSt} />
+          {found.map((x) => <div key={x.id} onClick={() => { setDoc(x); setQ(""); }} className="press" style={{ padding: "10px 6px", cursor: "pointer", borderBottom: `1px solid ${T.line}` }}><span style={{ fontSize: 13, color: T.text, fontWeight: 600 }}>{x.name}</span> <span style={{ fontSize: 11, color: T.subd }}>· {x.country}</span></div>)}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+            {popular.map((x) => <span key={x.id} onClick={() => setDoc(x)} className="press" style={{ fontSize: 11.5, color: T.violet, fontWeight: 700, background: T.violet + "14", border: `1px solid ${T.violet}44`, borderRadius: 999, padding: "5px 10px", cursor: "pointer" }}>{x.name.length > 22 ? x.name.slice(0, 22) + "…" : x.name}</span>)}
+          </div>
+        </div>
+      </>}
+      {mode === "pick" && <>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <div onClick={() => setMode("home")} className="press" style={{ cursor: "pointer" }}><Icon d={I.back} size={20} color={T.text} /></div>
+          <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.text }}>Подбор документов</div>
+        </div>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: T.subd, marginBottom: 8 }}>Куда едете?</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+          {countries.map((c) => <div key={c} onClick={() => setCountry(c)} className="press" style={{ textAlign: "center", padding: "10px 6px", borderRadius: 12, border: `1px solid ${country === c ? T.violet : T.line}`, background: country === c ? T.violet + "16" : T.card, color: country === c ? T.violet : T.text, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{c}</div>)}
+        </div>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: T.subd, marginBottom: 8 }}>Кто едет?</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+          <span style={{ fontSize: 13, color: T.text, flex: 1 }}>Взрослые</span>
+          <div onClick={() => setAdults(Math.max(1, adults - 1))} className="press" style={{ width: 30, height: 30, borderRadius: 9, border: `1px solid ${T.line}`, display: "grid", placeItems: "center", color: T.text, cursor: "pointer" }}>−</div>
+          <span style={{ fontSize: 14, fontWeight: 700, color: T.text, minWidth: 16, textAlign: "center" }}>{adults}</span>
+          <div onClick={() => setAdults(Math.min(9, adults + 1))} className="press" style={{ width: 30, height: 30, borderRadius: 9, border: `1px solid ${T.line}`, display: "grid", placeItems: "center", color: T.text, cursor: "pointer" }}>＋</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          {[["Без детей", false], ["С детьми", true]].map(([l, v]) => <div key={l} onClick={() => setKids(v)} className="press" style={{ flex: 1, textAlign: "center", padding: 10, borderRadius: 12, border: `1px solid ${kids === v ? T.violet : T.line}`, background: kids === v ? T.violet + "16" : T.card, color: kids === v ? T.violet : T.text, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{l}</div>)}
+        </div>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: T.subd, marginBottom: 8 }}>Когда вылет? <span style={{ fontWeight: 400 }}>(можно пропустить — включит сроки)</span></div>
+        <input type="date" value={df} onChange={(e) => setDf(e.target.value)} style={{ ...inputSt, marginBottom: 16 }} />
+        <div onClick={() => country && setMode("kit")} className="press" style={{ textAlign: "center", background: country ? GRAD.cta : T.card, border: country ? "none" : `1px solid ${T.line}`, borderRadius: 14, padding: 13, color: country ? "#fff" : T.subd, fontSize: 14.5, fontWeight: 800, cursor: country ? "pointer" : "default" }}>Собрать комплект</div>
+      </>}
+      {mode === "kit" && country && <>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+          <div onClick={() => setMode("pick")} className="press" style={{ cursor: "pointer" }}><Icon d={I.back} size={20} color={T.text} /></div>
+          <div style={{ flex: 1 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.text }}>{country}</div><div style={{ fontSize: 11.5, color: T.subd }}>{adults} {plural(adults, "взрослый", "взрослых", "взрослых")}{kids ? " · с детьми" : ""}{df ? ` · вылет ${fmtShort(new Date(df))}` : ""}</div></div>
+        </div>
+        <div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, margin: "12px 0 2px", fontFamily: "Sora,sans-serif" }}>Обязательно</div>
+        {(DOC_MATRIX[country] || DOC_BASE).map((dd) => <DocRow key={dd.id} dd={dd} />)}
+        {kids && <>
+          <div style={{ fontSize: 12.5, fontWeight: 800, color: T.subd, margin: "14px 0 2px", fontFamily: "Sora,sans-serif" }}>По ситуации</div>
+          {KID_DOCS.map((dd) => <DocRow key={dd.id} dd={dd} dim />)}
+        </>}
+        <div onClick={() => setAddOpen(true)} className="press" style={{ marginTop: 14, textAlign: "center", background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Добавить комплект в путешествие</div>
+        <div style={{ fontSize: 10.5, color: T.subd, marginTop: 8, textAlign: "center" }}>Сроки ориентировочные — проверяйте официальные источники</div>
+      </>}
     </div>
+    {/* Карточка документа */}
+    {doc && (() => { const info = DOC_INFO[doc.id] || {}; const links = (info.links || []).filter((l) => l.url); return (
+      <Overlay onClose={() => setDoc(null)}>
+        <SheetHead title={doc.name} onClose={() => setDoc(null)} />
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+          <Badge label={DOC_TYPE_LABEL[info.type] || "документ"} color={T.cyan} />
+          <Badge label={doc.country} color={T.subd} />
+          {df && <TimeBadge st={docStatus(doc, df)} />}
+        </div>
+        {info.desc && <div style={{ fontSize: 13, color: T.text, lineHeight: 1.45, marginBottom: 12 }}>{info.desc}</div>}
+        {(doc.E < 9999 || doc.P > 0) && <div style={{ fontSize: 12, color: T.subd, marginBottom: 12 }}>Когда заниматься: {doc.E < 9999 ? `не раньше чем за ${doc.E} дн. до вылета` : "в любое время"}{doc.P > 0 ? ` · оформляется ~${doc.P} дн.` : ""}</div>}
+        {(info.req || []).length > 0 && <>
+          <div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, marginBottom: 6, fontFamily: "Sora,sans-serif" }}>Что потребуется</div>
+          {(info.req || []).map((rq) => <div key={rq} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}><span style={{ width: 5, height: 5, borderRadius: 999, background: T.violet }} /><span style={{ fontSize: 12.5, color: T.sub }}>{rq}</span></div>)}
+        </>}
+        <div onClick={() => setToast("Мастер заполнения — следующий шаг разработки")} className="press" style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Заполнить с помощником <Badge label="скоро" color="#fff" /></div>
+        {links.length > 0 && <>
+          <div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, margin: "14px 0 6px", fontFamily: "Sora,sans-serif" }}>Официальные ссылки</div>
+          {links.map((l) => <div key={l.label} onClick={() => { try { window.open(l.url, "_blank"); } catch (e) { } }} className="press" style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 0", borderTop: `1px solid ${T.line}`, cursor: "pointer" }}><span style={{ fontSize: 13, color: T.violet, fontWeight: 600, flex: 1 }}>{l.label}</span><Icon d={I.chevR} size={14} color={T.subd} /></div>)}
+        </>}
+        {DOC_MATRIX[doc.country] && <div onClick={() => setAddOpen(true)} className="press" style={{ marginTop: 12, textAlign: "center", background: T.violet + "1a", border: `1px solid ${T.violet}55`, borderRadius: 12, padding: 11, color: T.violet, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Добавить в путешествие</div>}
+      </Overlay>); })()}
+    {/* Добавление в путешествие: существующее или новое */}
+    {addOpen && <Overlay onClose={() => setAddOpen(false)}>
+      <SheetHead title="В какое путешествие?" onClose={() => setAddOpen(false)} />
+      {matching.map((t) => <div key={t.id} onClick={() => { setAddOpen(false); setDoc(null); onOpenTrip(t.id); }} className="press" style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 12, marginBottom: 8, cursor: "pointer" }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: gradFor(t.dc), display: "grid", placeItems: "center", fontSize: 16 }}>✈️</div>
+        <div style={{ flex: 1 }}><div style={{ fontSize: 13.5, fontWeight: 700, color: T.text }}>{t.title}</div><div style={{ fontSize: 11, color: T.subd }}>документы уже внутри — отметьте готовые</div></div>
+        <Icon d={I.chevR} size={15} color={T.subd} />
+      </div>)}
+      {(doc ? DOC_MATRIX[doc.country] : country) && <div onClick={() => { createTripFromKit(doc ? doc.country : country); setDoc(null); }} className="press" style={{ textAlign: "center", background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>＋ Создать новое путешествие</div>}
+    </Overlay>}
   </div>;
 }
 const ddmm = (s) => { if (!s) return ""; const p = String(s).split("-"); return p.length === 3 ? `${p[2]}/${p[1]}` : s; };
@@ -1099,6 +1243,7 @@ export default function App() {
   useEffect(() => { store.set("trips", trips); }, [trips]);
   const [tripOpen, setTripOpen] = useState(null);      // id открытой поездки
   const [newTrip, setNewTrip] = useState(false);       // оверлей ручного создания
+  const [confirmTrip, setConfirmTrip] = useState(null); // маршрут, ожидающий подтверждения «Взять в поездку»
   const [hotelsPre, setHotelsPre] = useState(null);    // авто-открытие сервиса промокодов в «Отелях»
   const [editName, setEditName] = useState(false);
   const [name, setName] = useState(() => store.get("name", "TripWise tester"));
@@ -1210,7 +1355,13 @@ export default function App() {
   };
   const updateTrip = (id, fn) => setTrips((p) => p.map((t) => t.id === id ? fn(t) : t));
   const openTripScreen = (id) => { setTripOpen(id); setTab("routes"); setStack(["trip"]); };
-  // «Взять в поездку» из карточки маршрута: снапшот маршрута + параметры последнего поиска
+  // «Взять в поездку»: сперва подтверждение (пользователь осознаёт создание карточки поездки)
+  const askTakeTrip = (r) => {
+    const ls = lastSearchRef.current || {};
+    const dup = trips.find((t) => t.route && t.route.rid === r.id && t.df === (ls.df || ""));
+    if (dup) { openTripScreen(dup.id); return; }
+    setConfirmTrip(r);
+  };
   const takeTrip = (r) => {
     const ls = lastSearchRef.current || {};
     const dup = trips.find((t) => t.route && t.route.rid === r.id && t.df === (ls.df || ""));
@@ -1239,10 +1390,11 @@ export default function App() {
   useEffect(() => {
     const tg = (typeof window !== "undefined") && window.Telegram && window.Telegram.WebApp;
     if (!tg || !tg.BackButton) return;
-    const canBack = stack.length > 0 || sheet || traveler || editName || svcOpen || newTrip;
+    const canBack = stack.length > 0 || sheet || traveler || editName || svcOpen || newTrip || confirmTrip;
     let fired = false; // защита от двойного срабатывания (две подписки)
     const onBack = () => {
       if (fired) return; fired = true; setTimeout(() => { fired = false; }, 300);
+      if (confirmTrip) return setConfirmTrip(null);
       if (newTrip) return setNewTrip(false);
       if (svcOpen) return setSvcOpen(false);
       if (editName) return setEditName(false);
@@ -1261,7 +1413,7 @@ export default function App() {
       try { if (tg.BackButton.offClick) tg.BackButton.offClick(onBack); } catch (e) { }
       try { if (tg.offEvent) tg.offEvent("backButtonClicked", onBack); } catch (e) { }
     };
-  }, [stack, sheet, traveler, editName, svcOpen, newTrip]);
+  }, [stack, sheet, traveler, editName, svcOpen, newTrip, confirmTrip]);
   const isLiked = (r) => !!saved.find(x => x.id === ("liked-" + r.id));
   const likeRoute = (r) => {
     const id = "liked-" + r.id;
@@ -1291,12 +1443,12 @@ export default function App() {
     const curTrip = trips.find((t) => t.id === tripOpen);
     if (top === "trip" && curTrip) main = <TripScreen t={curTrip} onBack={() => setStack([])} onUpdate={updateTrip} onDelete={(id) => { setTrips((p) => p.filter((x) => x.id !== id)); setStack([]); setToast("Поездка удалена"); }} onFindTickets={findTicketsForTrip} goHotels={() => { setHotelsPre(null); setTab("hotels"); }} goDocs={() => setTab("docs")} setToast={setToast} />;
     else if (top === "trip") main = <RoutesScreen trips={trips} onOpenTrip={openTripScreen} onNewTrip={() => setNewTrip(true)} onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved((p) => p.filter((x) => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => { const f = { ...s.form, dep: s.form.dep ? new Date(s.form.dep) : null, ret: s.form.ret ? new Date(s.form.ret) : null }; setForm(f); runSearch(f); }} />;
-    else if (top === "detail") main = <Detail r={selected} query={query} onBack={() => setStack(["results"])} onEdit={() => { setTab("home"); setSheet(true); }} liked={isLiked(selected)} onLike={likeRoute} onShare={shareRoute} goHotels={(svc) => { setHotelsPre(svc || null); setTab("hotels"); }} onTakeTrip={takeTrip} inTrip={!!(selected && trips.some((t) => t.route && t.route.rid === selected.id && t.df === ((lastSearchRef.current || {}).df || "")))} />;
+    else if (top === "detail") main = <Detail r={selected} query={query} onBack={() => setStack(["results"])} onEdit={() => { setTab("home"); setSheet(true); }} liked={isLiked(selected)} onLike={likeRoute} onShare={shareRoute} goHotels={(svc) => { setHotelsPre(svc || null); setTab("hotels"); }} onTakeTrip={askTakeTrip} inTrip={!!(selected && trips.some((t) => t.route && t.route.rid === selected.id && t.df === ((lastSearchRef.current || {}).df || "")))} />;
     else if (top === "results") main = <Results query={query} routes={routes} loading={loading} error={searchError} onRetry={() => runSearch()} onEdit={() => { setTab("home"); setSheet(true); }} onBack={() => setStack([])} onOpen={(r) => { setSelected(r); setStack(["results", "detail"]); }} isLiked={isLiked} onLike={likeRoute} />;
     else main = <RoutesScreen trips={trips} onOpenTrip={openTripScreen} onNewTrip={() => setNewTrip(true)} onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved(p => p.filter(x => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => { const f = { ...s.form, dep: s.form.dep ? new Date(s.form.dep) : null, ret: s.form.ret ? new Date(s.form.ret) : null }; setForm(f); runSearch(f); }} />;
   } else if (tab === "home") main = <Home onSearch={() => setSheet(true)} onPickDest={openSheetWithDest} goTab={setTab} openServices={() => setSvcOpen(true)} />;
   else if (tab === "hotels") main = <Hotels setToast={setToast} preOpen={hotelsPre} onPreDone={() => setHotelsPre(null)} />;
-  else if (tab === "docs") main = <Docs />;
+  else if (tab === "docs") main = <Docs trips={trips} onOpenTrip={openTripScreen} onCreateTrip={(t) => { setTrips((p) => [t, ...p]); setToast("Поездка создана"); openTripScreen(t.id); }} setToast={setToast} />;
   else if (tab === "profile") main = <Profile name={name} onTraveler={() => setTraveler(true)} onEditName={() => setEditName(true)} setToast={setToast} />;
 
   return <div style={{ minHeight: "100vh", background: T.bg, display: "flex", justifyContent: "center" }}>
@@ -1325,6 +1477,18 @@ export default function App() {
       <BottomNav tab={tab} setTab={(k) => { if (k === tab && (k === "routes" || k === "profile" || k === "hotels" || k === "docs")) setStack([]); if (k === "routes" && tab === "routes") setStack([]); setTab(k); }} bottomStr={inset.bottomStr} />
       {sheet && <SearchSheet form={form} setForm={setForm} onClose={() => setSheet(false)} onSubmit={() => runSearch()} setToast={setToast} />}
       {traveler && <Traveler safeTop={safeTop} bottomStr={inset.bottomStr} onBack={() => setTraveler(false)} />}
+      {confirmTrip && <Overlay onClose={() => setConfirmTrip(null)}>
+        <SheetHead title="Создать поездку?" onClose={() => setConfirmTrip(null)} />
+        <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, padding: 14, marginBottom: 14 }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: T.text, fontFamily: "Sora,sans-serif" }}>{query.origin} → {query.destName}</div>
+          <div style={{ fontSize: 12, color: T.subd, marginTop: 3 }}>{query.datesLabel}{confirmTrip.stopover ? ` · стоповер в ${prep(confirmTrip.stopover.city)} ${confirmTrip.stopover.nights} ноч.` : ""} · {rub(confirmTrip.total)}</div>
+          <div style={{ fontSize: 11.5, color: T.subd, marginTop: 8, lineHeight: 1.4 }}>TripWise создаст карточку поездки: соберёт документы по стране, подскажет сроки, подберёт жильё со скидкой и напомнит о важном.</div>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <div onClick={() => setConfirmTrip(null)} className="press" style={{ flex: 1, textAlign: "center", background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 13, color: T.subd, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Отмена</div>
+          <div onClick={() => { const r = confirmTrip; setConfirmTrip(null); takeTrip(r); }} className="press" style={{ flex: 1.4, textAlign: "center", background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>✈ Создать</div>
+        </div>
+      </Overlay>}
       {newTrip && <NewTripSheet onClose={() => setNewTrip(false)} onCreate={(t) => { setTrips((p) => [t, ...p]); setNewTrip(false); setToast("Поездка создана"); openTripScreen(t.id); }} />}
       {svcOpen && <Overlay onClose={() => setSvcOpen(false)}><SheetHead title="Сервисы для поездки" onClose={() => setSvcOpen(false)} /><ServiceGrid setToast={setToast} /></Overlay>}
       {editName && <NameEdit name={name} onClose={() => setEditName(false)} onSave={(n) => { setName(n); setEditName(false); setToast("Имя сохранено"); }} />}
