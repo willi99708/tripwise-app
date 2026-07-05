@@ -200,6 +200,7 @@ function KidsPicker({ ages, onChange }) {
   </div>;
 }
 function Header({ onBack, title, subtitle, onEdit }) {
+  if (!title && !subtitle && !onEdit) return null;   // пустая шапка не съедает высоту — логотип теперь фиксированный
   return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px 8px", position: "relative", minHeight: 30 }}>
     
     <div style={{ transform: title ? "translateY(-4px)" : "translateY(-7px)" }}>{title ? <div style={{ textAlign: "center", maxWidth: 220 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>{subtitle && <div style={{ fontSize: 11, color: T.subd, marginTop: 2 }}>{subtitle}</div>}</div> : null}</div>
@@ -712,6 +713,78 @@ const ALL_DOCS = (() => {
   for (const k of KID_DOCS) if (!m.has(k.id)) m.set(k.id, { ...k, country: "любая страна", kw: DOC_KW[k.id] || "" });
   return [...m.values()];
 })();
+
+/* ================== МАСТЕР ЗАПОЛНЕНИЯ (шаг C) ==================
+   Отвечаешь по-русски -> получаешь готовые значения для официальной онлайн-формы.
+   Транслитерация по ИКАО 9303 (как в загранпаспорте). Данные никуда не отправляются
+   и живут только на устройстве до нажатия «Очистить». */
+const TR_MAP = { "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e", "ж": "zh", "з": "z", "и": "i", "й": "i", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u", "ф": "f", "х": "kh", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "shch", "ъ": "ie", "ы": "y", "ь": "", "э": "e", "ю": "iu", "я": "ia" };
+const translit = (s) => String(s || "").toLowerCase().split("").map((c) => TR_MAP[c] !== undefined ? TR_MAP[c] : c).join("").toUpperCase();
+const copyText = async (v) => {
+  try { await navigator.clipboard.writeText(v); return true; }
+  catch (e) { try { const ta = document.createElement("textarea"); ta.value = v; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); return true; } catch (_) { return false; } }
+};
+const FW = {
+  surname: { k: "surname", label: "Фамилия (кириллицей, как в паспорте)", en: "Surname / Family name", type: "name" },
+  given: { k: "given", label: "Имя", en: "Given name(s)", type: "name" },
+  passport: { k: "passport", label: "Номер загранпаспорта", en: "Passport number", type: "up", hint: "без пробелов" },
+  dob: { k: "dob", label: "Дата рождения", en: "Date of birth", type: "date" },
+  arr: { k: "arr", label: "Дата прилёта", en: "Arrival date", type: "date" },
+  flight: { k: "flight", label: "Номер рейса", en: "Flight number", type: "up", hint: "например SU274" },
+  email: { k: "email", label: "Email", en: "Email", type: "text" },
+  phone: { k: "phone", label: "Телефон с кодом страны", en: "Phone number", type: "text", hint: "+7…" },
+};
+const DOC_FIELDS = {
+  tdac: [FW.surname, FW.given, FW.passport, FW.dob, FW.flight, FW.arr, { k: "addr", label: "Адрес проживания в Таиланде (отель)", en: "Address in Thailand", type: "text" }, FW.phone, FW.email],
+  evisa_id: [FW.surname, FW.given, FW.passport, FW.dob, { k: "pexp", label: "Срок действия паспорта", en: "Passport expiry date", type: "date" }, FW.arr, { k: "addr", label: "Адрес в Индонезии (отель)", en: "Address in Indonesia", type: "text" }, FW.email],
+  eta: [FW.surname, FW.given, FW.passport, FW.dob, FW.arr, { k: "addr", label: "Адрес на Шри-Ланке (отель)", en: "Address in Sri Lanka", type: "text" }, FW.email],
+  imuga: [FW.surname, FW.given, FW.passport, FW.arr, FW.flight, { k: "addr", label: "Отель на Мальдивах", en: "Accommodation", type: "text" }, FW.email],
+};
+function DocWizard({ doc, onClose, setToast }) {
+  const fields = DOC_FIELDS[doc.id] || [];
+  const [ans, setAns] = useState({});
+  const [done, setDone] = useState(false);
+  const inputSt = { width: "100%", background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "11px 12px", color: T.text, fontSize: 14, outline: "none", boxSizing: "border-box", colorScheme: "dark" };
+  const val = (f) => {
+    const raw = String(ans[f.k] || "").trim();
+    if (!raw) return "";
+    if (f.type === "name") return translit(raw);
+    if (f.type === "up") return raw.toUpperCase().replace(/\s+/g, "");
+    if (f.type === "date") { const p = raw.split("-"); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : raw; }
+    return raw;
+  };
+  const filled = fields.filter((f) => val(f));
+  const copyOne = async (f) => { (await copyText(val(f))) ? setToast(`${f.en} — скопировано`) : setToast("Не удалось скопировать"); };
+  const copyAll = async () => { const s = filled.map((f) => `${f.en}: ${val(f)}`).join("\n"); (await copyText(s)) ? setToast("Все поля скопированы") : setToast("Не удалось скопировать"); };
+  return <Overlay onClose={onClose}>
+    <SheetHead title={done ? "Поля для формы" : "Помощник заполнения"} onClose={onClose} />
+    <div style={{ maxHeight: "58vh", overflowY: "auto", overscrollBehavior: "contain", paddingRight: 2 }}>
+      {!done ? <>
+        <div style={{ fontSize: 12, color: T.subd, lineHeight: 1.45, marginBottom: 12 }}>{doc.name}: отвечайте по-русски — подготовим значения в формате официальной формы. Данные никуда не отправляются и остаются на этом устройстве.</div>
+        {fields.map((f) => <div key={f.k} style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: T.sub, fontWeight: 600, marginBottom: 5 }}>{f.label}{f.hint ? <span style={{ color: T.subd, fontWeight: 400 }}> · {f.hint}</span> : null}</div>
+          <input type={f.type === "date" ? "date" : "text"} value={ans[f.k] || ""} onChange={(e) => setAns({ ...ans, [f.k]: e.target.value })} style={inputSt} />
+          {f.type === "name" && ans[f.k] ? <div style={{ fontSize: 11, color: T.violet, marginTop: 4 }}>В форме: {translit(ans[f.k])}</div> : null}
+        </div>)}
+      </> : <>
+        <div style={{ fontSize: 12, color: T.subd, marginBottom: 10 }}>Копируйте значения в официальную форму. Перед отправкой сверьте с документами.</div>
+        {filled.map((f) => <div key={f.k} style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 10.5, color: T.subd }}>{f.en}</div><div style={{ fontSize: 14, fontWeight: 700, color: T.text, wordBreak: "break-word" }}>{val(f)}</div></div>
+          <span onClick={() => copyOne(f)} className="press" style={{ flexShrink: 0, fontSize: 11.5, fontWeight: 700, color: T.violet, border: `1px solid ${T.violet}55`, background: T.violet + "14", borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>Копировать</span>
+        </div>)}
+      </>}
+    </div>
+    <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+      {!done
+        ? <div onClick={() => filled.length ? setDone(true) : setToast("Заполните хотя бы одно поле")} className="press" style={{ flex: 1, textAlign: "center", background: filled.length ? GRAD.cta : T.card, border: filled.length ? "none" : `1px solid ${T.line}`, borderRadius: 14, padding: 13, color: filled.length ? "#fff" : T.subd, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Подготовить поля</div>
+        : <>
+          <div onClick={() => setDone(false)} className="press" style={{ flex: 1, textAlign: "center", background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 13, color: T.text, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Изменить</div>
+          <div onClick={copyAll} className="press" style={{ flex: 1.3, textAlign: "center", background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Скопировать всё</div>
+        </>}
+    </div>
+    <div onClick={() => { setAns({}); onClose(); setToast("Данные удалены с устройства"); }} className="press" style={{ textAlign: "center", fontSize: 11.5, color: T.subd, cursor: "pointer", padding: "10px 0 2px" }}>Очистить мои данные</div>
+  </Overlay>;
+}
 // какие блоки включены (по источнику создания поездки); старые поездки — все блоки
 const tripBlocks = (t) => t.blocksOn || { tickets: true, lodging: true, docs: true };
 const tripDocs = (t) => {
@@ -817,7 +890,7 @@ function TripScreen({ t, onBack, onUpdate, onDelete, onFindTickets, goHotels, go
   const svcAdded = t.servicesAdded || [];
   const svcDone = svcAdded.filter((id) => t.checks.services[id]).length;
   const custom = t.custom || [];
-  const extrasOn = svcAdded.length > 0 || custom.length > 0;
+  const extrasOn = !!bOn.extras || svcAdded.length > 0 || custom.length > 0;
   const extrasDone = svcDone + custom.filter((c) => c.done).length;
   const extrasTotal = svcAdded.length + custom.length;
   const TABS = [
@@ -841,7 +914,7 @@ function TripScreen({ t, onBack, onUpdate, onDelete, onFindTickets, goHotels, go
   const insTap = () => { if (extrasOn) setBlk("extras"); else setSvcPick(true); };
   const docTap = (doc) => { if (doc.id === "ins") insTap(); else goDocs(doc.id); };
   return <div style={{ animation: "slideIn .18s ease-out", paddingBottom: 8 }}>
-    <div style={{ padding: "48px 20px 0" }}>
+    <div style={{ padding: "12px 20px 0" }}>
       <div style={{ position: "relative", borderRadius: 20, overflow: "hidden", background: gradFor(t.dc), padding: 14, minHeight: 84, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent,rgba(5,5,20,.72))" }} />
         <div onClick={() => { setMenu(!menu); setNameDraft(t.title); }} className="press" style={{ position: "absolute", top: 10, right: 10, width: 32, height: 32, borderRadius: 999, background: "rgba(8,8,22,.55)", border: "1px solid rgba(255,255,255,.22)", display: "grid", placeItems: "center", color: "#fff", fontWeight: 800, letterSpacing: 1.5, cursor: "pointer", fontSize: 15 }}>⋯</div>
@@ -919,19 +992,14 @@ function TripScreen({ t, onBack, onUpdate, onDelete, onFindTickets, goHotels, go
               <div style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: T.text }}>{c.name}</div>
               <span onClick={() => upd((x) => ({ ...x, custom: (x.custom || []).filter((y) => y.id !== c.id) }))} className="press" style={{ color: T.subd, fontSize: 15, cursor: "pointer", padding: "0 4px" }}>×</span>
             </div>))}
-          {/* частые пункты сборов + добавление разделов */}
+          {/* добавление недостающих категорий — вещи-подсказки живут в «Сборах» */}
           <div style={{ display: "flex", gap: 6, padding: "10px 0", borderTop: `1px solid ${T.line}`, flexWrap: "wrap" }}>
-            {COMMON_ITEMS.filter((n) => !custom.some((c) => c.name === n)).slice(0, 4).map((n) => (
-              <span key={n} onClick={() => addItem(n)} className="press" style={{ fontSize: 11.5, fontWeight: 700, color: T.text, border: `1px dashed ${T.line}`, borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>＋ {n}</span>))}
-            <span onClick={() => { setAddCustom(!addCustom); setCustomDraft(""); }} className="press" style={{ fontSize: 11.5, fontWeight: 700, color: T.violet, border: `1px dashed ${T.violet}66`, borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>＋ Свой пункт</span>
-            {!bOn.tickets && <span onClick={() => enableBlock("tickets")} className="press" style={{ fontSize: 11.5, fontWeight: 700, color: T.subd, border: `1px dashed ${T.line}`, borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>＋ Билеты</span>}
-            {!lodgeOn && <span onClick={() => enableBlock("lodging")} className="press" style={{ fontSize: 11.5, fontWeight: 700, color: T.subd, border: `1px dashed ${T.line}`, borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>＋ Жильё</span>}
-            {!bOn.docs && <span onClick={() => enableBlock("docs")} className="press" style={{ fontSize: 11.5, fontWeight: 700, color: T.subd, border: `1px dashed ${T.line}`, borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>＋ Документы</span>}
+            {!bOn.tickets && <span onClick={() => enableBlock("tickets")} className="press" style={{ fontSize: 11.5, fontWeight: 700, color: T.violet, border: `1px dashed ${T.violet}66`, background: T.violet + "0d", borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>＋ Билеты</span>}
+            {!lodgeOn && <span onClick={() => enableBlock("lodging")} className="press" style={{ fontSize: 11.5, fontWeight: 700, color: T.violet, border: `1px dashed ${T.violet}66`, background: T.violet + "0d", borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>＋ Жильё</span>}
+            {!bOn.docs && <span onClick={() => enableBlock("docs")} className="press" style={{ fontSize: 11.5, fontWeight: 700, color: T.violet, border: `1px dashed ${T.violet}66`, background: T.violet + "0d", borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>＋ Документы</span>}
+            {!extrasOn && <span onClick={() => { enableBlock("extras"); setBlk("extras"); }} className="press" style={{ fontSize: 11.5, fontWeight: 700, color: T.violet, border: `1px dashed ${T.violet}66`, background: T.violet + "0d", borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>＋ Сборы</span>}
+            {extrasOn && <span onClick={() => setBlk("extras")} className="press" style={{ fontSize: 11.5, fontWeight: 700, color: T.subd, border: `1px dashed ${T.line}`, borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>＋ Пункт в сборы</span>}
           </div>
-          {addCustom && <div style={{ display: "flex", gap: 8, paddingBottom: 10 }}>
-            <input value={customDraft} onChange={(e) => setCustomDraft(e.target.value)} placeholder="Например: страховка на авто" style={{ flex: 1, background: T.card2, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 10px", color: T.text, fontSize: 13, outline: "none" }} />
-            <div onClick={() => { addItem(customDraft); setAddCustom(false); }} className="press" style={{ background: GRAD.cta, borderRadius: 10, padding: "9px 13px", color: "#fff", fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>Добавить</div>
-          </div>}
         </div>
         {/* призыв к допам */}
         <div onClick={() => setSvcPick(true)} className="press" style={{ borderRadius: 16, padding: 14, marginBottom: 10, cursor: "pointer", background: "linear-gradient(120deg,#233a7d,#3b2a86)" }}>
@@ -992,9 +1060,16 @@ function TripScreen({ t, onBack, onUpdate, onDelete, onFindTickets, goHotels, go
               <span onClick={() => upd((x) => ({ ...x, custom: (x.custom || []).filter((y) => y.id !== c.id) }))} className="press" style={{ color: T.subd, fontSize: 15, cursor: "pointer", padding: "0 4px" }}>×</span>
             </div>))}
           <div style={{ display: "flex", gap: 8, padding: "10px 0 4px" }}>
-            <input value={customDraft} onChange={(e) => setCustomDraft(e.target.value)} placeholder="Добавить пункт…" style={{ flex: 1, background: T.card2, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 10px", color: T.text, fontSize: 13, outline: "none" }} />
+            <input value={customDraft} onChange={(e) => setCustomDraft(e.target.value)} placeholder="Свой пункт…" style={{ flex: 1, background: T.card2, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 10px", color: T.text, fontSize: 13, outline: "none" }} />
             <div onClick={() => { addItem(customDraft); setCustomDraft(""); }} className="press" style={{ background: GRAD.cta, borderRadius: 10, padding: "9px 13px", color: "#fff", fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>＋</div>
           </div>
+          {PACK_SUGGEST.map(([grp, items]) => { const rest = items.filter((n) => !custom.some((c) => c.name === n)); if (!rest.length) return null; return (
+            <div key={grp} style={{ paddingTop: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: T.subd, letterSpacing: .4, marginBottom: 6 }}>{grp.toUpperCase()}</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {rest.map((n) => <span key={n} onClick={() => addItem(n)} className="press" style={{ fontSize: 11.5, fontWeight: 700, color: T.text, border: `1px dashed ${T.line}`, borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>＋ {n}</span>)}
+              </div>
+            </div>); })}
         </>}
       </div>}
       <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "0 4px" }}>
@@ -1182,8 +1257,13 @@ function promosForTrip({ country, city, depISO }) {
 
 /* ПОЛЕЗНЫЕ СЕРВИСЫ (партнёрские). url — впиши реф-ссылку партнёра; пусто = покажем «скоро».
    from — цена «от», для чипа. Иконка/цвет — оформление плитки. */
-/* Частые пункты сборов — подсказки в Обзоре поездки (создают раздел «Сборы») */
-const COMMON_ITEMS = ["Обменять валюту", "Аптечка", "Повербанк", "Ноутбук", "Офлайн-карты", "Наличные $"];
+/* Чек-лист сборов по группам — пользователь добавляет нужное в раздел «Сборы» */
+const PACK_SUGGEST = [
+  ["Техника", ["Повербанк", "Зарядки и кабели", "Переходник для розеток", "Наушники", "Ноутбук"]],
+  ["Финансы", ["Обменять валюту", "Наличные $", "Предупредить банк о поездке"]],
+  ["Здоровье", ["Аптечка", "Личные лекарства", "Солнцезащитный крем", "Репеллент"]],
+  ["Разное", ["Офлайн-карты", "Копии документов", "Очки или линзы", "Зонт/дождевик", "Бутылка для воды"]],
+];
 const EXTRA_SERVICES = [
   { id: "insurance", title: "Страхование", sub: "медицина · рейс · багаж", from: 200, icon: "shield", color: "#7c5cff", url: "" },
   { id: "lounge", title: "Бизнес-залы", sub: "комфорт в ожидании рейса", from: 1500, icon: "armchair", color: "#48dcdc", url: "" },
@@ -1223,6 +1303,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
   const [doc, setDoc] = useState(null);        // открытая карточка документа
   const [addOpen, setAddOpen] = useState(false); // «добавить в путешествие»
   const [searchOpen, setSearchOpen] = useState(false); // нижний лист поиска (над клавиатурой)
+  const [wiz, setWiz] = useState(null);                // открытый мастер заполнения
   // открытие карточки конкретного документа из поездки
   useEffect(() => {
     if (preOpenDoc) { const dd = ALL_DOCS.find((x) => x.id === preOpenDoc); if (dd) setDoc(dd); onPreDone && onPreDone(); }
@@ -1320,6 +1401,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
         <div style={{ fontSize: 10.5, color: T.subd, marginTop: 8, textAlign: "center" }}>Сроки ориентировочные — проверяйте официальные источники</div>
       </>}
     </div>
+    {wiz && <DocWizard doc={wiz} onClose={() => setWiz(null)} setToast={setToast} />}
     {/* Поиск документа: нижний лист — вместе с подсказками сидит над клавиатурой */}
     {searchOpen && <Overlay onClose={() => { setSearchOpen(false); setQ(""); }}>
       <SheetHead title="Поиск документа" onClose={() => { setSearchOpen(false); setQ(""); }} />
@@ -1346,7 +1428,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
           <div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, marginBottom: 6, fontFamily: "Sora,sans-serif" }}>Что потребуется</div>
           {(info.req || []).map((rq) => <div key={rq} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}><span style={{ width: 5, height: 5, borderRadius: 999, background: T.violet }} /><span style={{ fontSize: 12.5, color: T.sub }}>{rq}</span></div>)}
         </>}
-        <div onClick={() => setToast("Мастер заполнения — следующий шаг разработки")} className="press" style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Заполнить с помощником <Badge label="скоро" color="#fff" /></div>
+        <div onClick={() => { if (DOC_FIELDS[doc.id]) { setWiz(doc); setDoc(null); } else setToast("Мастер для этого документа появится позже"); }} className="press" style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Заполнить с помощником {!DOC_FIELDS[doc.id] && <Badge label="скоро" color="#fff" />}</div>
         {links.length > 0 && <>
           <div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, margin: "14px 0 6px", fontFamily: "Sora,sans-serif" }}>Официальные ссылки</div>
           {links.map((l) => <div key={l.label} onClick={() => { try { window.open(l.url, "_blank"); } catch (e) { } }} className="press" style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 0", borderTop: `1px solid ${T.line}`, cursor: "pointer" }}><span style={{ fontSize: 13, color: T.violet, fontWeight: 600, flex: 1 }}>{l.label}</span><Icon d={I.chevR} size={14} color={T.subd} /></div>)}
@@ -1658,12 +1740,12 @@ export default function App() {
       ::-webkit-scrollbar{display:none}
       input::placeholder{color:${T.subd}}
       input,select,textarea{font-size:16px}
-      html,body{touch-action:pan-y;overscroll-behavior:none}
+      html,body{touch-action:pan-y;background:#0a0a18}
       .app-root{height:100vh;height:100dvh}
     `}</style>
     <div className="app-root" style={{ width: "100%", maxWidth: 420, paddingTop: safeTop, background: `radial-gradient(120% 60% at 80% 0%, #1a1340 0%, ${T.bg} 55%)`, color: T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", top: inset.logoTop != null ? inset.logoTop + "px" : "calc(env(safe-area-inset-top, 0px) + 14px)", zIndex: 30, pointerEvents: "none" }}><Logo /></div>
-      <div style={{ flex: 1, overflowY: "auto", overscrollBehavior: "none", paddingTop: 45, paddingBottom: 92 }}>{main}</div>
+      <div style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", background: "transparent", paddingTop: 10, paddingBottom: 92 }}>{main}</div>
       {!kb && <BottomNav tab={tab} setTab={(k) => { if (k === tab && (k === "routes" || k === "profile" || k === "hotels" || k === "docs")) setStack([]); if (k === "routes" && tab === "routes") setStack([]); setTab(k); }} bottomStr={inset.bottomStr} />}
       {sheet && <SearchSheet form={form} setForm={setForm} onClose={() => setSheet(false)} onSubmit={() => runSearch()} setToast={setToast} />}
       {traveler && <Traveler safeTop={safeTop} bottomStr={inset.bottomStr} onBack={() => setTraveler(false)} />}
