@@ -744,6 +744,16 @@ function DocWizard({ doc, onClose, setToast }) {
   const fields = DOC_FIELDS[doc.id] || [];
   const [ans, setAns] = useState({});
   const [done, setDone] = useState(false);
+  const [aiQ, setAiQ] = useState(""); const [aiA, setAiA] = useState(""); const [aiBusy, setAiBusy] = useState(false);
+  const askAi = async (q) => {
+    const question = String(q || aiQ).trim(); if (!question || aiBusy) return;
+    setAiQ(question); setAiBusy(true); setAiA("");
+    try {
+      const r = await fetch(API_BASE + "?action=ai-help", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ doc: doc.name, country: doc.country, question }) });
+      const j = await r.json(); setAiA(j.answer || "Не получилось получить ответ — попробуйте ещё раз");
+    } catch (e) { setAiA("Помощник недоступен — проверьте соединение"); }
+    setAiBusy(false);
+  };
   const inputSt = { width: "100%", background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "11px 12px", color: T.text, fontSize: 14, outline: "none", boxSizing: "border-box", colorScheme: "dark" };
   const val = (f) => {
     const raw = String(ans[f.k] || "").trim();
@@ -762,10 +772,25 @@ function DocWizard({ doc, onClose, setToast }) {
       {!done ? <>
         <div style={{ fontSize: 12, color: T.subd, lineHeight: 1.45, marginBottom: 12 }}>{doc.name}: отвечайте по-русски — подготовим значения в формате официальной формы. Данные никуда не отправляются и остаются на этом устройстве.</div>
         {fields.map((f) => <div key={f.k} style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 12, color: T.sub, fontWeight: 600, marginBottom: 5 }}>{f.label}{f.hint ? <span style={{ color: T.subd, fontWeight: 400 }}> · {f.hint}</span> : null}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+            <span style={{ fontSize: 12, color: T.sub, fontWeight: 600, flex: 1 }}>{f.label}{f.hint ? <span style={{ color: T.subd, fontWeight: 400 }}> · {f.hint}</span> : null}</span>
+            <span onClick={() => askAi(`Как правильно заполнить поле «${f.label}» для документа «${doc.name}»?`)} className="press" style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 999, border: `1px solid ${T.violet}55`, background: T.violet + "14", display: "grid", placeItems: "center", color: T.violet, fontSize: 11, fontWeight: 800, cursor: "pointer" }}>?</span>
+          </div>
           <input type={f.type === "date" ? "date" : "text"} value={ans[f.k] || ""} onChange={(e) => setAns({ ...ans, [f.k]: e.target.value })} style={inputSt} />
           {f.type === "name" && ans[f.k] ? <div style={{ fontSize: 11, color: T.violet, marginTop: 4 }}>В форме: {translit(ans[f.k])}</div> : null}
         </div>)}
+        <div style={{ background: T.card2, border: `1px solid ${T.line}`, borderRadius: 14, padding: 12, marginTop: 2 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+            <span style={{ fontSize: 14 }}>🤖</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: T.text, fontFamily: "Sora,sans-serif", flex: 1 }}>ИИ-помощник</span>
+            <Badge label="ГигаЧат" color={T.cyan} />
+          </div>
+          {aiA && <div style={{ fontSize: 12.5, color: T.sub, lineHeight: 1.5, background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 11px", marginBottom: 8, whiteSpace: "pre-wrap" }}>{aiA}</div>}
+          <div style={{ display: "flex", gap: 8 }}>
+            <input value={aiQ} onChange={(e) => setAiQ(e.target.value)} placeholder="Спросите про любое поле…" style={{ flex: 1, background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 10px", color: T.text, fontSize: 12.5, outline: "none" }} />
+            <div onClick={() => askAi()} className="press" style={{ background: aiBusy ? T.card : GRAD.cta, border: aiBusy ? `1px solid ${T.line}` : "none", borderRadius: 10, padding: "9px 13px", color: aiBusy ? T.subd : "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{aiBusy ? "…" : "Спросить"}</div>
+          </div>
+        </div>
       </> : <>
         <div style={{ fontSize: 12, color: T.subd, marginBottom: 10 }}>Копируйте значения в официальную форму. Перед отправкой сверьте с документами.</div>
         {filled.map((f) => <div key={f.k} style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
@@ -1272,9 +1297,12 @@ const EXTRA_SERVICES = [
 ];
 function ServiceGrid({ setToast }) {
   const go = (s) => { if (s.url) { try { window.open(s.url, "_blank"); } catch (e) { } setToast(`Открываем: ${s.title}…`); } else setToast("Скоро подключим партнёра"); };
+  const byId = (id) => EXTRA_SERVICES.find((s) => s.id === id);
+  const small = [byId("insurance"), byId("esim")].filter(Boolean);
+  const lounge = byId("lounge");
   return <>
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-      {EXTRA_SERVICES.map((s) => (
+      {small.map((s) => (
         <div key={s.id} onClick={() => go(s)} className="press" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, padding: 12, cursor: "pointer", display: "flex", flexDirection: "column", minHeight: 118 }}>
           <div style={{ width: 38, height: 38, borderRadius: 12, background: s.color + "22", border: `1px solid ${s.color}55`, display: "grid", placeItems: "center" }}><Icon d={I[s.icon]} size={19} color={s.color} /></div>
           <div style={{ fontSize: 13.5, fontWeight: 700, color: T.text, marginTop: 8, fontFamily: "Sora,sans-serif" }}>{s.title}</div>
@@ -1285,6 +1313,12 @@ function ServiceGrid({ setToast }) {
           </div>
         </div>))}
     </div>
+    {lounge && <div onClick={() => go(lounge)} className="press" style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12, background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, padding: "13px 14px", cursor: "pointer" }}>
+      <div style={{ width: 42, height: 42, borderRadius: 13, background: lounge.color + "22", border: `1px solid ${lounge.color}55`, display: "grid", placeItems: "center", flexShrink: 0 }}><Icon d={I[lounge.icon]} size={20} color={lounge.color} /></div>
+      <div style={{ flex: 1 }}><div style={{ fontSize: 14, fontWeight: 700, color: T.text, fontFamily: "Sora,sans-serif" }}>{lounge.title}</div><div style={{ fontSize: 10.5, color: T.subd, marginTop: 2 }}>{lounge.sub}</div></div>
+      <span style={{ fontSize: 11.5, fontWeight: 800, color: lounge.color, background: lounge.color + "1a", border: `1px solid ${lounge.color}44`, borderRadius: 999, padding: "4px 9px", flexShrink: 0 }}>от {lounge.from} ₽</span>
+      <div style={{ width: 26, height: 26, borderRadius: 999, background: "rgba(255,255,255,.06)", border: `1px solid ${T.line}`, display: "grid", placeItems: "center", flexShrink: 0 }}><Icon d={I.arrow} size={12} color={T.sub} /></div>
+    </div>}
     <div style={{ fontSize: 10.5, color: T.subd, marginTop: 8, textAlign: "center" }}>Услуги оказывают партнёры — переход по кнопке</div>
   </>;
 }
@@ -1306,7 +1340,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
   const [wiz, setWiz] = useState(null);                // открытый мастер заполнения
   // открытие карточки конкретного документа из поездки
   useEffect(() => {
-    if (preOpenDoc) { const dd = ALL_DOCS.find((x) => x.id === preOpenDoc); if (dd) setDoc(dd); onPreDone && onPreDone(); }
+    if (preOpenDoc) { const dd = ALL_DOCS.find((x) => x.id === preOpenDoc); if (dd) setDoc({ ...dd, _fromTrip: true }); onPreDone && onPreDone(); }
   }, [preOpenDoc]);
   const countries = Object.keys(DOC_MATRIX);
   const found = q.trim().length >= 2 ? ALL_DOCS.filter((x) => (x.name + " " + x.country + " " + (x.kw || "")).toLowerCase().includes(q.trim().toLowerCase())).slice(0, 6) : [];
@@ -1433,7 +1467,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
           <div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, margin: "14px 0 6px", fontFamily: "Sora,sans-serif" }}>Официальные ссылки</div>
           {links.map((l) => <div key={l.label} onClick={() => { try { window.open(l.url, "_blank"); } catch (e) { } }} className="press" style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 0", borderTop: `1px solid ${T.line}`, cursor: "pointer" }}><span style={{ fontSize: 13, color: T.violet, fontWeight: 600, flex: 1 }}>{l.label}</span><Icon d={I.chevR} size={14} color={T.subd} /></div>)}
         </>}
-        {DOC_MATRIX[doc.country] && <div onClick={() => setAddOpen(true)} className="press" style={{ marginTop: 12, textAlign: "center", background: T.violet + "1a", border: `1px solid ${T.violet}55`, borderRadius: 12, padding: 11, color: T.violet, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Добавить в путешествие</div>}
+        {!doc._fromTrip && DOC_MATRIX[doc.country] && <div onClick={() => setAddOpen(true)} className="press" style={{ marginTop: 12, textAlign: "center", background: T.violet + "1a", border: `1px solid ${T.violet}55`, borderRadius: 12, padding: 11, color: T.violet, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Добавить в путешествие</div>}
       </Overlay>); })()}
     {/* Добавление в путешествие: существующее или новое */}
     {addOpen && <Overlay onClose={() => setAddOpen(false)}>
@@ -1551,6 +1585,10 @@ export default function App() {
       const goFullscreen = () => { try { if (tg.requestFullscreen && isMobile && (!tg.isVersionAtLeast || tg.isVersionAtLeast("8.0")) && !tg.isFullscreen) tg.requestFullscreen(); } catch (e) { } };
       const noSwipe = () => { try { if (tg.disableVerticalSwipes) tg.disableVerticalSwipes(); } catch (e) { } };
       goFullscreen(); noSwipe();
+      // подложка нативного отскока WebView: на коротких экранах жест уходит в системный bounce
+      try { tg.setBackgroundColor && tg.setBackgroundColor("#0a0a18"); } catch (e) { }
+      try { tg.setHeaderColor && tg.setHeaderColor("#0a0a18"); } catch (e) { }
+      try { tg.setBottomBarColor && tg.setBottomBarColor("#0a0a18"); } catch (e) { }
       const u = tg.initDataUnsafe && tg.initDataUnsafe.user; if (u && u.first_name) setName([u.first_name, u.last_name].filter(Boolean).join(" "));
       recalc();
       ["viewportChanged", "safeAreaChanged", "contentSafeAreaChanged", "fullscreenChanged"].forEach((ev) => tg.onEvent && tg.onEvent(ev, recalc));
