@@ -944,6 +944,7 @@ function TripScreen({ t, onBack, onUpdate, onDelete, onFindTickets, goHotels, go
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent,rgba(5,5,20,.72))" }} />
         <div onClick={() => { setMenu(!menu); setNameDraft(t.title); }} className="press" style={{ position: "absolute", top: 10, right: 10, width: 32, height: 32, borderRadius: 999, background: "rgba(8,8,22,.55)", border: "1px solid rgba(255,255,255,.22)", display: "grid", placeItems: "center", color: "#fff", fontWeight: 800, letterSpacing: 1.5, cursor: "pointer", fontSize: 15 }}>⋯</div>
         <div style={{ position: "relative" }}>
+          {t.route && t.route.stopover && <span style={{ display: "inline-block", fontSize: 9.5, fontWeight: 800, letterSpacing: .4, color: "#fff", background: "rgba(124,92,255,.9)", borderRadius: 999, padding: "3px 9px", marginBottom: 6 }}>ЛУЧШИЙ СТОПОВЕР · {t.route.stopover.nights} НОЧ. {t.route.stopover.city.toUpperCase()}</span>}
           <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 19, color: "#fff" }}>{t.title}</div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,.85)" }}>{t.dcName}{t.country && t.country !== t.dcName ? `, ${t.country}` : ""}{t.df ? ` · ${fmtShort(new Date(t.df))}` : ""}{t.dt ? ` — ${fmtShort(new Date(t.dt))}` : ""}{d != null ? ` · через ${d} дн.` : ""}{t.adults > 1 ? ` · ${t.adults} чел.` : ""}</div>
         </div>
@@ -1706,6 +1707,8 @@ export default function App() {
     const onBack = () => {
       if (fired) return; fired = true; setTimeout(() => { fired = false; }, 300);
       if (confirmTrip) return setConfirmTrip(null);
+      // ушли смотреть промокоды/документы из карточки маршрута — «Назад» возвращает к маршруту
+      if (stack.length > 0 && tab !== "routes") { setTab("routes"); return; }
       if (newTrip) return setNewTrip(false);
       if (svcOpen) return setSvcOpen(false);
       if (editName) return setEditName(false);
