@@ -416,7 +416,7 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.line}` }}>
       <Icon d={r.stopover ? I.moon : I.clock} size={18} color={T.violet} />
       <div style={{ flex: 1 }}><div style={{ fontSize: 12.5, color: T.text, fontWeight: 600 }}>{r.stopover ? `Stopover: ${r.stopover.city}` : (r.transfers ? "Пересадка" : "Прямой перелёт")}</div><div style={{ fontSize: 11, color: T.subd }}>{r.stopover ? `${r.stopover.nights} ноч.` : (r.transfers ? hm(dur) : "Без пересадок")}</div></div>
-      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.text }}>{rub(r.total)}</div>
+      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.text }}>{r.approx ? "≈ " : ""}{rub(r.total)}</div>
       <div onClick={(e) => { e.stopPropagation(); onLike(r); }} className="press" style={{ cursor: "pointer", padding: 4 }}><Icon d={I.heart} size={20} color={liked ? T.pink : T.subd} /></div>
     </div>
   </div>;
@@ -528,11 +528,11 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
               <AirlineLogo code={s.airline} />
               <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{airlineName(s.airline) || "Авиакомпания"}</div><div style={{ fontSize: 11, color: T.subd }}>{s.flightNumber || (s.mode === "ferry" ? "Паром" : "номер рейса — в билете")}</div></div>
-              {s.mode === "ferry" ? <Badge label="паром" color={T.cyan} /> : (r.segments.length === 1 && (s.transfers || 0) === 0 ? <Badge label="Прямой рейс" color={T.green} /> : (r.segments.length === 1 ? null : <Badge label={`Рейс ${i + 1}`} color={T.violet} />))}
+              {s.mode === "ferry" ? <Badge label="паром" color={T.cyan} /> : s.approx ? <Badge label="≈ цена ориентировочная" color="#f59640" /> : (r.segments.length === 1 && (s.transfers || 0) === 0 ? <Badge label="Прямой рейс" color={T.green} /> : (r.segments.length === 1 ? null : <Badge label={`Рейс ${i + 1}`} color={T.violet} />))}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{depOf(s)}</div><div style={{ fontSize: 11, color: T.subd }}>{s.fromCode}</div></div>
-              <div style={{ flex: 1, textAlign: "center", fontSize: 10.5, color: T.subd }}>{hm(s.durationMin || 0)}<div style={{ height: 1, background: T.line, margin: "5px 0" }} />{(s.transfers || 0) > 0 ? `${s.transfers} ${s.transfers === 1 ? "пересадка" : "пересадки"}` : (r.agent ? "детали в билете" : "прямой")}</div>
+              <div style={{ flex: 1, textAlign: "center", fontSize: 10.5, color: T.subd }}>{s.approx ? <span style={{ color: "#f59640" }}>рейс уточняется<div style={{ height: 1, background: T.line, margin: "5px 0" }} />по ссылке</span> : <>{hm(s.durationMin || 0)}<div style={{ height: 1, background: T.line, margin: "5px 0" }} />{(s.transfers || 0) > 0 ? `${s.transfers} ${s.transfers === 1 ? "пересадка" : "пересадки"}` : (r.agent ? "детали в билете" : "прямой")}</>}</div>
               <div style={{ textAlign: "right" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{arrOf(s)}</div><div style={{ fontSize: 11, color: T.subd }}>{s.toCode}</div></div>
               {(s.priceLive || s.priceEstimate) ? <a href={s.deepLink || (((r.bookingLinks || []).find(l => l.from === s.fromCode && l.to === s.toCode) || {}).url) || undefined} target="_blank" rel="noreferrer" className="press" style={{ textDecoration: "none" }}><div style={{ background: GRAD.cta, borderRadius: 12, padding: "8px 12px", color: "#fff", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap" }}>{rub(s.priceLive || s.priceEstimate)}</div></a> : null}
             </div>
@@ -549,7 +549,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
     </div>
     {(r.agent || (r.segments && r.segments.length === 0)) && r.bookingLinks && r.bookingLinks.length > 0 && (
       <div style={{ padding: "12px 20px 0" }}>
-        <a href={r.bookingLinks[0].url} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Btn>Купить билет туда-обратно · {rub(r.total)}</Btn></a>
+        <a href={r.bookingLinks[0].url} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Btn>Купить билет туда-обратно · {r.approx ? "≈ " : ""}{rub(r.total)}</Btn></a>
       </div>)}
     <div style={{ padding: "16px 20px 8px", display: "flex", gap: 10 }}>
       <Btn style={{ flex: 1 }} onClick={() => onTakeTrip(r)}>{inTrip ? "Открыть поездку" : "✈ Взять в поездку"}</Btn>
@@ -1714,6 +1714,8 @@ export default function App() {
       if (editName) return setEditName(false);
       if (traveler) return setTraveler(false);
       if (sheet) return setSheet(false);
+      const closing = stack[stack.length - 1];
+      if (closing === "results" && stack.length === 1) { setStack([]); setTab("home"); setSheet(true); return; }
       setStack((p) => p.slice(0, -1));
     };
     try {
@@ -1741,7 +1743,7 @@ export default function App() {
       const ls = lastSearchRef.current || { oc: (form.origin && form.origin.code) || "", dc: (form.dest && form.dest.code) || "", df: form.dep ? iso(form.dep) : "", dt: (form.round && form.ret) ? iso(form.ret) : "", a: form.adults || 1 };
       if (ls.oc && ls.dc && ls.df) weblink = `https://t.me/TripWiseAI_bot/app?startapp=${b64urlEnc(JSON.stringify({ ...ls, id: r.id }))}`;
     } catch (e) { }
-    const text = `${query.origin} → ${query.destName} за ${rub(r.total)} — нашёл в TripWiseAI ✈️`;
+    const text = `${query.origin} → ${query.destName} за ${r.approx ? "≈ " : ""}{rub(r.total)} — нашёл в TripWiseAI ✈️`;
     const tg = (typeof window !== "undefined") && window.Telegram && window.Telegram.WebApp;
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(weblink)}&text=${encodeURIComponent(text)}`;
     try {
