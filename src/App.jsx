@@ -8,6 +8,25 @@ import React, { useState, useRef, useEffect } from "react";
 
 const API_BASE = "https://functions.yandexcloud.net/d4e3hpvr0lrijksc8i1r";
 
+/* ================== АНАЛИТИКА (Яндекс.Метрика) ==================
+   Все вызовы безопасны: если ym ещё не загрузился в Telegram WebView — тихо пропускаем.
+   trackPage — виртуальный просмотр вкладки; trackGoal — цель (reachGoal). */
+const YM_ID = 110545946;
+const YM_TAB_PATH = { home: "/home", routes: "/trips", hotels: "/hotels", docs: "/documents", profile: "/profile" };
+const YM_TAB_TITLE = { home: "Главная", routes: "Путешествия", hotels: "Отели", docs: "Документы", profile: "Профиль" };
+function ym_safe() { try { return typeof window !== "undefined" && typeof window.ym === "function" ? window.ym : null; } catch (e) { return null; } }
+function trackPage(path, title) { const f = ym_safe(); if (!f) return; try { f(YM_ID, "hit", path, { title }); } catch (e) { } }
+function trackGoal(goal, params) { const f = ym_safe(); if (!f) return; try { params ? f(YM_ID, "reachGoal", goal, params) : f(YM_ID, "reachGoal", goal); } catch (e) { } }
+// backend MAU-counter: валидный источник MAU по Telegram user_id (не зависит от Метрики)
+function trackAppOpenBackend() {
+  try {
+    const tg = window.Telegram && window.Telegram.WebApp;
+    const initData = tg && tg.initData;
+    if (!initData) return;
+    fetch(API_BASE + "?action=track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "app_open", initData }) }).catch(() => {});
+  } catch (e) { }
+}
+
 const T = {
   bg: "#0a0a18", bg2: "#0d0d20", card: "#14142e", card2: "#1a1a3a",
   line: "rgba(255,255,255,0.08)", line2: "rgba(255,255,255,0.14)",
@@ -210,7 +229,7 @@ function Header({ onBack, title, subtitle, onEdit }) {
 function BottomNav({ tab, setTab, bottomStr = "0px" }) {
   const items = [["home", "Главная", I.home], ["routes", "Путешествия", I.route], ["hotels", "Отели", I.hotel], ["docs", "Документы", I.doc], ["profile", "Профиль", I.user]];
   return <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 420, zIndex: 40, minHeight: 64, paddingBottom: `max(${bottomStr}, 12px)`, display: "flex", background: "rgba(10,10,24,.92)", backdropFilter: "blur(12px)", borderTop: `1px solid ${T.line}` }}>
-    {items.map(([k, label, ic]) => (<button key={k} onClick={() => setTab(k)} className="press" style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, paddingTop: 8, color: tab === k ? T.violet : T.subd }}><Icon d={ic} size={22} color={tab === k ? T.violet : T.subd} /><span style={{ fontSize: 10, fontWeight: tab === k ? 700 : 500, whiteSpace: "nowrap" }}>{label}</span></button>))}
+    {items.map(([k, label, ic]) => (<button key={k} onClick={() => { trackPage(YM_TAB_PATH[k] || "/" + k, YM_TAB_TITLE[k] || label); if (k === "hotels") trackGoal("hotels_opened"); else if (k === "docs") trackGoal("documents_opened"); setTab(k); }} className="press" style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, paddingTop: 8, color: tab === k ? T.violet : T.subd }}><Icon d={ic} size={22} color={tab === k ? T.violet : T.subd} /><span style={{ fontSize: 10, fontWeight: tab === k ? 700 : 500, whiteSpace: "nowrap" }}>{label}</span></button>))}
   </div>;
 }
 function Toast({ msg }) { if (!msg) return null; return <div style={{ position: "fixed", left: "50%", bottom: 86, transform: "translateX(-50%)", zIndex: 100, background: "#1c1c40", border: `1px solid ${T.line2}`, color: T.text, fontSize: 13, fontWeight: 600, padding: "10px 18px", borderRadius: 999, boxShadow: "0 8px 30px rgba(0,0,0,.5)", animation: "fadeUp .25s ease" }}>{msg}</div>; }
@@ -491,7 +510,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
         </div>
         <div className="carousel" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
           {chips.map((p) => (
-            <div key={p.serviceId} onClick={() => goHotels(p.serviceId)} className="press" style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,.05)", border: `1px solid ${T.line}`, borderRadius: 14, padding: "8px 10px", cursor: "pointer", flexShrink: 0 }}>
+            <div key={p.serviceId} onClick={() => { trackGoal("hotel_partner_click", { partner: p.serviceId, country: query.destCountry || "", city: query.destName || "" }); goHotels(p.serviceId); }} className="press" style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,.05)", border: `1px solid ${T.line}`, borderRadius: 14, padding: "8px 10px", cursor: "pointer", flexShrink: 0 }}>
               <ServiceLogo id={p.serviceId} name={p.service} />
               <div><div style={{ fontSize: 11.5, fontWeight: 700, color: T.text, whiteSpace: "nowrap" }}>{p.service}</div><div style={{ fontSize: 12, fontWeight: 800, color: T.violet, whiteSpace: "nowrap" }}>до {rub(p.discountRub)}</div></div>
               <Icon d={I.chevR} size={14} color={T.subd} />
@@ -534,7 +553,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
               <div><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{depOf(s)}</div><div style={{ fontSize: 11, color: T.subd }}>{s.fromCode}</div></div>
               <div style={{ flex: 1, textAlign: "center", fontSize: 10.5, color: T.subd }}>{s.approx ? <span style={{ color: "#f59640" }}>рейс уточняется<div style={{ height: 1, background: T.line, margin: "5px 0" }} />по ссылке</span> : <>{hm(s.durationMin || 0)}<div style={{ height: 1, background: T.line, margin: "5px 0" }} />{(s.transfers || 0) > 0 ? `${s.transfers} ${s.transfers === 1 ? "пересадка" : "пересадки"}` : (r.agent ? "детали в билете" : "прямой")}</>}</div>
               <div style={{ textAlign: "right" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 16 }}>{arrOf(s)}</div><div style={{ fontSize: 11, color: T.subd }}>{s.toCode}</div></div>
-              {(s.priceLive || s.priceEstimate) ? <a href={s.deepLink || (((r.bookingLinks || []).find(l => l.from === s.fromCode && l.to === s.toCode) || {}).url) || undefined} target="_blank" rel="noreferrer" className="press" style={{ textDecoration: "none" }}><div style={{ background: GRAD.cta, borderRadius: 12, padding: "8px 12px", color: "#fff", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap" }}>{rub(s.priceLive || s.priceEstimate)}</div></a> : null}
+              {(s.priceLive || s.priceEstimate) ? <a onClick={() => trackGoal("flight_partner_click", { partner: "aviasales", from: s.fromCode, to: s.toCode, price: r.total || 0 })} href={s.deepLink || (((r.bookingLinks || []).find(l => l.from === s.fromCode && l.to === s.toCode) || {}).url) || undefined} target="_blank" rel="noreferrer" className="press" style={{ textDecoration: "none" }}><div style={{ background: GRAD.cta, borderRadius: 12, padding: "8px 12px", color: "#fff", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap" }}>{rub(s.priceLive || s.priceEstimate)}</div></a> : null}
             </div>
           </div>
           {r.stopover && i === 0 && r.segments.length > 1 && (
@@ -1297,7 +1316,7 @@ const EXTRA_SERVICES = [
   { id: "transfer", title: "Трансфер", sub: "из аэропорта до отеля", from: 700, icon: "car", color: "#39d98a", url: "" },
 ];
 function ServiceGrid({ setToast }) {
-  const go = (s) => { if (s.url) { try { window.open(s.url, "_blank"); } catch (e) { } setToast(`Открываем: ${s.title}…`); } else setToast("Скоро подключим партнёра"); };
+  const go = (s) => { trackGoal("service_partner_click", { service: s.id, partner: s.id, country: "" }); if (s.url) { try { window.open(s.url, "_blank"); } catch (e) { } setToast(`Открываем: ${s.title}…`); } else setToast("Скоро подключим партнёра"); };
   const byId = (id) => EXTRA_SERVICES.find((s) => s.id === id);
   const small = [byId("insurance"), byId("esim")].filter(Boolean);
   const lounge = byId("lounge");
@@ -1524,7 +1543,7 @@ function Hotels({ setToast, preOpen, onPreDone }) {
           </div>
         )) : <div style={{ color: T.subd, fontSize: 13, textAlign: "center", padding: 12 }}>Активных промокодов пока нет</div>}
       </div>
-      <div style={{ marginTop: 16 }}><Btn onClick={() => { try { window.open(goUrl || svc.url, "_blank"); } catch (e) { } setToast(`Открываем ${svc.name}…`); }}>Перейти в {svc.name}</Btn></div>
+      <div style={{ marginTop: 16 }}><Btn onClick={() => { trackGoal("hotel_partner_click", { partner: (svc && svc.id) || "", country: "", city: "" }); try { window.open(goUrl || svc.url, "_blank"); } catch (e) { } setToast(`Открываем ${svc.name}…`); }}>Перейти в {svc.name}</Btn></div>
     </Overlay>}
   </div>;
 }
@@ -1588,6 +1607,7 @@ export default function App() {
       goFullscreen(); noSwipe();
       // подложка нативного отскока WebView: на коротких экранах жест уходит в системный bounce
       try { tg.setBackgroundColor && tg.setBackgroundColor("#0a0a18"); } catch (e) { }
+      trackGoal("app_open"); trackAppOpenBackend(); trackPage("/home", "Главная");
       try { tg.setHeaderColor && tg.setHeaderColor("#0a0a18"); } catch (e) { }
       try { tg.setBottomBarColor && tg.setBottomBarColor("#0a0a18"); } catch (e) { }
       const u = tg.initDataUnsafe && tg.initDataUnsafe.user; if (u && u.first_name) setName([u.first_name, u.last_name].filter(Boolean).join(" "));
@@ -1645,6 +1665,7 @@ export default function App() {
   const datesLabel = (f) => f.dep ? (f.round && f.ret ? `${fmtShort(f.dep)} — ${fmtShort(f.ret)}` : fmtShort(f.dep)) : "";
 
   const runSearch = async (f) => {
+    trackGoal("flight_search_started", { from: (f.origin && (f.origin.code || f.origin.city)) || "", to: (f.dest && (f.dest.code || f.dest.city)) || "", departDate: f.dep ? new Date(f.dep).toISOString().slice(0, 10) : "", returnDate: f.ret ? new Date(f.ret).toISOString().slice(0, 10) : "", passengers: (f.adults || 1) + (f.children ? f.children.length : 0) });
     const ff = f || form;
     if (!ff.origin || !ff.dest || !ff.dep) { setSheet(true); setToast("Заполните откуда, куда и дату"); return; }
     const nq = { origin: ff.origin.city, destName: ff.dest.city, destCountry: ff.dest.country, destinationId: ff.dest.destId || ff.dest.code, adults: ff.adults, datesLabel: datesLabel(ff), depISO: iso(ff.dep) };
@@ -1688,7 +1709,7 @@ export default function App() {
       checks: { tickets: false, lodgeMain: false, lodgeStop: false, docs: {}, services: {} },
       servicesAdded: [], custom: [], docsExtra: [], lodgingOff: false, children: ls.ch || [], createdAt: Date.now(),
     };
-    setTrips((p) => [t, ...p]); setToast("Поездка создана"); openTripScreen(t.id);
+    setTrips((p) => [t, ...p]); trackGoal("trip_created", { country: t.country || "", from: t.oc || "", to: t.dc || "" }); setToast("Поездка создана"); openTripScreen(t.id);
   };
   const findTicketsForTrip = (t) => {
     const o = AIRPORTS.find((a) => a.code === t.oc) || null, ds = AIRPORTS.find((a) => a.code === t.dc) || null;
@@ -1731,7 +1752,7 @@ export default function App() {
     };
   }, [stack, sheet, traveler, editName, svcOpen, newTrip, confirmTrip]);
   const isLiked = (r) => !!saved.find(x => x.id === ("liked-" + r.id));
-  const likeRoute = (r) => {
+  const likeRoute = (r) => { try { trackGoal("route_saved"); } catch(e){}
     const id = "liked-" + r.id;
     if (saved.find(x => x.id === id)) { setSaved(p => p.filter(x => x.id !== id)); setToast("Удалено из маршрутов"); }
     else { setSaved(p => [{ id, name: `${query.origin} — ${query.destName}`, dates: query.datesLabel, price: r.total, emoji: "🛫", route: r, query }, ...p]); setToast("Добавлено в «Маршруты»"); }
@@ -1760,9 +1781,9 @@ export default function App() {
     if (top === "trip" && curTrip) main = <TripScreen t={curTrip} onBack={() => setStack([])} onUpdate={updateTrip} onDelete={(id) => { setTrips((p) => p.filter((x) => x.id !== id)); setStack([]); setToast("Поездка удалена"); }} onFindTickets={findTicketsForTrip} goHotels={() => { setHotelsPre(null); setTab("hotels"); }} goDocs={(docId) => { setDocsPre(typeof docId === "string" ? docId : null); setTab("docs"); }} setToast={setToast} />;
     else if (top === "trip") main = <RoutesScreen trips={trips} onOpenTrip={openTripScreen} onNewTrip={() => setNewTrip(true)} onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved((p) => p.filter((x) => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => { const f = { ...s.form, dep: s.form.dep ? new Date(s.form.dep) : null, ret: s.form.ret ? new Date(s.form.ret) : null }; setForm(f); runSearch(f); }} />;
     else if (top === "detail") main = <Detail r={selected} query={query} onBack={() => setStack(["results"])} onEdit={() => { setTab("home"); setSheet(true); }} liked={isLiked(selected)} onLike={likeRoute} onShare={shareRoute} goHotels={(svc) => { setHotelsPre(svc || null); setTab("hotels"); }} onTakeTrip={askTakeTrip} inTrip={!!(selected && trips.some((t) => t.route && t.route.rid === selected.id && t.df === ((lastSearchRef.current || {}).df || "")))} />;
-    else if (top === "results") main = <Results query={query} routes={routes} loading={loading} error={searchError} onRetry={() => runSearch()} onEdit={() => { setTab("home"); setSheet(true); }} onBack={() => setStack([])} onOpen={(r) => { setSelected(r); setStack(["results", "detail"]); }} isLiked={isLiked} onLike={likeRoute} />;
+    else if (top === "results") { if (!loading && routes.length) trackGoal("flight_results_viewed", { count: routes.length }); main = <Results query={query} routes={routes} loading={loading} error={searchError} onRetry={() => runSearch()} onEdit={() => { setTab("home"); setSheet(true); }} onBack={() => setStack([])} onOpen={(r) => { setSelected(r); setStack(["results", "detail"]); }} isLiked={isLiked} onLike={likeRoute} />; }
     else main = <RoutesScreen trips={trips} onOpenTrip={openTripScreen} onNewTrip={() => setNewTrip(true)} onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved(p => p.filter(x => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => { const f = { ...s.form, dep: s.form.dep ? new Date(s.form.dep) : null, ret: s.form.ret ? new Date(s.form.ret) : null }; setForm(f); runSearch(f); }} />;
-  } else if (tab === "home") main = <Home onSearch={() => setSheet(true)} onPickDest={openSheetWithDest} goTab={setTab} openServices={() => setSvcOpen(true)} />;
+  } else if (tab === "home") main = <Home onSearch={() => setSheet(true)} onPickDest={openSheetWithDest} goTab={setTab} openServices={() => (trackGoal("services_opened"), setSvcOpen(true))} />;
   else if (tab === "hotels") main = <Hotels setToast={setToast} preOpen={hotelsPre} onPreDone={() => setHotelsPre(null)} />;
   else if (tab === "docs") main = <Docs trips={trips} preOpenDoc={docsPre} onPreDone={() => setDocsPre(null)} onOpenTrip={openTripScreen} onAddDocToTrip={(tripId, ids) => { updateTrip(tripId, (x) => { const cur = x.docsExtra || []; const base = (DOC_MATRIX[x.country] || DOC_BASE).map((dd) => dd.id); const add = (ids || []).filter((id) => !cur.includes(id) && !base.includes(id)); return { ...x, docsExtra: [...cur, ...add], blocksOn: { ...tripBlocks(x), docs: true } }; }); openTripScreen(tripId); }} onCreateTrip={(t) => { setTrips((p) => [t, ...p]); setToast("Поездка создана"); openTripScreen(t.id); }} setToast={setToast} />;
   else if (tab === "profile") main = <Profile name={name} onTraveler={() => setTraveler(true)} onEditName={() => setEditName(true)} setToast={setToast} />;
