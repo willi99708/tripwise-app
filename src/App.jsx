@@ -1665,9 +1665,9 @@ export default function App() {
   const datesLabel = (f) => f.dep ? (f.round && f.ret ? `${fmtShort(f.dep)} — ${fmtShort(f.ret)}` : fmtShort(f.dep)) : "";
 
   const runSearch = async (f) => {
-    trackGoal("flight_search_started", { from: (f.origin && (f.origin.code || f.origin.city)) || "", to: (f.dest && (f.dest.code || f.dest.city)) || "", departDate: f.dep ? new Date(f.dep).toISOString().slice(0, 10) : "", returnDate: f.ret ? new Date(f.ret).toISOString().slice(0, 10) : "", passengers: (f.adults || 1) + (f.children ? f.children.length : 0) });
     const ff = f || form;
     if (!ff.origin || !ff.dest || !ff.dep) { setSheet(true); setToast("Заполните откуда, куда и дату"); return; }
+    trackGoal("flight_search_started", { from: (ff.origin && (ff.origin.code || ff.origin.city)) || "", to: (ff.dest && (ff.dest.code || ff.dest.city)) || "", departDate: ff.dep ? new Date(ff.dep).toISOString().slice(0, 10) : "", returnDate: ff.ret ? new Date(ff.ret).toISOString().slice(0, 10) : "", passengers: (ff.adults || 1) + (ff.children ? ff.children.length : 0) });
     const nq = { origin: ff.origin.city, destName: ff.dest.city, destCountry: ff.dest.country, destinationId: ff.dest.destId || ff.dest.code, adults: ff.adults, datesLabel: datesLabel(ff), depISO: iso(ff.dep) };
     lastSearchRef.current = { oc: ff.origin.code, dc: ff.dest.code, df: iso(ff.dep), dt: (ff.round && ff.ret) ? iso(ff.ret) : "", a: ff.adults || 1, ch: ff.children || [] };
     setQuery(nq); setSheet(false); setTab("routes"); setStack(["results"]); setLoading(true); setSearchError(false);  // <- переходим в «Маршруты»
