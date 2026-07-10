@@ -402,16 +402,18 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
   const outSegs = r.roundTrip ? ((r.outbound && r.outbound.segments) || r.segments.filter(s => s.direction !== "return")) : r.segments;
   const retSegs = r.roundTrip ? ((r.return && r.return.segments) || r.segments.filter(s => s.direction === "return")) : [];
   const CodeLine = ({ segs, dir }) => { const cs = codesOf(segs); if (!cs.length) return null; const planeIcon = dir === "ret" ? "/graphics/plane_l.png" : "/graphics/plane_r.png"; return <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>{cs.map((c, idx) => (<React.Fragment key={idx}>{idx > 0 && <img src={planeIcon} alt="" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} style={{ width: 14, height: 14, objectFit: "contain", flexShrink: 0, opacity: 0.8 }} />}<span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{c}</span></React.Fragment>))}</div>; };
-  // подстрока под направлением: пересадки + ожидание; стоповер пересадкой не считаем и показываем зелёным
-  const LegSub = ({ segs, stop, waitMin }) => {
+  // подстрока под направлением: ВРЕМЯ В ПУТИ + пересадки; стоповер зелёным
+  const LegSub = ({ segs, stop, waitMin, legMin }) => {
     const planes = (segs || []).filter(s => s.mode === "plane" || !s.mode);
     const intra = planes.reduce((n, s) => n + (s.transfers || 0), 0);
     const junctions = Math.max(0, Math.max(0, planes.length - 1) - (stop ? 1 : 0));
     const t = intra + junctions;
+    // суммарное время направления: с бэка (legMin) либо сумма сегментов
+    const durSum = legMin != null && legMin > 0 ? legMin : (segs || []).reduce((n, s) => n + (s.durationMin || 0), 0);
+    const durTxt = durSum > 0 ? hm(durSum) : "";
     let txt, col = T.subd;
     if (stop) { txt = `${stop.nights} ${plural(stop.nights, "ночь", "ночи", "ночей")} отдыха в ${stop.city}${t > 0 ? ` · ${t} ${plural(t, "пересадка", "пересадки", "пересадок")}` : " · без пересадок"}`; col = T.green; }
-    else if (t > 0) txt = `${t} ${plural(t, "пересадка", "пересадки", "пересадок")}${waitMin > 0 ? ` на ${hm(waitMin)}` : ""}`;
-    else txt = r.agent ? "детали рейса — в билете" : "прямой";
+    else { const trTxt = t > 0 ? `${t} ${plural(t, "пересадка", "пересадки", "пересадок")}${waitMin > 0 ? ` на ${hm(waitMin)}` : ""}` : "прямой"; txt = durTxt ? `${durTxt} · ${trTxt}` : trTxt; }
     return <div style={{ fontSize: 10.5, color: col, marginTop: 1 }}>{txt}</div>;
   };
   return <div onClick={onOpen} className="press card-in" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 20, padding: 14, cursor: "pointer", animationDelay: `${i * 70}ms` }}>
@@ -424,8 +426,8 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
         <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, fontSize: 15.5, color: T.text, lineHeight: 1.25 }}>{r.title || (r.stopover ? `Через ${r.stopover.city}` : "План путешествия")}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 10 }}>
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-            <div><CodeLine segs={outSegs} dir="out" /><LegSub segs={outSegs} stop={r.roundTrip ? (r.outbound && r.outbound.stopover) : r.stopover} waitMin={r.roundTrip ? ((r.outbound && r.outbound.waitMin) || 0) : (r.waitMin || 0)} /></div>
-            {r.roundTrip && retSegs.length > 0 && <div><CodeLine segs={retSegs} dir="ret" /><LegSub segs={retSegs} stop={r.return && r.return.stopover} waitMin={(r.return && r.return.waitMin) || 0} /></div>}
+            <div><CodeLine segs={outSegs} dir="out" /><LegSub segs={outSegs} stop={r.roundTrip ? (r.outbound && r.outbound.stopover) : r.stopover} waitMin={r.roundTrip ? ((r.outbound && r.outbound.waitMin) || 0) : (r.waitMin || 0)} legMin={r.roundTrip ? (r.durationOut != null ? r.durationOut : (r.outbound && r.outbound.durationMin)) : r.durationMin} /></div>
+            {r.roundTrip && retSegs.length > 0 && <div><CodeLine segs={retSegs} dir="ret" /><LegSub segs={retSegs} stop={r.return && r.return.stopover} waitMin={(r.return && r.return.waitMin) || 0} legMin={r.durationRet != null ? r.durationRet : (r.return && r.return.durationMin)} /></div>}
           </div>
           <Icon d={I.chevR} size={16} color={T.violet} />
         </div>
@@ -434,7 +436,7 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
     </div>
     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.line}` }}>
       <Icon d={r.stopover ? I.moon : I.clock} size={18} color={T.violet} />
-      <div style={{ flex: 1 }}><div style={{ fontSize: 12.5, color: T.text, fontWeight: 600 }}>{r.stopover ? `Stopover: ${r.stopover.city}` : (r.transfers ? "Пересадка" : "Прямой перелёт")}</div><div style={{ fontSize: 11, color: T.subd }}>{r.stopover ? `${r.stopover.nights} ноч.` : (r.transfers ? hm(dur) : "Без пересадок")}</div></div>
+      <div style={{ flex: 1 }}><div style={{ fontSize: 12.5, color: T.text, fontWeight: 600 }}>{r.stopover ? `Stopover: ${r.stopover.city}` : (r.roundTrip ? "Туда — обратно" : (r.transfers ? "С пересадкой" : "Прямой перелёт"))}</div><div style={{ fontSize: 11, color: T.subd }}>{r.stopover ? `${r.stopover.nights} ноч. в пути` : (r.roundTrip ? "время по направлениям выше" : (r.durationMin > 0 ? hm(r.durationMin) : "—"))}</div></div>
       <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.text }}>{rub(r.total)}</div>
       <div onClick={(e) => { e.stopPropagation(); onLike(r); }} className="press" style={{ cursor: "pointer", padding: 4 }}><Icon d={I.heart} size={20} color={liked ? T.pink : T.subd} /></div>
     </div>
