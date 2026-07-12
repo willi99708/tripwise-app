@@ -202,6 +202,21 @@ function Porthole({ grad = GRAD.sunset, image, h = 150, label, sub, codeRight, s
     {codeRight && <div style={{ position: "absolute", right: 10, bottom: 10, color: "#fff", fontWeight: 700, fontSize: 12, opacity: .9 }}>{codeRight}</div>}
   </div>;
 }
+function PageHero({ title, sub, emoji, grad = GRAD.night, bullets }) {
+  return <div style={{ margin: "4px 20px 14px" }}>
+    <div style={{ position: "relative", borderRadius: 20, overflow: "hidden", background: grad, padding: "18px 16px", minHeight: 96, display: "flex", alignItems: "center", gap: 14 }}>
+      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(120% 80% at 78% 10%, rgba(255,255,255,.22), transparent 55%)" }} />
+      <div style={{ position: "relative", flex: 1 }}>
+        <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 20, color: "#fff", lineHeight: 1.15 }}>{title}</div>
+        {sub && <div style={{ fontSize: 12.5, color: "rgba(255,255,255,.82)", marginTop: 4, lineHeight: 1.35 }}>{sub}</div>}
+      </div>
+      <div style={{ position: "relative", width: 60, height: 60, borderRadius: 16, background: "rgba(255,255,255,.14)", border: "1px solid rgba(255,255,255,.22)", display: "grid", placeItems: "center", fontSize: 30, flexShrink: 0 }}>{emoji}</div>
+    </div>
+    {bullets && bullets.length > 0 && <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+      {bullets.map((b, i) => <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 5, height: 5, borderRadius: 999, background: T.violet, flexShrink: 0 }} /><span style={{ fontSize: 12, color: T.sub }}>{b}</span></div>)}
+    </div>}
+  </div>;
+}
 function Badge({ label, color = T.violet, icon }) { return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 999, background: color + "22", border: `1px solid ${color}55`, color, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>{icon && <span style={{ fontSize: 11 }}>{icon}</span>}{label}</span>; }
 function Btn({ children, onClick, grad = GRAD.cta, style }) { return <button onClick={onClick} className="press" style={{ border: "none", cursor: "pointer", color: "#fff", fontWeight: 700, fontFamily: "Sora,sans-serif", fontSize: 15, borderRadius: 16, padding: "16px 20px", width: "100%", background: grad, boxShadow: "0 10px 30px -8px rgba(124,92,255,.6)", ...style }}>{children}</button>; }
 function Logo() { return <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.text, letterSpacing: .2 }}>TripWise<span style={{ color: T.violet }}>AI</span></div>; }
@@ -216,6 +231,24 @@ function KidsPicker({ ages, onChange }) {
     {adding && <div className="carousel" style={{ display: "flex", gap: 6, overflowX: "auto", marginTop: 8, paddingBottom: 2 }}>
       {Array.from({ length: 18 }, (_, a) => <span key={a} onClick={() => { onChange([...(ages || []), a]); setAdding(false); }} className="press" style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 700, color: T.text, background: T.card2, border: `1px solid ${T.line}`, borderRadius: 10, padding: "7px 12px", cursor: "pointer" }}>{a}</span>)}
     </div>}
+  </div>;
+}
+/* Единый герой-блок раздела (референс из макетов): заголовок с градиент-акцентом,
+   подзаголовок и иллюстрация справа. img — PNG в /graphics/hero/, при отсутствии
+   показывается запасная эмодзи-плашка. accentWord подсвечивается градиентом. */
+function PageHero({ title, accentWord, subtitle, img, emoji, tint = "violet" }) {
+  const grad = tint === "cyan" ? "linear-gradient(90deg,#48dcdc,#7c5cff)" : tint === "gold" ? "linear-gradient(90deg,#f5b840,#f5794a)" : "linear-gradient(90deg,#7c5cff,#48dcdc)";
+  return <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 20px 14px" }}>
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <h1 style={{ fontFamily: "Sora,sans-serif", fontSize: 26, lineHeight: 1.08, margin: 0, fontWeight: 800, color: T.text }}>
+        {title}{accentWord ? <> <span style={{ background: grad, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{accentWord}</span></> : null}
+      </h1>
+      {subtitle && <p style={{ color: T.sub, fontSize: 12.5, marginTop: 8, lineHeight: 1.4, marginBottom: 0 }}>{subtitle}</p>}
+    </div>
+    <div style={{ width: 96, height: 96, borderRadius: 20, flexShrink: 0, position: "relative", display: "grid", placeItems: "center", background: "radial-gradient(circle at 60% 35%, rgba(124,92,255,.28), rgba(10,10,24,0) 70%)" }}>
+      <span style={{ fontSize: 40, filter: "drop-shadow(0 6px 14px rgba(124,92,255,.4))" }}>{emoji || "✈️"}</span>
+      {img && <img src={img} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />}
+    </div>
   </div>;
 }
 function Header({ onBack, title, subtitle, onEdit }) {
@@ -894,9 +927,11 @@ const Check = ({ on, onClick }) => (
 );
 const TimeBadge = ({ st }) => st.label ? <span style={{ fontSize: 10, fontWeight: 700, color: ST_COLOR[st.key] || (st.key === "now" ? T.violet : T.subd), background: (ST_COLOR[st.key] || (st.key === "now" ? T.violet : T.subd)) + "1c", border: `1px solid ${(ST_COLOR[st.key] || (st.key === "now" ? T.violet : T.subd))}44`, borderRadius: 999, padding: "2px 7px", whiteSpace: "nowrap" }}>{st.label}</span> : null;
 
-function TripCard({ t, onOpen }) {
+function TripCard({ t, onOpen, soonest }) {
   const p = tripProgress(t), act = nextAction(t), d = daysTo(t.df);
+  const badge = (d != null && soonest) ? { txt: "Ближайшая поездка", col: "#ff7a59", ic: "🔥" } : (d != null ? { txt: "Будущая поездка", col: T.cyan, ic: "✈️" } : null);
   return <div onClick={onOpen} className="press" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, padding: 12, marginBottom: 10, cursor: "pointer" }}>
+    {badge && <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: badge.col + "1e", border: `1px solid ${badge.col}55`, borderRadius: 999, padding: "3px 9px", marginBottom: 10 }}><span style={{ fontSize: 10 }}>{badge.ic}</span><span style={{ fontSize: 10.5, fontWeight: 800, color: badge.col, letterSpacing: .2 }}>{badge.txt}</span></div>}
     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
       <div style={{ width: 46, height: 46, borderRadius: 12, background: gradFor(t.dc), display: "grid", placeItems: "center", fontSize: 20, flexShrink: 0 }}>✈️</div>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1199,12 +1234,13 @@ function RoutesScreen({ trips, onOpenTrip, onNewTrip, onPickDest, onSearch, save
   </div>);
   return <div style={{ animation: "fadeUp .18s ease-out", paddingBottom: 8 }}>
     <Header />
-    <div style={{ padding: "8px 20px 0" }}>
+    <PageHero title="Путешествия" sub="Управляйте всеми поездками в одном месте" emoji="🧳" />
+    <div style={{ padding: "0 20px 0" }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
-        <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 20, flex: 1 }}>Путешествия</div>
+        <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 15, flex: 1 }}>Мои путешествия</div>
         <div onClick={onNewTrip} className="press" style={{ display: "flex", alignItems: "center", gap: 5, background: T.violet + "22", border: `1px solid ${T.violet}55`, borderRadius: 999, padding: "6px 12px", color: T.violet, fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>＋ Новая</div>
       </div>
-      {active.length ? active.map((t) => <TripCard key={t.id} t={t} onOpen={() => onOpenTrip(t.id)} />) : (
+      {active.length ? (() => { const dated = active.filter((x) => daysTo(x.df) != null); const soonId = dated.length ? dated.reduce((a, b) => daysTo(a.df) <= daysTo(b.df) ? a : b).id : null; return active.map((t) => <TripCard key={t.id} t={t} soonest={t.id === soonId} onOpen={() => onOpenTrip(t.id)} />); })() : (
         <div style={{ background: T.card, border: `1px dashed ${T.line}`, borderRadius: 18, padding: "22px 16px", textAlign: "center", marginBottom: 12 }}>
           <div style={{ fontSize: 26, marginBottom: 8 }}>🧳</div>
           <div style={{ fontSize: 14.5, fontWeight: 700, color: T.text, fontFamily: "Sora,sans-serif" }}>Пока нет поездок</div>
@@ -1389,8 +1425,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
     <Header />
     <div style={{ padding: "8px 20px 0" }}>
       {mode === "home" && <>
-        <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 20, color: T.text }}>Документы</div>
-        <div style={{ color: T.subd, fontSize: 12.5, marginTop: 4, marginBottom: 14 }}>Соберём комплект под поездку или поможем с одним документом.</div>
+        <div style={{ margin: "0 -20px 4px" }}><PageHero title="Документы" sub="Соберём комплект под поездку или поможем с одним документом" emoji="📄" /></div>
         {/* Сценарий 1: подбор комплекта */}
         <div style={{ background: T.card, border: `1.5px solid ${T.violet}55`, borderRadius: 18, padding: 14, marginBottom: 12 }}>
           <div style={{ display: "flex", gap: 11, alignItems: "center" }}>
@@ -1519,10 +1554,9 @@ function Hotels({ setToast, preOpen, onPreDone }) {
   const copy = async (p) => { try { await navigator.clipboard.writeText(p.code); setGoUrl(p.url || null); setToast("Промокод скопирован"); } catch (e) { setToast("Не удалось скопировать"); } };
   const activePromos = (s) => (s.promos || []).filter(p => p.endDate >= today).sort((a, b) => b.discountRub - a.discountRub);
   return <div style={{ animation: "fadeUp .18s ease-out" }}>
-    <Header />
-    <div style={{ padding: "8px 20px 0" }}>
-      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 20, color: T.text }}>Промокоды на отели</div>
-      <div style={{ color: T.subd, fontSize: 12.5, marginTop: 4, marginBottom: 16 }}>Выберите сервис — внутри активные промокоды.</div>
+    <PageHero title="Промокоды на отели" sub="Найдём лучшую скидку на бронирование жилья" emoji="🏷️" grad="linear-gradient(135deg,#141438,#3a2a7e,#5e4ad0)" bullets={["Предложения всех популярных сервисов", "Максимальная скидка по вашей поездке"]} />
+    <div style={{ padding: "0 20px 0" }}>
+      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 15, color: T.text, marginBottom: 12 }}>Все активные промокоды</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {SERVICES.map((s, i) => { const n = activePromos(s).length; return (
           <div key={s.id} onClick={() => { setSvc(s); setGoUrl(null); }} className="press card-in" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, overflow: "hidden", cursor: "pointer", animationDelay: `${i * 70}ms` }}>
