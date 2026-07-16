@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 export const maxDuration = 60;
 
 let cachedToken = null;
@@ -9,8 +11,7 @@ async function getAccessToken() {
   }
 
   const authKey = process.env.GIGACHAT_AUTH_KEY;
-  const scope =
-    process.env.GIGACHAT_SCOPE || "GIGACHAT_API_PERS";
+  const scope = process.env.GIGACHAT_SCOPE || "GIGACHAT_API_PERS";
 
   if (!authKey) {
     throw new Error("GIGACHAT_AUTH_KEY is missing");
@@ -23,7 +24,7 @@ async function getAccessToken() {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         Accept: "application/json",
-        RqUID: crypto.randomUUID(),
+        RqUID: randomUUID(),
         Authorization: `Basic ${authKey}`,
       },
       body: new URLSearchParams({ scope }),
@@ -34,90 +35,72 @@ async function getAccessToken() {
   const text = await response.text();
 
   if (!response.ok) {
-    throw new Error(
-      `GigaChat OAuth ${response.status}: ${text.slice(0, 300)}`
-    );
+    throw new Error(`GigaChat OAuth ${response.status}: ${text.slice(0, 300)}`);
   }
 
   const data = JSON.parse(text);
-
   if (!data.access_token) {
     throw new Error("OAuth response has no access_token");
   }
 
   cachedToken = data.access_token;
   tokenExpiresAt = Date.now() + 28 * 60 * 1000;
-
   return cachedToken;
 }
 
-export default {
-  async fetch(request) {
-    if (request.method !== "POST") {
-      return Response.json(
-        { ok: false, error: "Method not allowed" },
-        { status: 405 }
-      );
-    }
+export default async function handler(request, response) {
+  if (request.method !== "POST") {
+    return response.status(405).json({ ok: false, error: "Method not allowed" });
+  }
 
-    const expectedSecret = process.env.PROXY_SHARED_SECRET;
-    const receivedSecret = request.headers.get("x-proxy-key");
+  const expectedSecret = process.env.PROXY_SHARED_SECRET;
+  const receivedSecret = request.headers["x-proxy-key"];
 
-    if (!expectedSecret || receivedSecret !== expectedSecret) {
-      return Response.json(
-        { ok: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+  if (!expectedSecret || receivedSecret !== expectedSecret) {
+    return response.status(401).json({ ok: false, error: "Unauthorized" });
+  }
 
-    try {
-      const input = await request.json();
-      const token = await getAccessToken();
+  try {
+    const input =
+      typeof request.body === "string"
+        ? JSON.parse(request.body || "{}")
+        : request.body || {};
 
-      const gigaResponse = await fetch(
-        "https://gigachat.devices.sberbank.ru/api/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            RqUID: crypto.randomUUID(),
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            ...input,
-            model:
-              input.model ||
-              process.env.GIGACHAT_MODEL ||
-              "GigaChat-2-Pro",
-          }),
-          signal: AbortSignal.timeout(50000),
-        }
-      );
+    const token = await getAccessToken();
 
-      const text = await gigaResponse.text();
-
-      return new Response(text, {
-        status: gigaResponse.status,
+    const gigaResponse = await fetch(
+      "https://gigachat.devices.sberbank.ru/api/v1/chat/completions",
+      {
+        method: "POST",
         headers: {
-          "Content-Type":
-            gigaResponse.headers.get("content-type") ||
-            "application/json",
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          RqUID: randomUUID(),
+          Authorization: `Bearer ${token}`,
         },
-      });
-    } catch (error) {
-      console.error("GIGACHAT_PROXY_ERROR", error);
+        body: JSON.stringify({
+          ...input,
+          model:
+            input.model ||
+            process.env.GIGACHAT_MODEL ||
+            "GigaChat-2-Pro",
+        }),
+        signal: AbortSignal.timeout(50000),
+      }
+    );
 
-      return Response.json(
-        {
-          ok: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : String(error),
-        },
-        { status: 502 }
-      );
-    }
-  },
-};
+    const text = await gigaResponse.text();
+    response.status(gigaResponse.status);
+    response.setHeader(
+      "Content-Type",
+      gigaResponse.headers.get("content-type") || "application/json"
+    );
+    return response.send(text);
+  } catch (error) {
+    console.error("GIGACHAT_PROXY_ERROR", error);
+    return response.status(502).json({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
