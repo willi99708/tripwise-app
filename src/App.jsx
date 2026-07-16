@@ -233,24 +233,6 @@ function KidsPicker({ ages, onChange }) {
     </div>}
   </div>;
 }
-/* Единый герой-блок раздела (референс из макетов): заголовок с градиент-акцентом,
-   подзаголовок и иллюстрация справа. img — PNG в /graphics/hero/, при отсутствии
-   показывается запасная эмодзи-плашка. accentWord подсвечивается градиентом. */
-function PageHero({ title, accentWord, subtitle, img, emoji, tint = "violet" }) {
-  const grad = tint === "cyan" ? "linear-gradient(90deg,#48dcdc,#7c5cff)" : tint === "gold" ? "linear-gradient(90deg,#f5b840,#f5794a)" : "linear-gradient(90deg,#7c5cff,#48dcdc)";
-  return <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 20px 14px" }}>
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <h1 style={{ fontFamily: "Sora,sans-serif", fontSize: 26, lineHeight: 1.08, margin: 0, fontWeight: 800, color: T.text }}>
-        {title}{accentWord ? <> <span style={{ background: grad, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{accentWord}</span></> : null}
-      </h1>
-      {subtitle && <p style={{ color: T.sub, fontSize: 12.5, marginTop: 8, lineHeight: 1.4, marginBottom: 0 }}>{subtitle}</p>}
-    </div>
-    <div style={{ width: 96, height: 96, borderRadius: 20, flexShrink: 0, position: "relative", display: "grid", placeItems: "center", background: "radial-gradient(circle at 60% 35%, rgba(124,92,255,.28), rgba(10,10,24,0) 70%)" }}>
-      <span style={{ fontSize: 40, filter: "drop-shadow(0 6px 14px rgba(124,92,255,.4))" }}>{emoji || "✈️"}</span>
-      {img && <img src={img} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />}
-    </div>
-  </div>;
-}
 function Header({ onBack, title, subtitle, onEdit }) {
   if (!title && !subtitle && !onEdit) return null;   // пустая шапка не съедает высоту — логотип теперь фиксированный
   return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px 8px", position: "relative", minHeight: 30 }}>
