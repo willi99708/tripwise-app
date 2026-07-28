@@ -802,7 +802,6 @@ const ALL_DOCS = (() => {
    Транслитерация по ИКАО 9303 (как в загранпаспорте). Данные никуда не отправляются
    и живут только на устройстве до нажатия «Очистить». */
 const TR_MAP = { "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e", "ж": "zh", "з": "z", "и": "i", "й": "i", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u", "ф": "f", "х": "kh", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "shch", "ъ": "ie", "ы": "y", "ь": "", "э": "e", "ю": "iu", "я": "ia" };
-const translit = (s) => String(s || "").toLowerCase().split("").map((c) => TR_MAP[c] !== undefined ? TR_MAP[c] : c).join("").toUpperCase();
 const copyText = async (v) => {
   try { await navigator.clipboard.writeText(v); return true; }
   catch (e) { try { const ta = document.createElement("textarea"); ta.value = v; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); return true; } catch (_) { return false; } }
@@ -823,88 +822,278 @@ const DOC_FIELDS = {
   eta: [FW.surname, FW.given, FW.passport, FW.dob, FW.arr, { k: "addr", label: "Адрес на Шри-Ланке (отель)", en: "Address in Sri Lanka", type: "text" }, FW.email],
   imuga: [FW.surname, FW.given, FW.passport, FW.arr, FW.flight, { k: "addr", label: "Отель на Мальдивах", en: "Accommodation", type: "text" }, FW.email],
 };
+
+/* ============ ДВИЖОК ДОКУМЕНТОВ: конфигурация вместо отдельных форм ============
+   Документ = шаги -> группы -> поля. Условия показа, автозаполнение из профиля/поездки
+   и валидация описываются здесь, а не в UI. Новый документ = новый конфиг. */
+const FLD = {
+  surname:   { k: "surname", label: "Фамилия (латиницей, как в загранпаспорте)", en: "Surname / Family name", type: "lat", src: "profile.surname", req: true },
+  given:     { k: "given", label: "Имя (латиницей)", en: "Given name(s)", type: "lat", src: "profile.given", req: true },
+  dob:       { k: "dob", label: "Дата рождения", en: "Date of birth", type: "date", src: "profile.dob", req: true },
+  sex:       { k: "sex", label: "Пол", en: "Sex", type: "radio", opts: [["M", "Мужской"], ["F", "Женский"]], src: "profile.sex", req: true },
+  nation:    { k: "nation", label: "Гражданство", en: "Nationality", type: "text", src: "profile.nation", req: true },
+  passport:  { k: "passport", label: "Номер загранпаспорта", en: "Passport number", type: "up", hint: "без пробелов", src: "profile.passport", req: true },
+  pexp:      { k: "pexp", label: "Паспорт действителен до", en: "Passport expiry date", type: "date", src: "profile.pexp", req: true },
+  email:     { k: "email", label: "Email", en: "Email", type: "email", src: "profile.email", req: true },
+  phone:     { k: "phone", label: "Телефон с кодом страны", en: "Phone number", type: "phone", hint: "+7…", src: "profile.phone", req: true },
+  arr:       { k: "arr", label: "Дата прилёта", en: "Arrival date", type: "date", src: "trip.df", req: true },
+  dep:       { k: "dep", label: "Дата вылета обратно", en: "Departure date", type: "date", src: "trip.dt" },
+  flight:    { k: "flight", label: "Номер рейса прибытия", en: "Flight number", type: "up", hint: "например SU274", req: true },
+  accType:   { k: "accType", label: "Где будете жить?", en: "Type of accommodation", type: "radio", opts: [["hotel", "Отель"], ["private", "У знакомых / аренда"]], req: true },
+  hotelName: { k: "hotelName", label: "Название отеля", en: "Hotel name", type: "text", req: true, when: { f: "accType", eq: "hotel" } },
+  hotelAddr: { k: "hotelAddr", label: "Адрес отеля", en: "Address", type: "text", req: true, when: { f: "accType", eq: "hotel" } },
+  hostName:  { k: "hostName", label: "Имя принимающей стороны", en: "Host name", type: "text", req: true, when: { f: "accType", eq: "private" } },
+  hostAddr:  { k: "hostAddr", label: "Адрес проживания", en: "Address", type: "text", req: true, when: { f: "accType", eq: "private" } },
+  hostPhone: { k: "hostPhone", label: "Телефон принимающей стороны", en: "Host phone", type: "phone", when: { f: "accType", eq: "private" } },
+  purpose:   { k: "purpose", label: "Цель поездки", en: "Purpose of visit", type: "radio", opts: [["tourism", "Туризм"], ["business", "Бизнес"], ["family", "К родственникам"]], req: true },
+};
+const F = (k, over) => ({ ...FLD[k], ...(over || {}) });
+// шаги документов: на экране 3-6 связанных полей
+const DOC_CONFIGS = {
+  tdac: {
+    title: "Thailand Digital Arrival Card", country: "Таиланд", resultType: "online_form_guide",
+    officialUrl: "https://tdac.immigration.go.th", version: "2026-01",
+    steps: [
+      { id: "personal", title: "Личные данные", groups: [{ title: "Как в загранпаспорте", fields: [F("surname"), F("given"), F("dob"), F("sex")] }] },
+      { id: "passport", title: "Паспорт", groups: [{ title: "Документ", fields: [F("passport"), F("nation")] }] },
+      { id: "trip", title: "Информация о поездке", groups: [{ title: "Прибытие", fields: [F("arr"), F("flight")] }, { title: "Цель", fields: [F("purpose")] }] },
+      { id: "stay", title: "Проживание", groups: [{ title: "Где остановитесь", fields: [F("accType"), F("hotelName"), F("hotelAddr"), F("hostName"), F("hostAddr"), F("hostPhone")] }] },
+      { id: "contacts", title: "Контакты", groups: [{ title: "Связь", fields: [F("email"), F("phone")] }] },
+    ],
+  },
+  evisa_id: {
+    title: "e-Visa Индонезии (B1)", country: "Индонезия", resultType: "online_form_guide",
+    officialUrl: "https://evisa.imigrasi.go.id", version: "2026-01",
+    steps: [
+      { id: "personal", title: "Личные данные", groups: [{ title: "Как в загранпаспорте", fields: [F("surname"), F("given"), F("dob"), F("sex")] }] },
+      { id: "passport", title: "Паспорт", groups: [{ title: "Документ", fields: [F("passport"), F("pexp"), F("nation")] }] },
+      { id: "trip", title: "Поездка", groups: [{ title: "Даты", fields: [F("arr"), F("dep")] }, { title: "Цель", fields: [F("purpose")] }] },
+      { id: "stay", title: "Проживание", groups: [{ title: "Адрес в Индонезии", fields: [F("accType"), F("hotelName"), F("hotelAddr"), F("hostName"), F("hostAddr")] }] },
+      { id: "contacts", title: "Контакты", groups: [{ title: "Связь", fields: [F("email"), F("phone")] }] },
+    ],
+  },
+  eta: {
+    title: "ETA Шри-Ланки", country: "Шри-Ланка", resultType: "online_form_guide",
+    officialUrl: "https://www.eta.gov.lk", version: "2026-01",
+    steps: [
+      { id: "personal", title: "Личные данные", groups: [{ title: "Как в загранпаспорте", fields: [F("surname"), F("given"), F("dob"), F("sex")] }] },
+      { id: "passport", title: "Паспорт", groups: [{ title: "Документ", fields: [F("passport"), F("pexp"), F("nation")] }] },
+      { id: "trip", title: "Поездка", groups: [{ title: "Прибытие", fields: [F("arr"), F("dep")] }, { title: "Цель", fields: [F("purpose")] }] },
+      { id: "stay", title: "Проживание", groups: [{ title: "Адрес на Шри-Ланке", fields: [F("accType"), F("hotelName"), F("hotelAddr"), F("hostName"), F("hostAddr")] }] },
+      { id: "contacts", title: "Контакты", groups: [{ title: "Связь", fields: [F("email"), F("phone")] }] },
+    ],
+  },
+  imuga: {
+    title: "IMUGA Traveller Declaration", country: "Мальдивы", resultType: "online_form_guide",
+    officialUrl: "https://imuga.immigration.gov.mv", version: "2026-01",
+    steps: [
+      { id: "personal", title: "Личные данные", groups: [{ title: "Как в загранпаспорте", fields: [F("surname"), F("given"), F("dob"), F("sex")] }] },
+      { id: "passport", title: "Паспорт", groups: [{ title: "Документ", fields: [F("passport"), F("nation")] }] },
+      { id: "trip", title: "Поездка", groups: [{ title: "Прибытие", fields: [F("arr"), F("flight")] }] },
+      { id: "stay", title: "Проживание", groups: [{ title: "Отель на Мальдивах", fields: [F("accType"), F("hotelName"), F("hotelAddr"), F("hostName"), F("hostAddr")] }] },
+      { id: "contacts", title: "Контакты", groups: [{ title: "Связь", fields: [F("email"), F("phone")] }] },
+    ],
+  },
+};
+// конфиг для документа: готовый или собранный из старого DOC_FIELDS (чтобы ничего не потерять)
+function docConfig(docId, docName, country) {
+  if (DOC_CONFIGS[docId]) return DOC_CONFIGS[docId];
+  const legacy = DOC_FIELDS[docId];
+  if (!legacy) return null;
+  const chunks = [];
+  for (let i = 0; i < legacy.length; i += 4) chunks.push(legacy.slice(i, i + 4));
+  return { title: docName || docId, country: country || "", resultType: "online_form_guide", officialUrl: "", version: "",
+    steps: chunks.map((fs, i) => ({ id: "s" + i, title: chunks.length > 1 ? `Данные ${i + 1}` : "Данные", groups: [{ title: "", fields: fs.map((f) => ({ ...f, req: true })) }] })) };
+}
+// видимость поля по условию из конфига
+const fieldVisible = (f, ans) => !f.when || String(ans[f.when.f] || "") === String(f.when.eq);
+// все видимые поля документа
+function visibleFields(cfg, ans) {
+  const out = [];
+  for (const st of cfg.steps) for (const g of st.groups) for (const f of g.fields) if (fieldVisible(f, ans)) out.push({ ...f, stepId: st.id });
+  return out;
+}
+// автозаполнение: profile.* из store("profile"), trip.* из активной поездки
+function autofillFrom(cfg, trips) {
+  const prof = store.get("profile", {});
+  const trip = (trips || []).slice().sort((a, b) => (a.df || "") < (b.df || "") ? -1 : 1)[0] || {};
+  const out = {};
+  for (const st of cfg.steps) for (const g of st.groups) for (const f of g.fields) {
+    if (!f.src) continue;
+    const [scope, key] = f.src.split(".");
+    const v = scope === "profile" ? prof[key] : scope === "trip" ? trip[key] : null;
+    if (v) out[f.k] = v;
+  }
+  return out;
+}
+// валидация значения поля
+function validateField(f, v) {
+  const s = String(v == null ? "" : v).trim();
+  if (!s) return f.req ? "не заполнено" : null;
+  if (f.type === "email" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s)) return "похоже на некорректный email";
+  if (f.type === "phone" && !/^\+?[\d\s()-]{7,20}$/.test(s)) return "телефон в формате +7…";
+  if (f.type === "date" && !/^\d{4}-\d{2}-\d{2}$/.test(s)) return "выберите дату";
+  if (f.type === "lat" && /[а-яё]/i.test(s)) return "нужна латиница, как в загранпаспорте";
+  if (f.k === "passport" && s.replace(/\s/g, "").length < 6) return "проверьте номер паспорта";
+  return null;
+}
+
 function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
-  const fields = DOC_FIELDS[doc.id] || [];
+  const cfg = docConfig(doc.id, doc.name, doc.country);
   const saved = savedId ? (store.get("mydocs", []).find((d) => d.id === savedId)) : null;
-  const [ans, setAns] = useState(saved ? (saved.ans || {}) : {});
-  const [done, setDone] = useState(saved ? saved.status === "ready" : false);
   const [docId] = useState(savedId || (doc.id + "-" + Date.now().toString(36)));
+  const [ans, setAns] = useState(() => {
+    if (saved && saved.ans) return saved.ans;
+    return cfg ? autofillFrom(cfg, store.get("trips", [])) : {};
+  });
+  const [stepIdx, setStepIdx] = useState(saved && saved.stepIdx ? saved.stepIdx : 0);
+  const [mode, setMode] = useState(saved && saved.status === "ready" ? "result" : "form");
+  const [editing, setEditing] = useState({});      // какие автозаполненные поля раскрыты для правки
+  const [touched, setTouched] = useState({});      // показывать ошибку только после ввода/проверки
+  const [focusF, setFocusF] = useState(null);      // активное поле — контекст для ГигаЧата
   const [aiQ, setAiQ] = useState(""); const [aiA, setAiA] = useState(""); const [aiBusy, setAiBusy] = useState(false);
-  // сохраняем прогресс в «Мои документы» на каждое изменение (дебаунс не нужен — localStorage быстрый)
-  const persist = (nextAns, status) => {
+
+  if (!cfg) return <Overlay onClose={onClose}><SheetHead title={doc.name} onClose={onClose} />
+    <div style={{ fontSize: 13, color: T.subd, lineHeight: 1.5, padding: "4px 0 12px" }}>Мастер для этого документа появится позже. Пока воспользуйтесь официальным сайтом.</div>
+  </Overlay>;
+
+  const steps = cfg.steps;
+  const step = steps[Math.min(stepIdx, steps.length - 1)];
+  const allVisible = visibleFields(cfg, ans);
+  const reqAll = allVisible.filter((f) => f.req);
+  const filledReq = reqAll.filter((f) => !validateField(f, ans[f.k]));
+  const pct = reqAll.length ? Math.round(filledReq.length / reqAll.length * 100) : 0;
+  const problems = reqAll.map((f) => ({ f, err: validateField(f, ans[f.k]) })).filter((x) => x.err);
+
+  const persist = (nextAns, status, si) => {
     try {
       const list = store.get("mydocs", []);
-      const rec = { id: docId, docKey: doc.id, name: doc.name, country: doc.country || "", ans: nextAns, status, updatedAt: Date.now() };
+      const rec = { id: docId, docKey: doc.id, name: doc.name, country: doc.country || cfg.country || "", ans: nextAns, status, stepIdx: si == null ? stepIdx : si, updatedAt: Date.now() };
       const i = list.findIndex((d) => d.id === docId);
       if (i >= 0) list[i] = rec; else list.unshift(rec);
-      store.set("mydocs", list);
-      onSaved && onSaved();
-    } catch (e) { }
+      store.set("mydocs", list); onSaved && onSaved();
+    } catch (e) { console.warn("[TripWiseAI] doc save failed", e); }
   };
-  const setAnsP = (next) => { setAns(next); persist(next, done ? "ready" : "draft"); };
+  const setVal = (k, v) => { const next = { ...ans, [k]: v }; setAns(next); persist(next, mode === "result" ? "ready" : "draft"); };
+  const goStep = (i) => { const n = Math.max(0, Math.min(steps.length - 1, i)); setStepIdx(n); setAiA(""); persist(ans, "draft", n); };
+
   const askAi = async (q) => {
-    const question = String(q || aiQ).trim(); if (!question || aiBusy) return;
-    setAiQ(question); setAiBusy(true); setAiA("");
+    const question = String(q || aiQ || "").trim(); if (!question || aiBusy) return;
+    setAiBusy(true); setAiA("");
     try {
-      const r = await fetch(API_BASE + "?action=ai-help", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ doc: doc.name, country: doc.country, question }) });
-      const j = await r.json(); setAiA(j.answer || "Не получилось получить ответ — попробуйте ещё раз");
-    } catch (e) { setAiA("Помощник недоступен — проверьте соединение"); }
-    setAiBusy(false);
+      const ctx = focusF ? `Раздел: ${step.title}. Поле: ${focusF.en || focusF.label}${focusF.hint ? ` (формат: ${focusF.hint})` : ""}.` : `Раздел: ${step.title}.`;
+      const r = await fetch(API_BASE + "?action=ai-help", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ doc: cfg.title, country: cfg.country, question: `${ctx} ${question}` }) });
+      const d = await r.json();
+      setAiA((d && d.answer) || "Не удалось получить ответ.");
+    } catch (e) { setAiA("Помощник сейчас недоступен."); }
+    setAiBusy(false); setAiQ("");
   };
-  const inputSt = { width: "100%", background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "11px 12px", color: T.text, fontSize: 14, outline: "none", boxSizing: "border-box", colorScheme: "dark" };
-  const val = (f) => {
-    const raw = String(ans[f.k] || "").trim();
-    if (!raw) return "";
-    if (f.type === "name") return translit(raw);
-    if (f.type === "up") return raw.toUpperCase().replace(/\s+/g, "");
-    if (f.type === "date") { const p = raw.split("-"); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : raw; }
-    return raw;
+
+  const inputSt = { width: "100%", background: T.card, border: `1px solid ${T.line2}`, borderRadius: 12, padding: "12px 13px", color: T.text, fontSize: 15, fontFamily: "Manrope,sans-serif", outline: "none", boxSizing: "border-box", colorScheme: "dark" };
+  const Field = ({ f }) => {
+    const v = ans[f.k] || "";
+    const err = touched[f.k] ? validateField(f, v) : null;
+    const autofilled = !!f.src && !!v && !editing[f.k] && !touched[f.k];
+    if (autofilled) return <div style={{ display: "flex", alignItems: "center", gap: 10, background: T.card2, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 12px", marginBottom: 9 }}>
+      <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 10.5, color: T.subd }}>{f.label}</div><div style={{ fontSize: 14, color: T.text, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v}</div></div>
+      <span onClick={() => setEditing({ ...editing, [f.k]: true })} className="press" style={{ flexShrink: 0, fontSize: 11.5, color: T.violet, fontWeight: 700, cursor: "pointer" }}>Изменить</span>
+    </div>;
+    return <div style={{ marginBottom: 11 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+        <span style={{ fontSize: 12, color: T.sub, fontWeight: 600, flex: 1 }}>{f.label}{f.req ? <span style={{ color: "#ff6db0" }}> *</span> : null}{f.hint ? <span style={{ color: T.subd, fontWeight: 400 }}> · {f.hint}</span> : null}</span>
+        <span onClick={() => { setFocusF(f); askAi(`Что указать в этом поле?`); }} className="press" style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 999, border: `1px solid ${T.violet}55`, background: T.violet + "14", display: "grid", placeItems: "center", color: T.violet, fontSize: 11, fontWeight: 800, cursor: "pointer" }}>?</span>
+      </div>
+      {f.type === "radio"
+        ? <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>{(f.opts || []).map(([ov, ol]) => <div key={ov} onClick={() => { setVal(f.k, ov); setTouched({ ...touched, [f.k]: true }); }} className="press" style={{ background: v === ov ? T.violet + "22" : T.card, border: `1px solid ${v === ov ? T.violet : T.line}`, borderRadius: 999, padding: "9px 14px", fontSize: 13, fontWeight: 700, color: v === ov ? T.violet : T.text, cursor: "pointer" }}>{ol}</div>)}</div>
+        : <input type={f.type === "date" ? "date" : f.type === "email" ? "email" : "text"} value={v} onFocus={() => setFocusF(f)}
+            onChange={(e) => { const nv = f.type === "up" ? e.target.value.toUpperCase() : e.target.value; setVal(f.k, nv); setTouched({ ...touched, [f.k]: true }); }}
+            placeholder={f.en || ""} style={{ ...inputSt, borderColor: err ? "#ff6db088" : T.line2 }} />}
+      {err && <div style={{ fontSize: 11, color: "#ff6db0", marginTop: 4 }}>{err}</div>}
+    </div>;
   };
-  const filled = fields.filter((f) => val(f));
-  const copyOne = async (f) => { (await copyText(val(f))) ? setToast(`${f.en} — скопировано`) : setToast("Не удалось скопировать"); };
-  const copyAll = async () => { const s = filled.map((f) => `${f.en}: ${val(f)}`).join("\n"); (await copyText(s)) ? setToast("Все поля скопированы") : setToast("Не удалось скопировать"); };
+
+  const val = (f) => { const raw = String(ans[f.k] || "").trim(); if (!raw) return ""; if (f.type === "date") { const p = raw.split("-"); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : raw; } if (f.type === "up") return raw.toUpperCase(); return raw; };
+  const copyAll = async () => { const s = allVisible.filter((f) => ans[f.k]).map((f) => `${f.en || f.label}: ${val(f)}`).join("\n"); (await copyText(s)) ? setToast("Все поля скопированы") : setToast("Не удалось скопировать"); };
+
+  const AiBar = () => <div style={{ marginTop: 12 }}>
+    {aiA && <div style={{ position: "relative", fontSize: 12.5, color: T.sub, lineHeight: 1.5, background: T.card2, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 30px 10px 12px", marginBottom: 8, whiteSpace: "pre-wrap" }}>
+      {aiA}
+      <span onClick={() => setAiA("")} className="press" style={{ position: "absolute", top: 6, right: 8, cursor: "pointer", color: T.subd, fontSize: 14, lineHeight: 1 }}>×</span>
+    </div>}
+    <div style={{ display: "flex", gap: 8 }}>
+      <input value={aiQ} onChange={(e) => setAiQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") askAi(); }} placeholder={focusF ? `Спросить про «${focusF.label.slice(0, 22)}…»` : "Спросить про текущее поле…"} style={{ flex: 1, background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: "10px 11px", color: T.text, fontSize: 12.5, outline: "none" }} />
+      <div onClick={() => askAi()} className="press" style={{ background: aiBusy ? T.card : GRAD.cta, border: aiBusy ? `1px solid ${T.line}` : "none", borderRadius: 10, padding: "10px 14px", color: aiBusy ? T.subd : "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{aiBusy ? "…" : "Спросить"}</div>
+    </div>
+  </div>;
+
+  // ---------- экран результата ----------
+  if (mode === "result") {
+    const ready = allVisible.filter((f) => ans[f.k]);
+    return <Overlay onClose={onClose}><SheetHead title="Документ готов" onClose={onClose} />
+      <div style={{ maxHeight: "56vh", overflowY: "auto", overscrollBehavior: "contain" }}>
+        <div style={{ fontSize: 12, color: T.subd, marginBottom: 12, lineHeight: 1.45 }}>Значения подготовлены в формате официальной формы{cfg.officialUrl ? " — перенесите их на официальный сайт" : ""}. Данные хранятся только на вашем устройстве.</div>
+        {ready.map((f) => <div key={f.k} style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 10.5, color: T.subd }}>{f.en || f.label}</div><div style={{ fontSize: 14, fontWeight: 700, color: T.text, wordBreak: "break-word" }}>{val(f)}</div></div>
+          <span onClick={async () => { (await copyText(val(f))) ? setToast("Скопировано") : setToast("Не удалось"); }} className="press" style={{ flexShrink: 0, fontSize: 11.5, fontWeight: 700, color: T.violet, border: `1px solid ${T.violet}55`, background: T.violet + "14", borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>Копировать</span>
+        </div>)}
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <div onClick={() => { setMode("form"); persist(ans, "draft"); }} className="press" style={{ flex: 1, textAlign: "center", background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 13, color: T.text, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Изменить</div>
+        <div onClick={copyAll} className="press" style={{ flex: 1.3, textAlign: "center", background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Скопировать всё</div>
+      </div>
+      {cfg.officialUrl && <div onClick={() => { try { window.open(cfg.officialUrl, "_blank"); } catch (e) { } }} className="press" style={{ textAlign: "center", fontSize: 12.5, color: T.violet, fontWeight: 700, cursor: "pointer", padding: "12px 0 2px" }}>Открыть официальный сайт →</div>}
+    </Overlay>;
+  }
+
+  // ---------- экран проверки ----------
+  if (mode === "review") {
+    return <Overlay onClose={onClose}><SheetHead title="Проверка документа" onClose={onClose} />
+      <div style={{ maxHeight: "56vh", overflowY: "auto", overscrollBehavior: "contain" }}>
+        {steps.map((st) => {
+          const sf = allVisible.filter((f) => f.stepId === st.id && f.req);
+          const bad = sf.map((f) => ({ f, err: validateField(f, ans[f.k]) })).filter((x) => x.err);
+          return <div key={st.id} style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, fontWeight: 700, color: bad.length ? "#e0a53a" : T.green }}>
+              <span>{bad.length ? "!" : "✓"}</span><span style={{ color: T.text }}>{st.title}</span>
+            </div>
+            {bad.map(({ f, err }) => <div key={f.k} onClick={() => { setTouched({ ...touched, [f.k]: true }); setMode("form"); goStep(steps.findIndex((s) => s.id === st.id)); }} className="press" style={{ marginLeft: 20, marginTop: 5, fontSize: 12, color: T.subd, cursor: "pointer" }}>• {f.label} — <span style={{ color: "#ff6db0" }}>{err}</span></div>)}
+          </div>;
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <div onClick={() => setMode("form")} className="press" style={{ flex: 1, textAlign: "center", background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 13, color: T.text, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Назад</div>
+        <div onClick={() => { if (problems.length) { setTouched(Object.fromEntries(reqAll.map((f) => [f.k, true]))); return setToast("Остались незаполненные поля"); } setMode("result"); persist(ans, "ready"); }} className="press" style={{ flex: 1.3, textAlign: "center", background: problems.length ? T.card : GRAD.cta, border: problems.length ? `1px solid ${T.line}` : "none", borderRadius: 14, padding: 13, color: problems.length ? T.subd : "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Сформировать</div>
+      </div>
+    </Overlay>;
+  }
+
+  // ---------- экран шага ----------
+  const last = stepIdx >= steps.length - 1;
   return <Overlay onClose={onClose}>
-    <SheetHead title={done ? "Поля для формы" : "Помощник заполнения"} onClose={onClose} />
-    <div style={{ maxHeight: "58vh", overflowY: "auto", overscrollBehavior: "contain", paddingRight: 2 }}>
-      {!done ? <>
-        <div style={{ fontSize: 12, color: T.subd, lineHeight: 1.45, marginBottom: 12 }}>{doc.name}: отвечайте по-русски — подготовим значения в формате официальной формы. Данные никуда не отправляются и остаются на этом устройстве.</div>
-        {fields.map((f) => <div key={f.k} style={{ marginBottom: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-            <span style={{ fontSize: 12, color: T.sub, fontWeight: 600, flex: 1 }}>{f.label}{f.hint ? <span style={{ color: T.subd, fontWeight: 400 }}> · {f.hint}</span> : null}</span>
-            <span onClick={() => askAi(`Как правильно заполнить поле «${f.label}» для документа «${doc.name}»?`)} className="press" style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 999, border: `1px solid ${T.violet}55`, background: T.violet + "14", display: "grid", placeItems: "center", color: T.violet, fontSize: 11, fontWeight: 800, cursor: "pointer" }}>?</span>
-          </div>
-          <input type={f.type === "date" ? "date" : "text"} value={ans[f.k] || ""} onChange={(e) => setAnsP({ ...ans, [f.k]: e.target.value })} style={inputSt} />
-          {f.type === "name" && ans[f.k] ? <div style={{ fontSize: 11, color: T.violet, marginTop: 4 }}>В форме: {translit(ans[f.k])}</div> : null}
-        </div>)}
-        <div style={{ background: T.card2, border: `1px solid ${T.line}`, borderRadius: 14, padding: 12, marginTop: 2 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
-            <span style={{ fontSize: 14 }}>🤖</span>
-            <span style={{ fontSize: 12.5, fontWeight: 800, color: T.text, fontFamily: "Sora,sans-serif", flex: 1 }}>ИИ-помощник</span>
-            <Badge label="ГигаЧат" color={T.cyan} />
-          </div>
-          {aiA && <div style={{ fontSize: 12.5, color: T.sub, lineHeight: 1.5, background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 11px", marginBottom: 8, whiteSpace: "pre-wrap" }}>{aiA}</div>}
-          <div style={{ display: "flex", gap: 8 }}>
-            <input value={aiQ} onChange={(e) => setAiQ(e.target.value)} placeholder="Спросите про любое поле…" style={{ flex: 1, background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 10px", color: T.text, fontSize: 12.5, outline: "none" }} />
-            <div onClick={() => askAi()} className="press" style={{ background: aiBusy ? T.card : GRAD.cta, border: aiBusy ? `1px solid ${T.line}` : "none", borderRadius: 10, padding: "9px 13px", color: aiBusy ? T.subd : "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{aiBusy ? "…" : "Спросить"}</div>
-          </div>
-        </div>
-      </> : <>
-        <div style={{ fontSize: 12, color: T.subd, marginBottom: 10 }}>Копируйте значения в официальную форму. Перед отправкой сверьте с документами.</div>
-        {filled.map((f) => <div key={f.k} style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
-          <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 10.5, color: T.subd }}>{f.en}</div><div style={{ fontSize: 14, fontWeight: 700, color: T.text, wordBreak: "break-word" }}>{val(f)}</div></div>
-          <span onClick={() => copyOne(f)} className="press" style={{ flexShrink: 0, fontSize: 11.5, fontWeight: 700, color: T.violet, border: `1px solid ${T.violet}55`, background: T.violet + "14", borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>Копировать</span>
-        </div>)}
-      </>}
+    <SheetHead title={cfg.title} onClose={onClose} />
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: 11.5, color: T.violet, fontWeight: 800 }}>Шаг {stepIdx + 1} из {steps.length}</span>
+        <span style={{ fontSize: 14, fontWeight: 800, color: T.text, fontFamily: "Sora,sans-serif", flex: 1 }}>{step.title}</span>
+      </div>
+      <div style={{ height: 5, background: T.line, borderRadius: 999, overflow: "hidden" }}><div style={{ width: pct + "%", height: "100%", background: GRAD.cta, transition: "width .2s" }} /></div>
+      <div style={{ fontSize: 10.5, color: T.subd, marginTop: 5 }}>Заполнено {filledReq.length} из {reqAll.length} обязательных полей</div>
+    </div>
+    <div style={{ maxHeight: "48vh", overflowY: "auto", overscrollBehavior: "contain", paddingRight: 2 }}>
+      {step.groups.map((g, gi) => {
+        const vis = g.fields.filter((f) => fieldVisible(f, ans));
+        if (!vis.length) return null;
+        return <div key={gi} style={{ background: T.card2, border: `1px solid ${T.line}`, borderRadius: 14, padding: 12, marginBottom: 10 }}>
+          {g.title && <div style={{ fontSize: 11.5, color: T.subd, fontWeight: 700, marginBottom: 9 }}>{g.title}</div>}
+          {vis.map((f) => <Field key={f.k} f={f} />)}
+        </div>;
+      })}
+      <AiBar />
     </div>
     <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-      {!done
-        ? <div onClick={() => { if (!filled.length) return setToast("Заполните хотя бы одно поле"); setDone(true); persist(ans, "ready"); }} className="press" style={{ flex: 1, textAlign: "center", background: filled.length ? GRAD.cta : T.card, border: filled.length ? "none" : `1px solid ${T.line}`, borderRadius: 14, padding: 13, color: filled.length ? "#fff" : T.subd, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Подготовить поля</div>
-        : <>
-          <div onClick={() => { setDone(false); persist(ans, "draft"); }} className="press" style={{ flex: 1, textAlign: "center", background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 13, color: T.text, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Изменить</div>
-          <div onClick={copyAll} className="press" style={{ flex: 1.3, textAlign: "center", background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Скопировать всё</div>
-        </>}
+      <div onClick={() => stepIdx === 0 ? onClose() : goStep(stepIdx - 1)} className="press" style={{ flex: 1, textAlign: "center", background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 13, color: T.text, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Назад</div>
+      <div onClick={() => { if (last) { setTouched(Object.fromEntries(reqAll.map((f) => [f.k, true]))); setMode("review"); } else goStep(stepIdx + 1); }} className="press" style={{ flex: 1.4, textAlign: "center", background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 13.5, fontWeight: 800, cursor: "pointer" }}>{last ? "Проверить документ" : "Продолжить"}</div>
     </div>
-    <div onClick={() => { setAns({}); onClose(); setToast("Данные удалены с устройства"); }} className="press" style={{ textAlign: "center", fontSize: 11.5, color: T.subd, cursor: "pointer", padding: "10px 0 2px" }}>Очистить мои данные</div>
   </Overlay>;
 }
 // какие блоки включены (по источнику создания поездки); старые поездки — все блоки
@@ -993,11 +1182,11 @@ function TripCard({ t, onOpen, soonest }) {
   </div>;
 }
 
-function TripScreen({ t, onBack, onUpdate, onDelete, onFindTickets, goHotels, goDocs, setToast }) {
+function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, goHotels, goDocs, setToast }) {
   const bOn = tripBlocks(t);
   const docs = bOn.docs ? tripDocs(t) : [];
   const p = tripProgress(t), act = nextAction(t), d = daysTo(t.df);
-  const [blk, setBlk] = useState("overview");
+  const [blk, setBlk] = useState(initialBlk || "overview");
   const [menu, setMenu] = useState(false);
   const [nameDraft, setNameDraft] = useState(t.title);
   const [svcPick, setSvcPick] = useState(false);
@@ -1578,7 +1767,8 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
             <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
               {mine.map((d) => {
                 const ready = d.status === "ready";
-                const total = (DOC_FIELDS[d.docKey] || []).length || 1;
+                const cfgD = docConfig(d.docKey, d.name, d.country);
+                const total = cfgD ? Math.max(1, visibleFields(cfgD, d.ans || {}).filter((f) => f.req).length) : ((DOC_FIELDS[d.docKey] || []).length || 1);
                 const fld = Object.values(d.ans || {}).filter((v) => String(v || "").trim()).length;
                 return <div key={d.id} onClick={() => onResumeDoc && onResumeDoc(d)} className="press" style={{ background: T.card, border: `1px solid ${ready ? T.green + "55" : T.line}`, borderRadius: 16, padding: 12, cursor: "pointer" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1677,7 +1867,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
           <div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, marginBottom: 6, fontFamily: "Sora,sans-serif" }}>Что потребуется</div>
           {(info.req || []).map((rq) => <div key={rq} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}><span style={{ width: 5, height: 5, borderRadius: 999, background: T.violet }} /><span style={{ fontSize: 12.5, color: T.sub }}>{rq}</span></div>)}
         </>}
-        <div onClick={() => { if (DOC_FIELDS[doc.id]) { setResumeId(null); setWiz(doc); setDoc(null); } else setToast("Мастер для этого документа появится позже"); }} className="press" style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Заполнить с помощником {!DOC_FIELDS[doc.id] && <Badge label="скоро" color="#fff" />}</div>
+        <div onClick={() => { if (docConfig(doc.id, doc.name, doc.country)) { setResumeId(null); setWiz(doc); setDoc(null); } else setToast("Мастер для этого документа появится позже"); }} className="press" style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Заполнить с помощником {!docConfig(doc.id, doc.name, doc.country) && <Badge label="скоро" color="#fff" />}</div>
         {links.length > 0 && <>
           <div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, margin: "14px 0 6px", fontFamily: "Sora,sans-serif" }}>Официальные ссылки</div>
           {links.map((l) => <div key={l.label} onClick={() => { try { window.open(l.url, "_blank"); } catch (e) { } }} className="press" style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 0", borderTop: `1px solid ${T.line}`, cursor: "pointer" }}><span style={{ fontSize: 13, color: T.violet, fontWeight: 600, flex: 1 }}>{l.label}</span><Icon d={I.chevR} size={14} color={T.subd} /></div>)}
@@ -1807,7 +1997,8 @@ export default function App() {
   const [notifyPrefs, setNotifyPrefs] = useState(() => store.get("notifyPrefs", { deals: true, promos: true, deadlines: true, news: true }));
   const changeNotifyPrefs = (next) => { setNotifyPrefs(next); store.set("notifyPrefs", next); syncNotifyPrefs(next); };
   useEffect(() => { store.set("trips", trips); }, [trips]);
-  const [tripOpen, setTripOpen] = useState(null);      // id открытой поездки
+  const [tripOpen, setTripOpen] = useState(null);
+  const [tripSection, setTripSection] = useState(null); // раздел из deep link (docs/tickets/lodging/extras)      // id открытой поездки
   const [newTrip, setNewTrip] = useState(false);       // оверлей ручного создания
   const [confirmTrip, setConfirmTrip] = useState(null); // маршрут, ожидающий подтверждения «Взять в поездку»
   const [kb, setKb] = useState(false);                 // открыта ли клавиатура (по фокусу в полях)
@@ -1904,6 +2095,23 @@ export default function App() {
         const m = h.match(/[#&]r=([^&]+)/);
         const raw = sp || (m && m[1]) || "";
         if (!raw) return;
+        // deep link из пуш-уведомления: trip_<id> | trip_<id>_section_<s> | trip_<id>_document_<docId>
+        if (raw.indexOf("trip_") === 0) {
+          const mt = raw.match(/^trip_([^_]+)(?:_section_([a-z]+))?(?:_document_([\w-]+))?$/);
+          if (mt) {
+            deepLinkDone.current = true;
+            const tripId = mt[1], section = mt[2] || null, docId = mt[3] || null;
+            setTimeout(() => {
+              const exists = (store.get("trips", []) || []).some((x) => x.id === tripId);
+              if (!exists) return; // поездку удалили — молча игнорируем
+              if (docId) { setDocsPre(docId); setTab("docs"); return; }
+              setTripSection(section || "overview");
+              setTripOpen(tripId); setTab("routes"); setStack(["trip"]);
+            }, 0);
+          }
+          try { history.replaceState(null, "", location.pathname); } catch (e) { }
+          return;
+        }
         const d = JSON.parse(b64urlDec(raw)); // {oc,dc,df,dt,a,id}
         const o = AIRPORTS.find(a => a.code === d.oc), ds = AIRPORTS.find(a => a.code === d.dc);
         if (o && ds && d.df) {
@@ -1945,7 +2153,7 @@ export default function App() {
     setLoading(false);
   };
   const updateTrip = (id, fn) => setTrips((p) => p.map((t) => t.id === id ? fn(t) : t));
-  const openTripScreen = (id) => { setTripOpen(id); setTab("routes"); setStack(["trip"]); };
+  const openTripScreen = (id) => { setTripSection(null); setTripOpen(id); setTab("routes"); setStack(["trip"]); };
   // «Взять в поездку»: сперва подтверждение (пользователь осознаёт создание карточки поездки)
   const askTakeTrip = (r) => {
     const ls = lastSearchRef.current || {};
@@ -2037,7 +2245,7 @@ export default function App() {
   let main = null;
   if (tab === "routes") {
     const curTrip = trips.find((t) => t.id === tripOpen);
-    if (top === "trip" && curTrip) main = <TripScreen t={curTrip} onBack={() => setStack([])} onUpdate={updateTrip} onDelete={(id) => { setTrips((p) => p.filter((x) => x.id !== id)); deleteTripOnServer(id); setStack([]); setToast("Поездка удалена"); }} onFindTickets={findTicketsForTrip} goHotels={() => { setHotelsPre(null); setTab("hotels"); }} goDocs={(docId) => { setDocsPre(typeof docId === "string" ? docId : null); setTab("docs"); }} setToast={setToast} />;
+    if (top === "trip" && curTrip) main = <TripScreen t={curTrip} initialBlk={tripSection} onBack={() => setStack([])} onUpdate={updateTrip} onDelete={(id) => { setTrips((p) => p.filter((x) => x.id !== id)); deleteTripOnServer(id); setStack([]); setToast("Поездка удалена"); }} onFindTickets={findTicketsForTrip} goHotels={() => { setHotelsPre(null); setTab("hotels"); }} goDocs={(docId) => { setDocsPre(typeof docId === "string" ? docId : null); setTab("docs"); }} setToast={setToast} />;
     else if (top === "trip") main = <RoutesScreen trips={trips} onOpenTrip={openTripScreen} onNewTrip={() => setNewTrip(true)} onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved((p) => p.filter((x) => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => { const f = { ...s.form, dep: s.form.dep ? new Date(s.form.dep) : null, ret: s.form.ret ? new Date(s.form.ret) : null }; setForm(f); runSearch(f); }} />;
     else if (top === "detail") main = <Detail r={selected} query={query} onBack={() => setStack(["results"])} onEdit={() => { setTab("home"); setSheet(true); }} liked={isLiked(selected)} onLike={likeRoute} onShare={shareRoute} goHotels={(svc) => { setHotelsPre(svc || null); setTab("hotels"); }} onTakeTrip={askTakeTrip} inTrip={!!(selected && trips.some((t) => t.route && t.route.rid === selected.id && t.df === ((lastSearchRef.current || {}).df || "")))} />;
     else if (top === "results") { main = <Results query={query} routes={routes} loading={loading} error={searchError} onRetry={() => runSearch()} onEdit={() => { setTab("home"); setSheet(true); }} onBack={() => setStack([])} onOpen={(r) => { setSelected(r); setStack(["results", "detail"]); }} isLiked={isLiked} onLike={likeRoute} />; }
