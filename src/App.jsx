@@ -755,6 +755,165 @@ const KID_DOCS = [
 ];
 /* Карточки документов: тип, описание, что потребуется, официальные ссылки.
    URL пустые — впиши официальные/партнёрские ссылки, пустые не показываются. */
+
+/* ================== ВИЗОВЫЙ СПРАВОЧНИК (сверено по источникам) ==================
+   ВАЖНО: правила въезда меняются. У каждой записи — дата проверки и официальный источник.
+   Перед поездкой приложение показывает дату актуальности и ссылку на первоисточник. */
+const CHECKED = "2026-07-28";
+const VISA_INFO = {
+  "Таиланд": {
+    status: "Безвизово", days: 60, checked: CHECKED,
+    summary: "Безвизовый въезд до 60 дней, продление ещё на 30 дней в иммиграционной службе (~1900 бат).",
+    warn: "Кабинет министров одобрил сокращение безвиза до 30 дней. Дата вступления в силу на момент проверки не объявлена — уточните перед вылетом.",
+    must: ["Загранпаспорт (авиакомпании обычно требуют 6 мес.)", "TDAC — электронная карта прибытия, обязательна с 01.05.2025", "Обратный билет (могут спросить)"],
+    money: "На границе могут запросить подтверждение средств (ориентир — от $700 на человека).",
+    src: [{ label: "Иммиграционное бюро Таиланда (TDAC)", url: "https://tdac.immigration.go.th" }],
+  },
+  "Индонезия": {
+    status: "Виза по прибытии", days: 30, checked: CHECKED,
+    summary: "Виза по прибытии (VOA) или заранее онлайн (e-VOA) на 30 дней, продлевается один раз ещё на 30.",
+    must: ["Загранпаспорт 6 мес.", "VOA $35 / 500 000 IDR — карта или наличные", "Декларация All Indonesia (за 3 дня до прилёта)", "Туристический сбор Love Bali 150 000 IDR — для Бали"],
+    money: "Обратный билет и подтверждение проживания.",
+    src: [{ label: "Иммиграция Индонезии (e-VOA)", url: "https://evisa.imigrasi.go.id" }, { label: "All Indonesia (декларация)", url: "https://allindonesia.beacukai.go.id" }],
+  },
+  "Вьетнам": {
+    status: "Безвизово", days: 45, checked: CHECKED,
+    summary: "Безвизовый въезд до 45 дней. Дольше — электронная виза на 90 дней ($25 однократная, $50 многократная, ~3 рабочих дня).",
+    must: ["Загранпаспорт 6 мес.", "Обратный билет"],
+    tip: "e-Visa подавайте минимум за 2 недели: в праздники (Тет, 30 апреля) сроки растягиваются. Подать можно только находясь вне Вьетнама.",
+    src: [{ label: "Официальный портал e-Visa", url: "https://evisa.gov.vn" }],
+  },
+  "Шри-Ланка": {
+    status: "Бесплатное разрешение", days: 30, checked: CHECKED,
+    summary: "Для россиян въезд на 30 дней бесплатный: ETA онлайн либо виза по прибытии. Обязательность ETA была отменена — оформление добровольное, но рекомендуется.",
+    must: ["Загранпаспорт 6 мес.", "ETA (рекомендуется) — бесплатно", "Обратный билет"],
+    warn: "Оформляйте только на eta.gov.lk — платные сайты-двойники не имеют отношения к правительству.",
+    src: [{ label: "Официальный сайт ETA", url: "https://eta.gov.lk" }],
+  },
+  "Мальдивы": {
+    status: "Безвизово", days: 30, checked: CHECKED,
+    summary: "Бесплатная виза по прибытии на 30 дней.",
+    must: ["Загранпаспорт 6 мес.", "IMUGA Traveller Declaration — в течение 96 часов до вылета", "Подтверждение брони отеля", "Обратный билет"],
+    src: [{ label: "IMUGA (декларация)", url: "https://imuga.immigration.gov.mv" }],
+  },
+  "ОАЭ": {
+    status: "Безвизово", days: 90, checked: CHECKED,
+    summary: "Безвизовый въезд до 90 дней в течение 180-дневного периода.",
+    must: ["Загранпаспорт 6 мес.", "Обратный билет и бронь жилья (могут спросить)"],
+    src: [{ label: "ICP — миграционная служба ОАЭ", url: "https://icp.gov.ae" }],
+  },
+  "Турция": {
+    status: "Безвизово", days: 90, checked: CHECKED,
+    summary: "Безвизовый въезд до 90 дней в течение 180 дней.",
+    must: ["Загранпаспорт (действующий минимум 120 дней с даты въезда)", "Обратный билет и бронь жилья (могут спросить)"],
+    src: [{ label: "МИД Турции", url: "https://www.mfa.gov.tr" }],
+  },
+  "Египет": {
+    status: "Виза по прибытии", days: 30, checked: CHECKED,
+    summary: "Виза по прибытии или e-Visa заранее. С 01.03.2026 сбор в аэропортах Каира, Хургады и Средиземноморья — $30.",
+    must: ["Загранпаспорт 6 мес.", "Визовый сбор наличными долларами (без сдачи)", "Миграционная карта"],
+    tip: "Только Шарм-эль-Шейх и Синай до 15 дней — бесплатный «синайский штамп». Но при поездке за пределы Синая (например, экскурсия в Каир) нужна полная виза.",
+    src: [{ label: "Официальный портал e-Visa Египта", url: "https://visa2egypt.gov.eg" }],
+  },
+  "Китай": {
+    status: "Безвизово", days: 30, checked: CHECKED,
+    summary: "Безвизовый въезд до 30 дней для туризма, бизнеса, визитов к родственникам и транзита.",
+    warn: "Безвизовый режим действует по 14 сентября 2026 года. Продление на момент проверки не объявлено — если поездка позже, проверьте актуальный режим.",
+    must: ["Обычный загранпаспорт (рекомендуется 6 мес.)", "Электронная въездная карта (можно заполнить заранее)", "Регистрация по месту пребывания в течение суток — отель делает сам"],
+    src: [{ label: "Посольство КНР в РФ", url: "http://ru.china-embassy.gov.cn" }],
+  },
+  "Грузия": { status: "Безвизово", days: 365, checked: CHECKED, summary: "Безвизовый въезд до 1 года.", must: ["Загранпаспорт", "Обратный билет и бронь жилья (могут спросить)"], src: [{ label: "МВД Грузии", url: "https://info.police.ge" }] },
+  "Армения": { status: "Безвизово", days: 180, checked: CHECKED, summary: "Безвизовый въезд до 180 дней в году. Можно въехать по внутреннему паспорту РФ.", must: ["Загранпаспорт или паспорт РФ"], src: [{ label: "МИД Армении", url: "https://www.mfa.am" }] },
+  "Казахстан": { status: "Безвизово", days: 90, checked: CHECKED, summary: "Безвизовый въезд до 90 дней. Можно въехать по внутреннему паспорту РФ.", must: ["Загранпаспорт или паспорт РФ", "Регистрация при пребывании свыше 30 дней"], src: [{ label: "МИД Казахстана", url: "https://www.gov.kz/memleket/entities/mfa" }] },
+  "Индия": {
+    status: "Электронная виза", days: 30, checked: CHECKED,
+    summary: "Нужна e-Visa. Оформляется онлайн заранее, обычно 3–5 рабочих дней.",
+    must: ["Загранпаспорт 6 мес. и 2 чистые страницы", "Фото и скан паспорта", "Обратный билет", "Визовый сбор — оплата картой на сайте"],
+    warn: "Оформляйте только на indianvisaonline.gov.in — посреднические сайты берут наценку.",
+    src: [{ label: "Официальный портал e-Visa Индии", url: "https://indianvisaonline.gov.in" }],
+  },
+  "Куба": { status: "Безвизово", days: 90, checked: CHECKED, summary: "Безвизовый въезд до 90 дней.", must: ["Загранпаспорт", "Медицинская страховка — обязательна", "Электронная миграционная форма D'Viajeros (за 72 часа до вылета)"], src: [{ label: "D'Viajeros", url: "https://dviajeros.mitrans.gob.cu" }] },
+  "Европа (Шенген)": {
+    status: "Виза обязательна", days: 90, checked: CHECKED,
+    summary: "Шенгенская виза. Правило 90/180: не более 90 дней в течение любых 180. Консульский сбор €90 (дети 6–12 лет €45) + сервисный сбор визового центра.",
+    must: ["Загранпаспорт (действителен ещё 3 мес. после возвращения, 2 чистые страницы)", "Анкета и фото 3,5×4,5", "Страховка на €30 000 на весь срок", "Брони жилья и билетов на весь маршрут", "Справка с работы", "Выписка со счёта за 3 месяца"],
+    money: "Ориентир по финансам — от €60–130 на день поездки; важна не только сумма, но и история движения средств.",
+    warn: "Подавать нужно в страну основного пребывания (правило первой страны). Крупное единовременное пополнение счёта перед подачей — частая причина отказа.",
+    src: [{ label: "Визовый кодекс ЕС и правила", url: "https://home-affairs.ec.europa.eu" }],
+  },
+};
+
+/* ============ ДОКУМЕНТЫ, КОТОРЫЕ НУЖНО ЗАПРОСИТЬ (не заполнить) ============
+   Справка с работы, выписка со счёта, спонсорское письмо: пользователю нужно знать не «какие поля»,
+   а У КОГО запросить, ЧТО должно быть внутри и ПО КАКОМУ образцу. */
+const REQUEST_DOCS = {
+  work_ref: {
+    id: "work_ref", name: "Справка с места работы", kind: "request", country: "Европа (Шенген)", checked: CHECKED,
+    who: "Бухгалтерия или отдел кадров вашего работодателя",
+    how: "Напишите заявление или запрос в свободной форме — обычно готовят 1–3 рабочих дня. Просите на фирменном бланке с подписью руководителя и печатью (если организация её использует).",
+    deadline: "Справка должна быть свежей: большинство консульств принимают документ не старше 1 месяца на дату подачи.",
+    must: [
+      "Фирменный бланк с реквизитами, адресом и телефоном организации",
+      "Должность и дата приёма на работу",
+      "Размер оклада (за последние 6 месяцев или средний в месяц)",
+      "Фраза о сохранении рабочего места и зарплаты на время отпуска",
+      "Даты отпуска — должны совпадать с датами поездки",
+      "Подпись руководителя и главного бухгалтера, печать при наличии",
+      "Исходящий номер и дата выдачи",
+    ],
+    template: `Справка выдана [ФИО полностью], [дата рождения], в том, что он(а) работает в [полное название организации] с [дата приёма] по настоящее время в должности [должность].
+
+Средняя заработная плата за последние 6 месяцев составляет [сумма] рублей в месяц.
+
+На период с [дата начала] по [дата окончания] [ФИО] предоставляется ежегодный оплачиваемый отпуск с сохранением рабочего места и заработной платы.
+
+Справка выдана для предоставления в консульство [страна].
+
+Руководитель организации ______________ / [ФИО] /
+Главный бухгалтер ______________ / [ФИО] /
+Дата выдачи: [дата]   Исходящий №: [номер]`,
+    tips: ["ИП прикладывают свидетельство о регистрации и налоговую декларацию вместо справки.", "Самозанятые — справку о постановке на учёт и справку о доходах из приложения «Мой налог».", "Студенты и пенсионеры — справку из учебного заведения или пенсионное удостоверение плюс спонсорское письмо."],
+  },
+  bank_ref: {
+    id: "bank_ref", name: "Выписка с банковского счёта", kind: "request", country: "Европа (Шенген)", checked: CHECKED,
+    who: "Ваш банк — отделение или онлайн-банк",
+    how: "В большинстве банков выписку можно заказать в приложении с электронной подписью банка. Для консульств чаще нужна именно официальная выписка с печатью или с квалифицированной подписью, а не скриншот.",
+    deadline: "Выписка должна быть выдана не ранее чем за 1 месяц до подачи.",
+    must: [
+      "Движение средств за последние 3 месяца",
+      "Остаток на счёте на дату выдачи",
+      "ФИО владельца счёта",
+      "Реквизиты банка, печать или электронная подпись",
+    ],
+    tips: ["Ориентир по сумме — от €60–130 на каждый день поездки, но лучше показать запас в 1,5–2 раза больше минимума.", "Резкое пополнение счёта прямо перед подачей выглядит подозрительно: важна история движения средств.", "Карты российских банков за рубежом не работают — некоторые консульства просят показать и наличные или карту иностранного банка."],
+  },
+  sponsor: {
+    id: "sponsor", name: "Спонсорское письмо", kind: "request", country: "Европа (Шенген)", checked: CHECKED,
+    who: "Спонсор — близкий родственник (супруг, родитель, взрослый ребёнок)",
+    how: "Пишется в свободной форме от руки или на компьютере, подпись спонсора обязательна. Нотариальное заверение обычно не требуется, но некоторые консульства просят.",
+    deadline: "Прикладывается вместе с документами спонсора — его справкой с работы и выпиской со счёта.",
+    must: [
+      "ФИО и паспортные данные спонсора",
+      "ФИО и паспортные данные того, кого спонсируют",
+      "Степень родства",
+      "Обязательство оплатить поездку",
+      "Страна и даты поездки",
+      "Подпись и дата",
+      "Копия паспорта спонсора и документ о родстве (свидетельство о рождении или браке)",
+    ],
+    template: `Я, [ФИО спонсора полностью], паспорт [серия номер], выдан [кем и когда], проживающий(ая) по адресу [адрес],
+
+настоящим подтверждаю, что беру на себя все расходы, связанные с поездкой моего(ей) [степень родства: сына / дочери / супруги] [ФИО полностью], [дата рождения], паспорт [серия номер],
+
+в [страна поездки] в период с [дата начала] по [дата окончания].
+
+Обязуюсь оплатить проезд, проживание, питание и медицинское обслуживание в течение всего срока поездки.
+
+Дата: [дата]        Подпись: ______________ / [ФИО] /`,
+    tips: ["Спонсорское письмо обязательно для детей, студентов, пенсионеров и неработающих.", "К письму всегда прикладывают финансовые документы самого спонсора."],
+  },
+};
+
 const DOC_INFO = {
   pass6: { type: "info", desc: "Проверьте срок действия загранпаспорта: для большинства стран — минимум 6 месяцев после даты возвращения.", req: ["Загранпаспорт"], links: [] },
   ins: { type: "online", desc: "Медицинская страховка на весь срок поездки. Оформляется онлайн за несколько минут.", req: ["Паспортные данные", "Даты поездки"], links: [{ label: "Оформить страховку", url: "" }] },
@@ -785,6 +944,7 @@ const DOC_KW = {
   vjw: "япония visit japan web токио", tz_visa: "танзания занзибар танзанийская виза", vn_evisa: "вьетнам вьетнамская виза фукуок",
   eta: "шри-ланка ланкийская коломбо разрешение", mu_form: "маврикий форма въезда", sc_ta: "сейшелы разрешение",
   ph_etd: "филиппины декларация манила", schengen: "шенген шенгенская европа виза анкета франция италия испания",
+  work_ref: "справка работа работодатель бухгалтерия зарплата отпуск шенген", bank_ref: "выписка банк счёт финансы деньги шенген", sponsor: "спонсор спонсорское письмо ребёнок студент пенсионер",
   in_evisa: "индия индийская виза гоа дели", eg_voa: "египет египетская виза хургада шарм синай",
   ins: "страховка полис медицинская", pass6: "загранпаспорт паспорт срок действия",
   kid_birth: "свидетельство рождение ребёнок дети", kid_consent: "согласие выезд ребёнок дети нотариус",
@@ -793,6 +953,8 @@ const ALL_DOCS = (() => {
   const m = new Map();
   for (const [country, arr] of Object.entries(DOC_MATRIX)) for (const dd of arr) if (!m.has(dd.id)) m.set(dd.id, { ...dd, country, kw: DOC_KW[dd.id] || "" });
   m.set("schengen", { id: "schengen", name: "Шенгенская анкета", E: 180, P: 15, country: "Европа (Шенген)", kw: DOC_KW.schengen });
+  // документы, которые запрашивают у третьей стороны (работодатель, банк, спонсор)
+  for (const r of Object.values(REQUEST_DOCS)) m.set(r.id, { id: r.id, name: r.name, E: 45, P: 3, country: r.country, kw: DOC_KW[r.id] || "" });
   for (const k of KID_DOCS) if (!m.has(k.id)) m.set(k.id, { ...k, country: "любая страна", kw: DOC_KW[k.id] || "" });
   return [...m.values()];
 })();
@@ -940,6 +1102,16 @@ function validateField(f, v) {
 
 function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
   const cfg = docConfig(doc.id, doc.name, doc.country);
+  const persistRequest = (status) => {
+    try {
+      const list = store.get("mydocs", []);
+      const rid = savedId || (doc.id + "-" + Date.now().toString(36));
+      const rec = { id: rid, docKey: doc.id, name: doc.name, country: doc.country || "", ans: {}, status, kind: "request", updatedAt: Date.now() };
+      const i = list.findIndex((d) => d.id === rid);
+      if (i >= 0) list[i] = rec; else list.unshift(rec);
+      store.set("mydocs", list); onSaved && onSaved();
+    } catch (e) { console.warn("[TripWiseAI] request doc save failed", e); }
+  };
   const saved = savedId ? (store.get("mydocs", []).find((d) => d.id === savedId)) : null;
   const [docId] = useState(savedId || (doc.id + "-" + Date.now().toString(36)));
   const [ans, setAns] = useState(() => {
@@ -953,6 +1125,44 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
   const [focusF, setFocusF] = useState(null);      // активное поле — контекст для ГигаЧата
   const [aiQ, setAiQ] = useState(""); const [aiA, setAiA] = useState(""); const [aiBusy, setAiBusy] = useState(false);
 
+  const rq = REQUEST_DOCS[doc.id];
+  if (rq) {
+    const copyTpl = async () => { (await copyText(rq.template || "")) ? setToast("Шаблон скопирован") : setToast("Не удалось скопировать"); };
+    return <Overlay onClose={onClose}><SheetHead title={rq.name} onClose={onClose} />
+      <div style={{ maxHeight: "60vh", overflowY: "auto", overscrollBehavior: "contain", paddingRight: 2 }}>
+        <div style={{ background: T.violet + "14", border: `1px solid ${T.violet}44`, borderRadius: 14, padding: 12, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: T.violet, fontWeight: 800, marginBottom: 4 }}>У КОГО ЗАПРОСИТЬ</div>
+          <div style={{ fontSize: 13.5, color: T.text, fontWeight: 600, marginBottom: 8 }}>{rq.who}</div>
+          <div style={{ fontSize: 12.5, color: T.sub, lineHeight: 1.5 }}>{rq.how}</div>
+        </div>
+        {rq.deadline && <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: T.card2, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 12px", marginBottom: 12 }}>
+          <span style={{ fontSize: 14 }}>⏳</span><span style={{ fontSize: 12.5, color: T.sub, lineHeight: 1.45 }}>{rq.deadline}</span>
+        </div>}
+        <div style={{ fontSize: 13, fontWeight: 800, color: T.text, fontFamily: "Sora,sans-serif", marginBottom: 8 }}>Что должно быть в документе</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14 }}>
+          {(rq.must || []).map((m, i) => <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <span style={{ width: 5, height: 5, borderRadius: 999, background: T.violet, marginTop: 6, flexShrink: 0 }} />
+            <span style={{ fontSize: 12.5, color: T.sub, lineHeight: 1.45 }}>{m}</span>
+          </div>)}
+        </div>
+        {rq.template && <>
+          <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: T.text, fontFamily: "Sora,sans-serif", flex: 1 }}>Образец текста</div>
+            <span onClick={copyTpl} className="press" style={{ fontSize: 11.5, fontWeight: 700, color: T.violet, border: `1px solid ${T.violet}55`, background: T.violet + "14", borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>Копировать</span>
+          </div>
+          <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: 12, fontSize: 12, color: T.sub, lineHeight: 1.6, whiteSpace: "pre-wrap", marginBottom: 14 }}>{rq.template}</div>
+        </>}
+        {(rq.tips || []).length > 0 && <>
+          <div style={{ fontSize: 13, fontWeight: 800, color: T.text, fontFamily: "Sora,sans-serif", marginBottom: 8 }}>Важно</div>
+          {(rq.tips || []).map((t, i) => <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 7 }}>
+            <span style={{ fontSize: 12 }}>💡</span><span style={{ fontSize: 12.5, color: T.subd, lineHeight: 1.45 }}>{t}</span>
+          </div>)}
+        </>}
+        <div style={{ fontSize: 10.5, color: T.subd, marginTop: 12 }}>Требования проверены {rq.checked}. Перед подачей сверьтесь с сайтом консульства — правила меняются.</div>
+      </div>
+      <div onClick={() => { persistRequest("ready"); onClose(); setToast("Отмечено как готовое"); }} className="press" style={{ marginTop: 12, textAlign: "center", background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 13.5, fontWeight: 800, cursor: "pointer" }}>Документ получен</div>
+    </Overlay>;
+  }
   if (!cfg) return <Overlay onClose={onClose}><SheetHead title={doc.name} onClose={onClose} />
     <div style={{ fontSize: 13, color: T.subd, lineHeight: 1.5, padding: "4px 0 12px" }}>Мастер для этого документа появится позже. Пока воспользуйтесь официальным сайтом.</div>
   </Overlay>;
@@ -1824,6 +2034,32 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
           <div style={{ flex: 1 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.text }}>{country}</div><div style={{ fontSize: 11.5, color: T.subd }}>{adults} {plural(adults, "взрослый", "взрослых", "взрослых")}{kids ? " · с детьми" : ""}{df ? ` · вылет ${fmtShort(new Date(df))}` : ""}</div></div>
         </div>
         <div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, margin: "12px 0 2px", fontFamily: "Sora,sans-serif" }}>Обязательно</div>
+        {(() => {
+          const vi = VISA_INFO[country];
+          if (!vi) return null;
+          const col = vi.status === "Виза обязательна" ? "#e0a53a" : vi.status.indexOf("Безвиз") === 0 ? T.green : T.cyan;
+          return <div style={{ background: T.card, border: `1px solid ${col}44`, borderRadius: 16, padding: 14, marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: .3, color: col, background: col + "1e", border: `1px solid ${col}55`, borderRadius: 999, padding: "3px 10px" }}>{vi.status.toUpperCase()}</span>
+              {vi.days ? <span style={{ fontSize: 11.5, color: T.subd }}>до {vi.days} {plural(vi.days, "дня", "дней", "дней")}</span> : null}
+            </div>
+            <div style={{ fontSize: 12.5, color: T.sub, lineHeight: 1.5, marginBottom: vi.warn || vi.tip ? 10 : 0 }}>{vi.summary}</div>
+            {vi.warn && <div style={{ display: "flex", gap: 7, alignItems: "flex-start", background: "#e0a53a14", border: "1px solid #e0a53a44", borderRadius: 10, padding: "9px 11px", marginBottom: 8 }}>
+              <span style={{ fontSize: 12 }}>⚠️</span><span style={{ fontSize: 12, color: T.sub, lineHeight: 1.45 }}>{vi.warn}</span></div>}
+            {vi.tip && <div style={{ display: "flex", gap: 7, alignItems: "flex-start", marginBottom: 8 }}>
+              <span style={{ fontSize: 12 }}>💡</span><span style={{ fontSize: 12, color: T.subd, lineHeight: 1.45 }}>{vi.tip}</span></div>}
+            {(vi.must || []).length > 0 && <div style={{ marginTop: 4 }}>
+              {(vi.must || []).map((m, i) => <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 5 }}>
+                <span style={{ width: 4, height: 4, borderRadius: 999, background: T.subd, marginTop: 6, flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: T.subd, lineHeight: 1.4 }}>{m}</span></div>)}
+            </div>}
+            {vi.money && <div style={{ fontSize: 12, color: T.subd, lineHeight: 1.45, marginTop: 8 }}>💳 {vi.money}</div>}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 10 }}>
+              {(vi.src || []).map((s, i) => <span key={i} onClick={() => { try { window.open(s.url, "_blank"); } catch (e) { } }} className="press" style={{ fontSize: 11.5, color: T.violet, fontWeight: 700, border: `1px solid ${T.violet}44`, background: T.violet + "12", borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>{s.label} →</span>)}
+            </div>
+            <div style={{ fontSize: 10, color: T.subd, marginTop: 9 }}>Проверено {vi.checked} · правила въезда меняются, сверьтесь с источником</div>
+          </div>;
+        })()}
         {docsForCitizen(cc, country).map((dd) => <DocRow key={dd.id} dd={dd} />)}
         {kids && <>
           <div style={{ fontSize: 12.5, fontWeight: 800, color: T.subd, margin: "14px 0 2px", fontFamily: "Sora,sans-serif" }}>По ситуации <span style={{ fontWeight: 400 }}>— добавьте нужное</span></div>
