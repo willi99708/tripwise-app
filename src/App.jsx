@@ -986,6 +986,40 @@ const ENTRY_MODE_LABEL = {
   voa: "Виза по прибытии", consular_visa: "Консульская виза", declaration: "Въездная декларация",
 };
 // базовые пункты комплекта, общие для всех
+// что это за пункт и зачем — без этого список бесполезен
+const ITEM_DESC = {
+  passport_valid: { what: "Загранпаспорт с достаточным сроком действия", why: "Большинство стран не впустят, если паспорт истекает раньше чем через 6 месяцев после возвращения. Авиакомпания может не пустить на рейс.", cost: "бесплатно (проверка)", days: "замена — до 1 месяца" },
+  return_ticket: { what: "Билет обратно или в третью страну", why: "На границе и при посадке могут попросить доказать, что вы не остаётесь. Без него бывает отказ во въезде.", cost: "стоимость билета", days: "сразу" },
+  stay_proof: { what: "Бронь отеля или адрес проживания", why: "Пограничник спрашивает, где вы будете жить. Нужен адрес — он же вписывается в анкеты и декларации.", cost: "по тарифу отеля", days: "сразу" },
+  photo: { what: "Фотография по требованиям консульства", why: "Вклеивается в анкету. Селфи и фото с телефона не принимают — нужен нужный размер, фон и свежесть съёмки.", cost: "300–800 ₽", days: "в день обращения" },
+  work_ref: { what: "Справка с места работы", why: "Показывает консульству, что у вас есть работа и вы вернётесь. Без неё резко растёт риск отказа.", cost: "бесплатно", days: "1–3 рабочих дня" },
+  bank_ref: { what: "Выписка с банковского счёта", why: "Подтверждает, что вам хватит денег на поездку. Смотрят и сумму, и историю движения средств.", cost: "бесплатно", days: "от 1 дня" },
+  ins: { what: "Медицинская страховка", why: "Обязательна для визы, покрытие от €30 000. Без неё документы не примут.", cost: "от 1 500 ₽", days: "сразу онлайн" },
+  jp_form: { what: "Официальная визовая анкета Японии", why: "Основной документ заявления. Заполняется латиницей, ошибки в датах и именах — причина возврата.", cost: "консульский сбор не взимается", days: "рассмотрение от 10 рабочих дней" },
+  jp_schedule: { what: "Программа пребывания по дням", why: "Япония требует расписанный маршрут: даты, города, где ночуете. Без него анкету не примут.", cost: "бесплатно", days: "заполняется сразу" },
+  tdac: { what: "Электронная карта прибытия Таиланда", why: "Обязательна с мая 2025. Без QR-кода не пройти паспортный контроль.", cost: "бесплатно", days: "открывается за 3 дня до прилёта" },
+  evisa_id: { what: "Виза Индонезии по прибытии", why: "Без неё не пустят в страну. Дешевле и быстрее оформить заранее онлайн, чем стоять в очереди в аэропорту.", cost: "$35 / 500 000 IDR", days: "онлайн — за минуты" },
+  ecd: { what: "Таможенная декларация All Indonesia", why: "Обязательна для всех прибывающих. Даёт QR-код для таможни.", cost: "бесплатно", days: "за 3 дня до прилёта" },
+  eta: { what: "Разрешение на въезд ETA", why: "Рекомендуется оформить заранее — с ним прохождение границы быстрее.", cost: "бесплатно для россиян", days: "обычно до 1 дня" },
+  imuga: { what: "Декларация IMUGA", why: "Обязательна для въезда на Мальдивы. Заполняется в течение 96 часов до вылета.", cost: "бесплатно", days: "за 96 часов до вылета" },
+  schengen: { what: "Анкета на шенгенскую визу", why: "Основное заявление. Подаётся в визовый центр вместе с полным пакетом.", cost: "€90 + сервисный сбор", days: "7–60 дней в зависимости от страны" },
+  keta: { what: "Разрешение K-ETA", why: "Без него не посадят на рейс в Корею. Действует 3 года.", cost: "~10 000 вон", days: "оформить за 72 часа до вылета" },
+  ds160: { what: "Анкета DS-160", why: "Заполняется онлайн до записи на собеседование. Без неё не назначат интервью.", cost: "консульский сбор оплачивается отдельно", days: "заполняется за 1–2 часа" },
+  uk_form: { what: "Онлайн-заявление на gov.uk", why: "Основная заявка. После неё нужно сдать биометрию за рубежом.", cost: "по тарифу gov.uk", days: "рассмотрение от 3 недель" },
+  imm5257: { what: "Анкета IMM5257 в личном кабинете IRCC", why: "Подаётся полностью онлайн. После одобрения паспорт отправляется в визовый центр за границей.", cost: "100 CAD + 85 CAD биометрия", days: "от 2 недель до 3 месяцев" },
+  au_600: { what: "Заявление subclass 600", why: "Подаётся онлайн через ImmiAccount. Могут запросить медосмотр и биометрию.", cost: "по тарифу ImmiAccount", days: "несколько месяцев" },
+  cy_form: { what: "Кипрская визовая анкета", why: "Нужна, если нет действующей двукратной шенгенской визы.", cost: "уточняется в консульстве", days: "обычно до 2 недель" },
+  in_evisa: { what: "Электронная виза Индии", why: "Без неё не пустят. Оформляется только на официальном портале.", cost: "визовый сбор на сайте", days: "3–5 рабочих дней" },
+  tz_evisa: { what: "Виза Танзании", why: "Нужна для въезда, действует и на Занзибаре.", cost: "$50", days: "онлайн до 10 дней или по прилёте" },
+  tz_ins: { what: "Страховка местного страховщика Занзибара", why: "Обязательна с октября 2024. Российский полис не подходит — нужен именно местный.", cost: "около $44", days: "оформляется онлайн" },
+  eg_visa: { what: "Виза Египта", why: "Нужна для въезда, кроме Шарм-эль-Шейха до 15 дней.", cost: "$30 наличными", days: "по прилёте или онлайн" },
+  cn_card: { what: "Электронная въездная карта Китая", why: "Ускоряет прохождение границы, можно заполнить заранее.", cost: "бесплатно", days: "заранее или на границе" },
+  cu_dviajeros: { what: "Форма D'Viajeros", why: "Обязательная миграционная форма Кубы, даёт QR-код.", cost: "бесплатно", days: "за 72 часа до вылета" },
+  cu_ins: { what: "Медицинская страховка", why: "На Кубе обязательна, её проверяют при въезде.", cost: "от 1 500 ₽", days: "сразу онлайн" },
+  kw_evisa: { what: "Электронная виза Кувейта", why: "Нужна для въезда, оформляется заранее онлайн.", cost: "визовый сбор на сайте", days: "несколько дней" },
+  dk_faroe: { what: "Датская виза с пометкой о Фарерах", why: "Шенгенская виза на Фарерах не действует — нужна отдельная. Дания не принимает документы в России.", cost: "€90", days: "зависит от страны подачи" },
+  kp_tour: { what: "Оформление через туроператора", why: "Самостоятельная подача невозможна — визу получает аккредитованный оператор.", cost: "в составе тура", days: "уточняется у оператора" },
+};
 const BASE_ITEMS = [
   { id: "passport_valid", name: "Проверить срок действия паспорта", kind: "check" },
   { id: "return_ticket", name: "Обратный билет", kind: "check" },
@@ -1375,7 +1409,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
   if (rq) {
     const copyTpl = async () => { (await copyText(rq.template || "")) ? setToast("Шаблон скопирован") : setToast("Не удалось скопировать"); };
     return <Overlay onClose={onClose}><SheetHead title={rq.name} onClose={onClose} />
-      <div style={{ maxHeight: "60vh", overflowY: "auto", overscrollBehavior: "contain", paddingRight: 2 }}>
+      <div style={{ maxHeight: "64vh", overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain", paddingRight: 2 }}>
         <div style={{ background: T.violet + "14", border: `1px solid ${T.violet}44`, borderRadius: 14, padding: 12, marginBottom: 12 }}>
           <div style={{ fontSize: 11, color: T.violet, fontWeight: 800, marginBottom: 4 }}>У КОГО ЗАПРОСИТЬ</div>
           <div style={{ fontSize: 13.5, color: T.text, fontWeight: 600, marginBottom: 8 }}>{rq.who}</div>
@@ -1446,7 +1480,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
     setAiBusy(false); setAiQ("");
   };
 
-  const inputSt = { width: "100%", background: T.card, border: `1px solid ${T.line2}`, borderRadius: 12, padding: "12px 13px", color: T.text, fontSize: 15, fontFamily: "Manrope,sans-serif", outline: "none", boxSizing: "border-box", colorScheme: "dark" };
+  const inputSt = { width: "100%", maxWidth: "100%", background: T.card, border: `1px solid ${T.line2}`, borderRadius: 12, padding: "12px 13px", color: T.text, fontSize: 15, fontFamily: "Manrope,sans-serif", outline: "none", boxSizing: "border-box", colorScheme: "dark" };
   const Field = ({ f }) => {
     const v = ans[f.k] || "";
     const err = touched[f.k] ? validateField(f, v) : null;
@@ -1457,7 +1491,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
     </div>;
     return <div style={{ marginBottom: 11 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-        <span style={{ fontSize: 12, color: T.sub, fontWeight: 600, flex: 1 }}>{f.label}{f.req ? <span style={{ color: "#ff6db0" }}> *</span> : null}{f.hint ? <span style={{ color: T.subd, fontWeight: 400 }}> · {f.hint}</span> : null}</span>
+        <span style={{ fontSize: 12, color: T.sub, fontWeight: 600, flex: 1, minWidth: 0, wordBreak: "break-word" }}>{f.label}{f.req ? <span style={{ color: "#ff6db0" }}> *</span> : null}{f.hint ? <span style={{ color: T.subd, fontWeight: 400 }}> · {f.hint}</span> : null}</span>
         <span onClick={() => { setFocusF(f); askAi(`Что указать в этом поле?`); }} className="press" style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 999, border: `1px solid ${T.violet}55`, background: T.violet + "14", display: "grid", placeItems: "center", color: T.violet, fontSize: 11, fontWeight: 800, cursor: "pointer" }}>?</span>
       </div>
       {f.type === "radio"
@@ -1489,7 +1523,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
   if (mode === "result") {
     const ready = allVisible.filter((f) => ans[f.k]);
     return <Overlay onClose={onClose}><SheetHead title="Документ готов" onClose={onClose} />
-      <div style={{ maxHeight: "56vh", overflowY: "auto", overscrollBehavior: "contain" }}>
+      <div style={{ maxHeight: "62vh", overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain" }}>
         <div style={{ fontSize: 12, color: T.subd, marginBottom: 12, lineHeight: 1.45 }}>Значения подготовлены в формате официальной формы{cfg.officialUrl ? " — перенесите их на официальный сайт" : ""}. Данные хранятся только на вашем устройстве.</div>
         {ready.map((f) => <div key={f.k} style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
           <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 10.5, color: T.subd }}>{f.en || f.label}</div><div style={{ fontSize: 14, fontWeight: 700, color: T.text, wordBreak: "break-word" }}>{val(f)}</div></div>
@@ -1507,7 +1541,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
   // ---------- экран проверки ----------
   if (mode === "review") {
     return <Overlay onClose={onClose}><SheetHead title="Проверка документа" onClose={onClose} />
-      <div style={{ maxHeight: "56vh", overflowY: "auto", overscrollBehavior: "contain" }}>
+      <div style={{ maxHeight: "62vh", overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain" }}>
         {steps.map((st) => {
           const sf = allVisible.filter((f) => f.stepId === st.id && f.req);
           const bad = sf.map((f) => ({ f, err: validateField(f, ans[f.k]) })).filter((x) => x.err);
@@ -1538,7 +1572,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
       <div style={{ height: 5, background: T.line, borderRadius: 999, overflow: "hidden" }}><div style={{ width: pct + "%", height: "100%", background: GRAD.cta, transition: "width .2s" }} /></div>
       <div style={{ fontSize: 10.5, color: T.subd, marginTop: 5 }}>Заполнено {filledReq.length} из {reqAll.length} обязательных полей</div>
     </div>
-    <div style={{ maxHeight: "48vh", overflowY: "auto", overscrollBehavior: "contain", paddingRight: 2 }}>
+    <div style={{ maxHeight: "62vh", overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain", paddingRight: 2 }}>
       {step.groups.map((g, gi) => {
         const vis = g.fields.filter((f) => fieldVisible(f, ans));
         if (!vis.length) return null;
@@ -2202,33 +2236,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
     <Header />
     <div style={{ padding: "8px 20px 0" }}>
       {mode === "home" && <>
-        <div style={{ margin: "0 -20px 4px" }}><PageHero title="Документы" sub="Выберите страну — подскажем, что нужно оформить" emoji="📄" /></div>
-        {/* Главный сценарий: сначала страна */}
-        <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 17, color: T.text, marginBottom: 4 }}>Куда вы едете?</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}>
-          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .3, color: T.violet, background: T.violet + "18", border: `1px solid ${T.violet}44`, borderRadius: 999, padding: "4px 10px" }}>{TRIP_TYPE_LABEL.toUpperCase()}</span>
-          <span style={{ fontSize: 10.5, color: T.subd }}>другие типы поездок появятся позже</span>
-        </div>
-        <input value={cq} onChange={(e) => setCq(e.target.value)} placeholder="Поиск страны…" style={{ ...inputSt, marginBottom: 12 }} />
-        {!cq.trim() && <>
-          <div style={{ fontSize: 11.5, color: T.subd, fontWeight: 700, marginBottom: 8 }}>Популярные направления</div>
-          <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 16 }}>
-            {POPULAR_C.map((c) => <span key={c} onClick={() => { setCountry(c); setPurpose("tourism"); setMode("kit"); }} className="press" style={{ fontSize: 12.5, color: T.text, fontWeight: 700, background: T.card, border: `1px solid ${T.line}`, borderRadius: 999, padding: "8px 13px", cursor: "pointer" }}>{c}</span>)}
-          </div>
-        </>}
-        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 18 }}>
-          {countries.filter((c) => !cq.trim() || c.toLowerCase().includes(cq.trim().toLowerCase())).map((c) => {
-            const cf = countryCfg(c), vi = VISA_INFO[c] || {};
-            const sl = SUPPORT_LABEL[cf.supportLevel] || SUPPORT_LABEL.information_only;
-            return <div key={c} onClick={() => { setCountry(c); setPurpose("tourism"); setMode("kit"); }} className="press" style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: "11px 13px", cursor: "pointer" }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: T.text }}>{c}</div>
-                <div style={{ fontSize: 11, color: T.subd, marginTop: 2 }}>{ENTRY_MODE_LABEL[cf.entryMode] || vi.status}{vi.days ? ` · до ${vi.days} дн.` : ""}</div>
-              </div>
-              <span style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 800, color: sl.col, background: sl.col + "1a", border: `1px solid ${sl.col}44`, borderRadius: 999, padding: "3px 8px" }}>{sl.txt}</span>
-            </div>;
-          })}
-        </div>
+        <div style={{ margin: "0 -20px 4px" }}><PageHero title="Документы" sub="Соберём комплект под поездку или поможем с одним документом" emoji="📄" /></div>
         {/* Сценарий 1: подбор комплекта */}
         <div style={{ background: T.card, border: `1.5px solid ${T.violet}55`, borderRadius: 18, padding: 14, marginBottom: 12 }}>
           <div style={{ display: "flex", gap: 11, alignItems: "center" }}>
@@ -2314,54 +2322,50 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
           <div onClick={() => setMode("home")} className="press" style={{ cursor: "pointer" }}><Icon d={I.back} size={20} color={T.text} /></div>
           <div style={{ flex: 1 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.text }}>{country}</div><div style={{ fontSize: 11.5, color: T.subd }}>{TRIP_TYPE_LABEL}{linkedTrip ? ` · поездка «${linkedTrip.title}»` : ""}</div></div>
         </div>
-        {/* режим въезда + уровень поддержки */}
+        {/* один блок: режим въезда + что именно нужно, с ценой, сроком и статусом */}
         {(() => {
           const sl = SUPPORT_LABEL[cCfg.supportLevel] || SUPPORT_LABEL.information_only;
           const noVisa = cCfg.entryMode === "none";
-          return <div style={{ background: T.card, border: `1px solid ${noVisa ? T.green + "44" : T.violet + "44"}`, borderRadius: 16, padding: 14, margin: "12px 0 14px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 800, color: noVisa ? T.green : T.violet, background: (noVisa ? T.green : T.violet) + "1e", border: `1px solid ${(noVisa ? T.green : T.violet)}55`, borderRadius: 999, padding: "3px 10px" }}>{(ENTRY_MODE_LABEL[cCfg.entryMode] || "").toUpperCase()}</span>
+          return <>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 10px" }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: noVisa ? T.green : T.violet, background: (noVisa ? T.green : T.violet) + "1e", border: `1px solid ${(noVisa ? T.green : T.violet)}55`, borderRadius: 999, padding: "4px 10px" }}>{(ENTRY_MODE_LABEL[cCfg.entryMode] || "").toUpperCase()}</span>
               <span style={{ fontSize: 9.5, fontWeight: 800, color: sl.col, background: sl.col + "1a", border: `1px solid ${sl.col}44`, borderRadius: 999, padding: "3px 8px", marginLeft: "auto" }}>{sl.txt}</span>
             </div>
-            <div style={{ fontSize: 13, color: T.text, fontWeight: 600, lineHeight: 1.4 }}>
-              {noVisa ? "Виза для туристической поездки не требуется. Перед поездкой нужно:" : "Для вашей поездки потребуется:"}
+            {cCfg.note && <div style={{ fontSize: 11.5, color: T.subd, marginBottom: 10, lineHeight: 1.45 }}>💡 {cCfg.note}</div>}
+            {(cCfg.purposes || []).length > 1 && <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: T.subd, marginBottom: 7 }}>Цель поездки</div>
+              <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                {cCfg.purposes.map((p) => <div key={p} onClick={() => setPurpose(p)} className="press" style={{ background: purpose === p ? T.violet + "22" : T.card, border: `1px solid ${purpose === p ? T.violet : T.line}`, borderRadius: 999, padding: "8px 13px", cursor: "pointer", fontSize: 12.5, fontWeight: 700, color: purpose === p ? T.violet : T.text }}>{PURPOSE_LABEL[p]}</div>)}
+              </div>
+            </div>}
+            <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 15, color: T.text, marginBottom: 10 }}>{noVisa ? "Что нужно перед поездкой" : "Что нужно оформить"}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 9, marginBottom: 18 }}>
+              {(cCfg.items || []).map((it) => {
+                const d = ITEM_DESC[it.id] || {};
+                const mine = store.get("mydocs", []).find((x) => x.docKey === it.id);
+                const st = mine ? (mine.status === "ready" ? "ready" : "draft") : "todo";
+                const meta = st === "ready" ? { txt: "Готов", col: T.green } : st === "draft" ? { txt: "Заполняется", col: "#e0a53a" } : { txt: it.kind === "request" ? "Запросить" : it.kind === "form" ? "Заполнить" : it.kind === "external" ? "На сайте" : "Проверить", col: T.violet };
+                const canOpen = it.kind === "form" || it.kind === "request";
+                const dd = ALL_DOCS.find((x) => x.id === it.id);
+                return <div key={it.id} onClick={() => { if (!canOpen) return; setResumeId(null); setWiz(dd || { id: it.id, name: it.name, country }); }} className={canOpen ? "press" : ""} style={{ background: T.card, border: `1px solid ${st === "ready" ? T.green + "44" : T.line}`, borderRadius: 14, padding: 13, cursor: canOpen ? "pointer" : "default" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: T.text, lineHeight: 1.3 }}>{d.what || it.name}</div>
+                      {d.why && <div style={{ fontSize: 11.5, color: T.subd, lineHeight: 1.45, marginTop: 4 }}>{d.why}</div>}
+                    </div>
+                    <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 800, color: meta.col, background: meta.col + "1a", border: `1px solid ${meta.col}44`, borderRadius: 999, padding: "3px 8px" }}>{meta.txt}</span>
+                  </div>
+                  {(d.cost || d.days) && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 9 }}>
+                    {d.cost && <span style={{ fontSize: 10.5, color: T.sub, background: T.card2, border: `1px solid ${T.line}`, borderRadius: 8, padding: "4px 8px" }}>💳 {d.cost}</span>}
+                    {d.days && <span style={{ fontSize: 10.5, color: T.sub, background: T.card2, border: `1px solid ${T.line}`, borderRadius: 8, padding: "4px 8px" }}>⏱ {d.days}</span>}
+                  </div>}
+                </div>;
+              })}
             </div>
-            <div style={{ marginTop: 9 }}>
-              {(cCfg.items || []).map((it, i) => <div key={it.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 6 }}>
-                <span style={{ fontSize: 11, color: T.subd, fontWeight: 700, minWidth: 14 }}>{i + 1}.</span>
-                <span style={{ fontSize: 12.5, color: T.sub, lineHeight: 1.4 }}>{it.name}</span>
-              </div>)}
-            </div>
-            {cCfg.note && <div style={{ fontSize: 11.5, color: T.subd, marginTop: 8, lineHeight: 1.45 }}>💡 {cCfg.note}</div>}
-            {cCfg.supportLevel === "information_only" && <div style={{ fontSize: 11.5, color: "#e0a53a", marginTop: 8, lineHeight: 1.45 }}>Для этой страны пока доступна только справка — заполнение форм в приложении не поддерживается.</div>}
-          </div>;
+            {cCfg.supportLevel === "information_only" && <div style={{ fontSize: 11.5, color: "#e0a53a", marginBottom: 14, lineHeight: 1.45 }}>Для этой страны доступна только справка — заполнение форм в приложении не поддерживается.</div>}
+          </>;
         })()}
-        {/* подцель — только там, где влияет на комплект */}
-        {(cCfg.purposes || []).length > 1 && <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: T.subd, marginBottom: 8 }}>Какова основная цель поездки?</div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {cCfg.purposes.map((p) => <div key={p} onClick={() => setPurpose(p)} className="press" style={{ background: purpose === p ? T.violet + "22" : T.card, border: `1px solid ${purpose === p ? T.violet : T.line}`, borderRadius: 999, padding: "9px 14px", cursor: "pointer", fontSize: 12.5, fontWeight: 700, color: purpose === p ? T.violet : T.text }}>{PURPOSE_LABEL[p]}</div>)}
-          </div>
-          {purpose === "private_visit" && <div style={{ fontSize: 11.5, color: T.subd, marginTop: 8, lineHeight: 1.45 }}>Понадобятся данные принимающей стороны: имя, адрес, телефон, характер отношений и кто оплачивает поездку.</div>}
-        </div>}
-        {/* персональный комплект со статусами */}
-        <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 15, color: T.text, marginBottom: 10 }}>Ваш комплект</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-          {(cCfg.items || []).map((it) => {
-            const mine = store.get("mydocs", []).find((d) => d.docKey === it.id);
-            const st = mine ? (mine.status === "ready" ? "ready" : "draft") : "todo";
-            const meta = st === "ready" ? { txt: "Готов", col: T.green, ic: "✓" } : st === "draft" ? { txt: "Заполняется", col: "#e0a53a", ic: "◐" } : { txt: it.kind === "request" ? "Запросить" : it.kind === "form" ? "Заполнить" : it.kind === "external" ? "На сайте" : "Проверить", col: T.subd, ic: "○" };
-            const canOpen = it.kind === "form" || it.kind === "request";
-            const dd = ALL_DOCS.find((x) => x.id === it.id);
-            return <div key={it.id} onClick={() => { if (canOpen && dd) { setResumeId(mine ? mine.id : null); setWiz(dd); } else if (canOpen) { setResumeId(mine ? mine.id : null); setWiz({ id: it.id, name: it.name, country }); } }} className={canOpen ? "press" : ""} style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${st === "ready" ? T.green + "44" : T.line}`, borderRadius: 14, padding: "11px 13px", cursor: canOpen ? "pointer" : "default" }}>
-              <span style={{ fontSize: 15, color: meta.col, width: 16, textAlign: "center", flexShrink: 0 }}>{meta.ic}</span>
-              <span style={{ flex: 1, fontSize: 13, color: T.text, fontWeight: 600 }}>{it.name}</span>
-              <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 700, color: meta.col }}>{meta.txt}</span>
-              {canOpen && <Icon d={I.chevR} size={15} color={T.subd} />}
-            </div>;
-          })}
-        </div>
-        <div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, margin: "12px 0 2px", fontFamily: "Sora,sans-serif" }}>Обязательно</div>
+        <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 15, color: T.text, marginBottom: 10 }}>Правила въезда</div>
         {(() => {
           const vi = VISA_INFO[country];
           if (!vi) return null;
@@ -2399,7 +2403,6 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
             <div style={{ fontSize: 10, color: T.subd, marginTop: 9 }}>Проверено {vi.checked} · правила въезда меняются, сверьтесь с источником</div>
           </div>;
         })()}
-        {docsForCitizen(cc, country).map((dd) => <DocRow key={dd.id} dd={dd} />)}
         {kids && <>
           <div style={{ fontSize: 12.5, fontWeight: 800, color: T.subd, margin: "14px 0 2px", fontFamily: "Sora,sans-serif" }}>По ситуации <span style={{ fontWeight: 400 }}>— добавьте нужное</span></div>
           {KID_DOCS.filter((x) => x.id !== "kid_birth").map((dd) => { const sel = kitSel.includes(dd.id); return (
@@ -2442,7 +2445,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
           <div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, marginBottom: 6, fontFamily: "Sora,sans-serif" }}>Что потребуется</div>
           {(info.req || []).map((rq) => <div key={rq} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}><span style={{ width: 5, height: 5, borderRadius: 999, background: T.violet }} /><span style={{ fontSize: 12.5, color: T.sub }}>{rq}</span></div>)}
         </>}
-        <div onClick={() => { if (docConfig(doc.id, doc.name, doc.country)) { setResumeId(null); setWiz(doc); setDoc(null); } else setToast("Мастер для этого документа появится позже"); }} className="press" style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Заполнить с помощником {!docConfig(doc.id, doc.name, doc.country) && <Badge label="скоро" color="#fff" />}</div>
+        <div onClick={() => { if (docConfig(doc.id, doc.name, doc.country) || REQUEST_DOCS[doc.id]) { setResumeId(null); setWiz(doc); setDoc(null); } else setToast("Мастер для этого документа появится позже"); }} className="press" style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Заполнить с помощником {!(docConfig(doc.id, doc.name, doc.country) || REQUEST_DOCS[doc.id]) && <Badge label="скоро" color="#fff" />}</div>
         {links.length > 0 && <>
           <div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, margin: "14px 0 6px", fontFamily: "Sora,sans-serif" }}>Официальные ссылки</div>
           {links.map((l) => <div key={l.label} onClick={() => { try { window.open(l.url, "_blank"); } catch (e) { } }} className="press" style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 0", borderTop: `1px solid ${T.line}`, cursor: "pointer" }}><span style={{ fontSize: 13, color: T.violet, fontWeight: 600, flex: 1 }}>{l.label}</span><Icon d={I.chevR} size={14} color={T.subd} /></div>)}
