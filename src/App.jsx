@@ -970,6 +970,84 @@ const VISA_INFO = {
   "Куба": { status: "Безвизово", days: 90, checked: CHECKED, summary: "Безвизовый въезд до 90 дней.", must: ["Загранпаспорт", "Медицинская страховка — обязательна", "Электронная форма D'Viajeros (за 72 часа до вылета)"], src: [{ label: "D'Viajeros", url: "https://dviajeros.mitrans.gob.cu" }] },
 };
 
+
+/* ============ ЕДИНАЯ КОНФИГУРАЦИЯ СТРАН (MVP: только туризм и частный визит) ============
+   entryMode  — что нужно для въезда: none | eta | evisa | voa | consular_visa | declaration
+   supportLevel — что приложение реально умеет для этой страны (честно, без обещаний):
+     information_only        — справка и требования
+     personalized_checklist  — персональный комплект под поездку
+     guided_form             — пошаговое заполнение формы
+     full_preparation        — форма + генерация комплекта
+   purposes — поддерживаемые подцели. Вопрос о подцели задаём ТОЛЬКО если их больше одной. */
+const TRIP_TYPE = "short_private_trip";
+const TRIP_TYPE_LABEL = "Туризм и частная поездка";
+const ENTRY_MODE_LABEL = {
+  none: "Виза не требуется", eta: "Электронное разрешение", evisa: "Электронная виза",
+  voa: "Виза по прибытии", consular_visa: "Консульская виза", declaration: "Въездная декларация",
+};
+// базовые пункты комплекта, общие для всех
+const BASE_ITEMS = [
+  { id: "passport_valid", name: "Проверить срок действия паспорта", kind: "check" },
+  { id: "return_ticket", name: "Обратный билет", kind: "check" },
+  { id: "stay_proof", name: "Подтверждение проживания", kind: "check" },
+];
+const CI = (entryMode, supportLevel, items, extra) => ({ tripType: TRIP_TYPE, entryMode, supportLevel, purposes: ["tourism"], defaultPurpose: "tourism", items: items || [], ...(extra || {}) });
+const COUNTRY_CFG = {
+  // --- пошаговый мастер есть ---
+  "Таиланд": CI("declaration", "guided_form", [{ id: "tdac", name: "Карта прибытия TDAC", kind: "form" }, ...BASE_ITEMS], { note: "TDAC открывается за 3 дня до прилёта — раньше заполнить нельзя." }),
+  "Индонезия": CI("voa", "guided_form", [{ id: "evisa_id", name: "Виза по прибытии (e-VOA)", kind: "form" }, { id: "ecd", name: "Декларация All Indonesia", kind: "external" }, ...BASE_ITEMS], { note: "Для Бали дополнительно оплачивается сбор Love Bali." }),
+  "Шри-Ланка": CI("eta", "guided_form", [{ id: "eta", name: "Разрешение ETA", kind: "form" }, ...BASE_ITEMS]),
+  "Мальдивы": CI("declaration", "guided_form", [{ id: "imuga", name: "Декларация IMUGA", kind: "form" }, ...BASE_ITEMS]),
+  "Япония": CI("consular_visa", "guided_form", [
+      { id: "jp_form", name: "Визовая анкета", kind: "form" },
+      { id: "jp_schedule", name: "Программа пребывания по дням", kind: "form" },
+      { id: "work_ref", name: "Справка с работы", kind: "request" },
+      { id: "bank_ref", name: "Выписка со счёта", kind: "request" },
+      { id: "photo", name: "Фото 45×45 мм", kind: "check" },
+      ...BASE_ITEMS],
+    { purposes: ["tourism", "private_visit"], note: "Документы принимают визовые центры VFS в Москве и Санкт-Петербурге. Консульский сбор не взимается." }),
+  // --- консульская виза, персональный комплект ---
+  "Европа (Шенген)": CI("consular_visa", "personalized_checklist", [
+      { id: "schengen", name: "Шенгенская анкета", kind: "external" },
+      { id: "work_ref", name: "Справка с работы", kind: "request" },
+      { id: "bank_ref", name: "Выписка со счёта за 3 месяца", kind: "request" },
+      { id: "ins", name: "Страховка от €30 000", kind: "external" },
+      { id: "photo", name: "Фото 35×45 мм", kind: "check" },
+      ...BASE_ITEMS],
+    { purposes: ["tourism", "private_visit"] }),
+  "Великобритания": CI("consular_visa", "personalized_checklist", [{ id: "uk_form", name: "Онлайн-анкета на gov.uk", kind: "external" }, { id: "work_ref", name: "Справка с работы", kind: "request" }, { id: "bank_ref", name: "Выписка за 6 месяцев", kind: "request" }, ...BASE_ITEMS], { purposes: ["tourism", "private_visit"] }),
+  "США": CI("consular_visa", "personalized_checklist", [{ id: "ds160", name: "Анкета DS-160", kind: "external" }, { id: "work_ref", name: "Справка с работы", kind: "request" }, { id: "bank_ref", name: "Выписка со счёта", kind: "request" }, { id: "photo", name: "Фото 5×5 см", kind: "check" }, ...BASE_ITEMS], { purposes: ["tourism", "private_visit"] }),
+  "Канада": CI("consular_visa", "personalized_checklist", [{ id: "imm5257", name: "Анкета IMM5257 (IRCC)", kind: "external" }, { id: "work_ref", name: "Справка с работы", kind: "request" }, { id: "bank_ref", name: "Выписка со счёта", kind: "request" }, ...BASE_ITEMS], { purposes: ["tourism", "private_visit"] }),
+  "Австралия": CI("consular_visa", "personalized_checklist", [{ id: "au_600", name: "Заявление subclass 600 (ImmiAccount)", kind: "external" }, { id: "work_ref", name: "Справка с работы", kind: "request" }, { id: "bank_ref", name: "Выписка со счёта", kind: "request" }, ...BASE_ITEMS], { purposes: ["tourism", "private_visit"] }),
+  "Кипр": CI("consular_visa", "personalized_checklist", [{ id: "cy_form", name: "Кипрская визовая анкета", kind: "external" }, { id: "work_ref", name: "Справка с работы", kind: "request" }, { id: "bank_ref", name: "Выписка со счёта", kind: "request" }, ...BASE_ITEMS], { purposes: ["tourism", "private_visit"] }),
+  "Фарерские острова": CI("consular_visa", "information_only", [{ id: "dk_faroe", name: "Датская виза с пометкой о Фарерах", kind: "external" }, ...BASE_ITEMS]),
+  "Северная Корея": CI("consular_visa", "information_only", [{ id: "kp_tour", name: "Оформление через туроператора", kind: "external" }, ...BASE_ITEMS]),
+  "Танзания (Занзибар)": CI("evisa", "personalized_checklist", [{ id: "tz_evisa", name: "e-Visa Танзании ($50)", kind: "external" }, { id: "tz_ins", name: "Страховка местного страховщика (Занзибар)", kind: "external" }, ...BASE_ITEMS]),
+  "Индия": CI("evisa", "personalized_checklist", [{ id: "in_evisa", name: "e-Visa Индии", kind: "external" }, { id: "photo", name: "Фото и скан паспорта", kind: "check" }, ...BASE_ITEMS]),
+  "Кувейт": CI("evisa", "personalized_checklist", [{ id: "kw_evisa", name: "e-Visa Кувейта", kind: "external" }, ...BASE_ITEMS]),
+  "Египет": CI("voa", "personalized_checklist", [{ id: "eg_visa", name: "Виза по прибытии или e-Visa", kind: "external" }, ...BASE_ITEMS], { note: "Для Шарм-эль-Шейха до 15 дней — бесплатный синайский штамп." }),
+  "Южная Корея": CI("eta", "personalized_checklist", [{ id: "keta", name: "Разрешение K-ETA", kind: "external" }, ...BASE_ITEMS]),
+  "Куба": CI("none", "personalized_checklist", [{ id: "cu_dviajeros", name: "Форма D'Viajeros", kind: "external" }, { id: "cu_ins", name: "Медицинская страховка (обязательна)", kind: "external" }, ...BASE_ITEMS]),
+  "Китай": CI("none", "personalized_checklist", [{ id: "cn_card", name: "Электронная въездная карта", kind: "external" }, ...BASE_ITEMS]),
+};
+// шенгенские страны наследуют конфигурацию Шенгена
+const SCHENGEN_LIST = ["Венгрия", "Греция", "Франция", "Испания", "Италия", "Австрия", "Хорватия", "Португалия", "Швейцария", "Германия", "Швеция", "Словения", "Словакия", "Дания", "Исландия"];
+for (const c of SCHENGEN_LIST) COUNTRY_CFG[c] = { ...COUNTRY_CFG["Европа (Шенген)"], schengenCountry: true };
+// безвизовые направления — базовый комплект
+for (const c of ["Таиланд", "Вьетнам", "ОАЭ", "Катар", "Саудовская Аравия", "Оман", "Бахрейн", "Турция", "ЮАР", "Грузия", "Армения", "Казахстан"]) {
+  if (!COUNTRY_CFG[c]) COUNTRY_CFG[c] = CI("none", "personalized_checklist", [...BASE_ITEMS]);
+}
+function countryCfg(country) {
+  return COUNTRY_CFG[country] || CI("none", "information_only", [...BASE_ITEMS]);
+}
+const SUPPORT_LABEL = {
+  information_only: { txt: "Справка и требования", col: "#8a90b8" },
+  personalized_checklist: { txt: "Персональный комплект", col: "#48dcdc" },
+  guided_form: { txt: "Пошаговое заполнение", col: "#39d98a" },
+  full_preparation: { txt: "Полная подготовка", col: "#39d98a" },
+};
+const PURPOSE_LABEL = { tourism: "Туризм", private_visit: "Посещение друзей или родственников" };
+
 /* ============ ДОКУМЕНТЫ, КОТОРЫЕ НУЖНО ЗАПРОСИТЬ (не заполнить) ============
    Справка с работы, выписка со счёта, спонсорское письмо: пользователю нужно знать не «какие поля»,
    а У КОГО запросить, ЧТО должно быть внутри и ПО КАКОМУ образцу. */
@@ -1134,11 +1212,52 @@ const FLD = {
   hostName:  { k: "hostName", label: "Имя принимающей стороны", en: "Host name", type: "text", req: true, when: { f: "accType", eq: "private" } },
   hostAddr:  { k: "hostAddr", label: "Адрес проживания", en: "Address", type: "text", req: true, when: { f: "accType", eq: "private" } },
   hostPhone: { k: "hostPhone", label: "Телефон принимающей стороны", en: "Host phone", type: "phone", when: { f: "accType", eq: "private" } },
-  purpose:   { k: "purpose", label: "Цель поездки", en: "Purpose of visit", type: "radio", opts: [["tourism", "Туризм"], ["business", "Бизнес"], ["family", "К родственникам"]], req: true },
+  purpose:   { k: "purpose", label: "Цель поездки", en: "Purpose of visit", type: "radio", opts: [["tourism", "Туризм"], ["private_visit", "К друзьям или родственникам"]], req: true },
+  // --- расширенный набор для консульских виз ---
+  birthPlace: { k: "birthPlace", label: "Место рождения (город, страна)", en: "Place of birth", type: "text", src: "profile.birthPlace", req: true },
+  homeAddr:  { k: "homeAddr", label: "Адрес проживания", en: "Current residential address", type: "text", src: "profile.homeAddr", req: true },
+  occupation:{ k: "occupation", label: "Профессия / должность", en: "Occupation", type: "text", src: "profile.occupation", req: true },
+  employer:  { k: "employer", label: "Место работы", en: "Employer name", type: "text", src: "profile.employer", req: true },
+  employerAddr: { k: "employerAddr", label: "Адрес и телефон работодателя", en: "Employer address and phone", type: "text", req: true },
+  income:    { k: "income", label: "Примерный доход в месяц", en: "Monthly income", type: "text", hint: "в рублях", req: true },
+  payer:     { k: "payer", label: "Кто оплачивает поездку", en: "Who covers the expenses", type: "radio", opts: [["self", "Я сам"], ["sponsor", "Спонсор"], ["host", "Принимающая сторона"]], req: true },
+  cities:    { k: "cities", label: "Города посещения", en: "Cities to visit", type: "text", hint: "через запятую", req: true },
+  itinerary: { k: "itinerary", label: "Маршрут по дням", en: "Daily schedule", type: "textarea", hint: "дата — город — что планируете", req: true },
+  prevVisa:  { k: "prevVisa", label: "Были ли раньше в этой стране?", en: "Previous visits", type: "radio", opts: [["no", "Нет"], ["yes", "Да"]], req: true },
+  prevVisaWhen: { k: "prevVisaWhen", label: "Когда были в последний раз", en: "Date of last visit", type: "text", when: { f: "prevVisa", eq: "yes" } },
+  prevRefusal: { k: "prevRefusal", label: "Были ли отказы во въезде?", en: "Previous refusals", type: "radio", opts: [["no", "Нет"], ["yes", "Да"]], req: true },
+  hostRel:   { k: "hostRel", label: "Кем приходится принимающая сторона", en: "Relationship to host", type: "text", req: true, when: { f: "purpose", eq: "private_visit" } },
+  hostFull:  { k: "hostFull", label: "ФИО принимающей стороны", en: "Host full name", type: "text", req: true, when: { f: "purpose", eq: "private_visit" } },
+  hostAddrJ: { k: "hostAddrJ", label: "Адрес принимающей стороны", en: "Host address", type: "text", req: true, when: { f: "purpose", eq: "private_visit" } },
+  hostPhoneJ:{ k: "hostPhoneJ", label: "Телефон принимающей стороны", en: "Host phone", type: "phone", req: true, when: { f: "purpose", eq: "private_visit" } },
 };
 const F = (k, over) => ({ ...FLD[k], ...(over || {}) });
 // шаги документов: на экране 3-6 связанных полей
 const DOC_CONFIGS = {
+  jp_form: {
+    title: "Виза в Японию — туристическая", country: "Япония", resultType: "filled_official_document",
+    officialUrl: "https://www.ru.emb-japan.go.jp", version: "2026-02",
+    steps: [
+      { id: "purpose", title: "Цель и параметры поездки", groups: [{ title: "Поездка", fields: [F("purpose"), F("arr"), F("dep")] }, { title: "Куда", fields: [F("cities")] }] },
+      { id: "personal", title: "Личные данные", groups: [{ title: "Как в загранпаспорте", fields: [F("surname"), F("given"), F("dob"), F("sex")] }, { title: "Рождение и адрес", fields: [F("birthPlace"), F("homeAddr")] }] },
+      { id: "passport", title: "Паспорт", groups: [{ title: "Документ", fields: [F("passport"), F("pexp"), F("nation")] }] },
+      { id: "flight", title: "Перелёт", groups: [{ title: "Рейс", fields: [F("flight")] }] },
+      { id: "stay", title: "Проживание", groups: [{ title: "Где остановитесь", fields: [F("accType"), F("hotelName"), F("hotelAddr"), F("hostName"), F("hostAddr")] }] },
+      { id: "work", title: "Работа и финансирование", groups: [{ title: "Занятость", fields: [F("occupation"), F("employer"), F("employerAddr")] }, { title: "Финансы", fields: [F("income"), F("payer")] }] },
+      { id: "host", title: "Принимающая сторона", groups: [{ title: "Кто принимает", fields: [F("hostFull"), F("hostRel"), F("hostAddrJ"), F("hostPhoneJ")] }] },
+      { id: "extra", title: "Дополнительные вопросы", groups: [{ title: "История поездок", fields: [F("prevVisa"), F("prevVisaWhen"), F("prevRefusal")] }, { title: "Программа", fields: [F("itinerary")] }] },
+      { id: "contacts", title: "Контакты", groups: [{ title: "Связь", fields: [F("email"), F("phone")] }] },
+    ],
+  },
+  jp_schedule: {
+    title: "Программа пребывания в Японии", country: "Япония", resultType: "filled_official_document",
+    officialUrl: "https://www.ru.emb-japan.go.jp", version: "2026-02",
+    steps: [
+      { id: "dates", title: "Даты и города", groups: [{ title: "Поездка", fields: [F("arr"), F("dep"), F("cities")] }] },
+      { id: "plan", title: "Маршрут по дням", groups: [{ title: "Что планируете", fields: [F("itinerary")] }] },
+      { id: "stay", title: "Проживание", groups: [{ title: "Где живёте", fields: [F("hotelName", { req: true, when: null }), F("hotelAddr", { req: true, when: null })] }] },
+    ],
+  },
   tdac: {
     title: "Thailand Digital Arrival Card", country: "Таиланд", resultType: "online_form_guide",
     officialUrl: "https://tdac.immigration.go.th", version: "2026-01",
@@ -1294,8 +1413,9 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
     <div style={{ fontSize: 13, color: T.subd, lineHeight: 1.5, padding: "4px 0 12px" }}>Мастер для этого документа появится позже. Пока воспользуйтесь официальным сайтом.</div>
   </Overlay>;
 
-  const steps = cfg.steps;
-  const step = steps[Math.min(stepIdx, steps.length - 1)];
+  // шаги, где нет ни одного видимого поля (напр. «Принимающая сторона» при туризме), пропускаем
+  const steps = cfg.steps.filter((st) => st.groups.some((g) => g.fields.some((f) => fieldVisible(f, ans))));
+  const step = steps[Math.min(stepIdx, Math.max(0, steps.length - 1))] || cfg.steps[0];
   const allVisible = visibleFields(cfg, ans);
   const reqAll = allVisible.filter((f) => f.req);
   const filledReq = reqAll.filter((f) => !validateField(f, ans[f.k]));
@@ -1342,6 +1462,8 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
       </div>
       {f.type === "radio"
         ? <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>{(f.opts || []).map(([ov, ol]) => <div key={ov} onClick={() => { setVal(f.k, ov); setTouched({ ...touched, [f.k]: true }); }} className="press" style={{ background: v === ov ? T.violet + "22" : T.card, border: `1px solid ${v === ov ? T.violet : T.line}`, borderRadius: 999, padding: "9px 14px", fontSize: 13, fontWeight: 700, color: v === ov ? T.violet : T.text, cursor: "pointer" }}>{ol}</div>)}</div>
+        : f.type === "textarea"
+        ? <textarea value={v} onFocus={() => setFocusF(f)} rows={4} onChange={(e) => { setVal(f.k, e.target.value); setTouched({ ...touched, [f.k]: true }); }} placeholder={f.en || ""} style={{ ...inputSt, borderColor: err ? "#ff6db088" : T.line2, resize: "vertical", minHeight: 84, lineHeight: 1.45 }} />
         : <input type={f.type === "date" ? "date" : f.type === "email" ? "email" : "text"} value={v} onFocus={() => setFocusF(f)}
             onChange={(e) => { const nv = f.type === "up" ? e.target.value.toUpperCase() : e.target.value; setVal(f.k, nv); setTouched({ ...touched, [f.k]: true }); }}
             placeholder={f.en || ""} style={{ ...inputSt, borderColor: err ? "#ff6db088" : T.line2 }} />}
@@ -2045,7 +2167,13 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
   useEffect(() => {
     if (preOpenDoc) { const dd = ALL_DOCS.find((x) => x.id === preOpenDoc); if (dd) setDoc({ ...dd, _fromTrip: true }); onPreDone && onPreDone(); }
   }, [preOpenDoc]);
-  const countries = Object.keys(DOC_MATRIX);
+  const [purpose, setPurpose] = useState("tourism");    // подцель: tourism | private_visit
+  const countries = Object.keys(VISA_INFO).filter((c) => c !== "Европа (Шенген)").sort((a, b) => a.localeCompare(b, "ru"));
+  const POPULAR_C = ["Япония", "Китай", "Таиланд", "Индонезия", "Европа (Шенген)", "ОАЭ"];
+  const cCfg = country ? countryCfg(country) : null;
+  const cVisa = country ? VISA_INFO[country] : null;
+  // поездка с этой страной — подтягиваем даты, чтобы не спрашивать заново
+  const linkedTrip = country ? (trips || []).find((t) => t.country === country) : null;
   const found = q.trim().length >= 2 ? ALL_DOCS.filter((x) => (x.name + " " + x.country + " " + (x.kw || "")).toLowerCase().includes(q.trim().toLowerCase())).slice(0, 6) : [];
   const popular = ["tdac", "evisa_id", "schengen", "eta"].map((id) => ALL_DOCS.find((x) => x.id === id)).filter(Boolean);
   const inputSt = { width: "100%", background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "11px 12px", color: T.text, fontSize: 14, outline: "none", boxSizing: "border-box", colorScheme: "dark" };
@@ -2074,7 +2202,33 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
     <Header />
     <div style={{ padding: "8px 20px 0" }}>
       {mode === "home" && <>
-        <div style={{ margin: "0 -20px 4px" }}><PageHero title="Документы" sub="Соберём комплект под поездку или поможем с одним документом" emoji="📄" /></div>
+        <div style={{ margin: "0 -20px 4px" }}><PageHero title="Документы" sub="Выберите страну — подскажем, что нужно оформить" emoji="📄" /></div>
+        {/* Главный сценарий: сначала страна */}
+        <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 17, color: T.text, marginBottom: 4 }}>Куда вы едете?</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}>
+          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .3, color: T.violet, background: T.violet + "18", border: `1px solid ${T.violet}44`, borderRadius: 999, padding: "4px 10px" }}>{TRIP_TYPE_LABEL.toUpperCase()}</span>
+          <span style={{ fontSize: 10.5, color: T.subd }}>другие типы поездок появятся позже</span>
+        </div>
+        <input value={cq} onChange={(e) => setCq(e.target.value)} placeholder="Поиск страны…" style={{ ...inputSt, marginBottom: 12 }} />
+        {!cq.trim() && <>
+          <div style={{ fontSize: 11.5, color: T.subd, fontWeight: 700, marginBottom: 8 }}>Популярные направления</div>
+          <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 16 }}>
+            {POPULAR_C.map((c) => <span key={c} onClick={() => { setCountry(c); setPurpose("tourism"); setMode("kit"); }} className="press" style={{ fontSize: 12.5, color: T.text, fontWeight: 700, background: T.card, border: `1px solid ${T.line}`, borderRadius: 999, padding: "8px 13px", cursor: "pointer" }}>{c}</span>)}
+          </div>
+        </>}
+        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 18 }}>
+          {countries.filter((c) => !cq.trim() || c.toLowerCase().includes(cq.trim().toLowerCase())).map((c) => {
+            const cf = countryCfg(c), vi = VISA_INFO[c] || {};
+            const sl = SUPPORT_LABEL[cf.supportLevel] || SUPPORT_LABEL.information_only;
+            return <div key={c} onClick={() => { setCountry(c); setPurpose("tourism"); setMode("kit"); }} className="press" style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: "11px 13px", cursor: "pointer" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: T.text }}>{c}</div>
+                <div style={{ fontSize: 11, color: T.subd, marginTop: 2 }}>{ENTRY_MODE_LABEL[cf.entryMode] || vi.status}{vi.days ? ` · до ${vi.days} дн.` : ""}</div>
+              </div>
+              <span style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 800, color: sl.col, background: sl.col + "1a", border: `1px solid ${sl.col}44`, borderRadius: 999, padding: "3px 8px" }}>{sl.txt}</span>
+            </div>;
+          })}
+        </div>
         {/* Сценарий 1: подбор комплекта */}
         <div style={{ background: T.card, border: `1.5px solid ${T.violet}55`, borderRadius: 18, padding: 14, marginBottom: 12 }}>
           <div style={{ display: "flex", gap: 11, alignItems: "center" }}>
@@ -2157,8 +2311,55 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
       </>}
       {mode === "kit" && country && <>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-          <div onClick={() => setMode("pick")} className="press" style={{ cursor: "pointer" }}><Icon d={I.back} size={20} color={T.text} /></div>
-          <div style={{ flex: 1 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.text }}>{country}</div><div style={{ fontSize: 11.5, color: T.subd }}>{adults} {plural(adults, "взрослый", "взрослых", "взрослых")}{kids ? " · с детьми" : ""}{df ? ` · вылет ${fmtShort(new Date(df))}` : ""}</div></div>
+          <div onClick={() => setMode("home")} className="press" style={{ cursor: "pointer" }}><Icon d={I.back} size={20} color={T.text} /></div>
+          <div style={{ flex: 1 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.text }}>{country}</div><div style={{ fontSize: 11.5, color: T.subd }}>{TRIP_TYPE_LABEL}{linkedTrip ? ` · поездка «${linkedTrip.title}»` : ""}</div></div>
+        </div>
+        {/* режим въезда + уровень поддержки */}
+        {(() => {
+          const sl = SUPPORT_LABEL[cCfg.supportLevel] || SUPPORT_LABEL.information_only;
+          const noVisa = cCfg.entryMode === "none";
+          return <div style={{ background: T.card, border: `1px solid ${noVisa ? T.green + "44" : T.violet + "44"}`, borderRadius: 16, padding: 14, margin: "12px 0 14px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: noVisa ? T.green : T.violet, background: (noVisa ? T.green : T.violet) + "1e", border: `1px solid ${(noVisa ? T.green : T.violet)}55`, borderRadius: 999, padding: "3px 10px" }}>{(ENTRY_MODE_LABEL[cCfg.entryMode] || "").toUpperCase()}</span>
+              <span style={{ fontSize: 9.5, fontWeight: 800, color: sl.col, background: sl.col + "1a", border: `1px solid ${sl.col}44`, borderRadius: 999, padding: "3px 8px", marginLeft: "auto" }}>{sl.txt}</span>
+            </div>
+            <div style={{ fontSize: 13, color: T.text, fontWeight: 600, lineHeight: 1.4 }}>
+              {noVisa ? "Виза для туристической поездки не требуется. Перед поездкой нужно:" : "Для вашей поездки потребуется:"}
+            </div>
+            <div style={{ marginTop: 9 }}>
+              {(cCfg.items || []).map((it, i) => <div key={it.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 6 }}>
+                <span style={{ fontSize: 11, color: T.subd, fontWeight: 700, minWidth: 14 }}>{i + 1}.</span>
+                <span style={{ fontSize: 12.5, color: T.sub, lineHeight: 1.4 }}>{it.name}</span>
+              </div>)}
+            </div>
+            {cCfg.note && <div style={{ fontSize: 11.5, color: T.subd, marginTop: 8, lineHeight: 1.45 }}>💡 {cCfg.note}</div>}
+            {cCfg.supportLevel === "information_only" && <div style={{ fontSize: 11.5, color: "#e0a53a", marginTop: 8, lineHeight: 1.45 }}>Для этой страны пока доступна только справка — заполнение форм в приложении не поддерживается.</div>}
+          </div>;
+        })()}
+        {/* подцель — только там, где влияет на комплект */}
+        {(cCfg.purposes || []).length > 1 && <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: T.subd, marginBottom: 8 }}>Какова основная цель поездки?</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {cCfg.purposes.map((p) => <div key={p} onClick={() => setPurpose(p)} className="press" style={{ background: purpose === p ? T.violet + "22" : T.card, border: `1px solid ${purpose === p ? T.violet : T.line}`, borderRadius: 999, padding: "9px 14px", cursor: "pointer", fontSize: 12.5, fontWeight: 700, color: purpose === p ? T.violet : T.text }}>{PURPOSE_LABEL[p]}</div>)}
+          </div>
+          {purpose === "private_visit" && <div style={{ fontSize: 11.5, color: T.subd, marginTop: 8, lineHeight: 1.45 }}>Понадобятся данные принимающей стороны: имя, адрес, телефон, характер отношений и кто оплачивает поездку.</div>}
+        </div>}
+        {/* персональный комплект со статусами */}
+        <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 15, color: T.text, marginBottom: 10 }}>Ваш комплект</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+          {(cCfg.items || []).map((it) => {
+            const mine = store.get("mydocs", []).find((d) => d.docKey === it.id);
+            const st = mine ? (mine.status === "ready" ? "ready" : "draft") : "todo";
+            const meta = st === "ready" ? { txt: "Готов", col: T.green, ic: "✓" } : st === "draft" ? { txt: "Заполняется", col: "#e0a53a", ic: "◐" } : { txt: it.kind === "request" ? "Запросить" : it.kind === "form" ? "Заполнить" : it.kind === "external" ? "На сайте" : "Проверить", col: T.subd, ic: "○" };
+            const canOpen = it.kind === "form" || it.kind === "request";
+            const dd = ALL_DOCS.find((x) => x.id === it.id);
+            return <div key={it.id} onClick={() => { if (canOpen && dd) { setResumeId(mine ? mine.id : null); setWiz(dd); } else if (canOpen) { setResumeId(mine ? mine.id : null); setWiz({ id: it.id, name: it.name, country }); } }} className={canOpen ? "press" : ""} style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${st === "ready" ? T.green + "44" : T.line}`, borderRadius: 14, padding: "11px 13px", cursor: canOpen ? "pointer" : "default" }}>
+              <span style={{ fontSize: 15, color: meta.col, width: 16, textAlign: "center", flexShrink: 0 }}>{meta.ic}</span>
+              <span style={{ flex: 1, fontSize: 13, color: T.text, fontWeight: 600 }}>{it.name}</span>
+              <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 700, color: meta.col }}>{meta.txt}</span>
+              {canOpen && <Icon d={I.chevR} size={15} color={T.subd} />}
+            </div>;
+          })}
         </div>
         <div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, margin: "12px 0 2px", fontFamily: "Sora,sans-serif" }}>Обязательно</div>
         {(() => {
