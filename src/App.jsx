@@ -43,6 +43,46 @@ const GRAD = {
   sunset: "linear-gradient(135deg,#3a1d6e,#b14a8a,#f0863a)", night: "linear-gradient(135deg,#141438,#3a2a7e,#5e4ad0)",
   violet: "linear-gradient(135deg,#7c5cff,#6d4dff)", cta: "linear-gradient(100deg,#7c5cff,#6d4dff 55%,#48b0ff)",
 };
+
+/* ======================== ГЛАВНАЯ: ВИЗУАЛЬНАЯ СИСТЕМА ========================
+   Эти токены применяются только к главной странице и общей нижней навигации.
+   Остальные экраны, API, аналитика и бизнес-логика не изменены. */
+const HOME_T = {
+  bg: "#020914",
+  bgDeep: "#010610",
+  surface: "#071323",
+  surface2: "#09182a",
+  surface3: "#0b1a2e",
+  border: "rgba(129,156,204,.18)",
+  borderStrong: "rgba(141,171,228,.34)",
+  text: "#f7f8fc",
+  sub: "#9aa3b8",
+  subDim: "#737e97",
+  violet: "#9364f5",
+  pink: "#d66cf1",
+  cyan: "#31c7f3",
+  gold: "#d7b46a",
+};
+
+/* Все пути к новой графике собраны здесь. Если файлы в репозитории названы иначе,
+   достаточно поправить только этот объект. */
+const HOME_ASSETS = {
+  hero: "/graphics/main.png",
+  documents: "/graphics/home/documents.png",
+  hotels: "/graphics/home/hotels.png",
+  services: "/graphics/home/services.png",
+  fullTrip: "/graphics/home/full-trip.png",
+  actionLocation: "/graphics/actions/action-location.png",
+  actionAi: "/graphics/actions/action-ai.png",
+  actionArrow: "/graphics/actions/action-arrow.png",
+  nav: {
+    home: "/graphics/nav/nav-home.png",
+    routes: "/graphics/nav/nav-trips.png",
+    hotels: "/graphics/nav/nav-hotels.png",
+    docs: "/graphics/nav/nav-documents.png",
+    profile: "/graphics/nav/nav-profile.png",
+  },
+};
 const GP = [GRAD.ocean, GRAD.city, GRAD.sunset, GRAD.night];
 const gradFor = (code) => GP[((code || "X").charCodeAt(0) + (code || "X").charCodeAt(1 || 0)) % GP.length];
 
@@ -223,7 +263,16 @@ function PageHero({ title, sub, emoji, grad = GRAD.night, bullets }) {
 }
 function Badge({ label, color = T.violet, icon }) { return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 999, background: color + "22", border: `1px solid ${color}55`, color, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>{icon && <span style={{ fontSize: 11 }}>{icon}</span>}{label}</span>; }
 function Btn({ children, onClick, grad = GRAD.cta, style }) { return <button onClick={onClick} className="press" style={{ border: "none", cursor: "pointer", color: "#fff", fontWeight: 700, fontFamily: "Sora,sans-serif", fontSize: 15, borderRadius: 16, padding: "16px 20px", width: "100%", background: grad, boxShadow: "0 10px 30px -8px rgba(124,92,255,.6)", ...style }}>{children}</button>; }
-function Logo() { return <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.text, letterSpacing: .2 }}>TripWise<span style={{ color: T.violet }}>AI</span></div>; }
+function UiImage({ src, alt = "", style, fallback = null }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return fallback;
+  return <img src={src} alt={alt} draggable={false} onError={() => setFailed(true)} style={{ display: "block", userSelect: "none", ...style }} />;
+}
+function Logo({ home = false }) {
+  return <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: home ? HOME_T.text : T.text, letterSpacing: .2 }}>
+    TripWise<span style={{ color: home ? HOME_T.cyan : T.violet }}>AI</span>
+  </div>;
+}
 function KidsPicker({ ages, onChange }) {
   const [adding, setAdding] = useState(false);
   return <div>
@@ -249,9 +298,44 @@ function Header({ onBack, title, subtitle, onEdit }) {
   </div>;
 }
 function BottomNav({ tab, setTab, bottomStr = "0px" }) {
-  const items = [["home", "Главная", I.home], ["routes", "Путешествия", I.route], ["hotels", "Отели", I.hotel], ["docs", "Документы", I.doc], ["profile", "Профиль", I.user]];
-  return <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 420, zIndex: 40, minHeight: 64, paddingBottom: `max(${bottomStr}, 12px)`, display: "flex", background: "rgba(10,10,24,.92)", backdropFilter: "blur(12px)", borderTop: `1px solid ${T.line}` }}>
-    {items.map(([k, label, ic]) => (<button key={k} onClick={() => { trackPage(YM_TAB_PATH[k] || "/" + k, YM_TAB_TITLE[k] || label); if (k === "hotels") trackGoal("hotels_opened"); else if (k === "docs") trackGoal("documents_opened"); setTab(k); }} className="press" style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, paddingTop: 8, color: tab === k ? T.violet : T.subd }}><Icon d={ic} size={22} color={tab === k ? T.violet : T.subd} /><span style={{ fontSize: 10, fontWeight: tab === k ? 700 : 500, whiteSpace: "nowrap" }}>{label}</span></button>))}
+  const items = [
+    ["home", "Главная", HOME_ASSETS.nav.home, I.home],
+    ["routes", "Путешествия", HOME_ASSETS.nav.routes, I.route],
+    ["hotels", "Отели", HOME_ASSETS.nav.hotels, I.hotel],
+    ["docs", "Документы", HOME_ASSETS.nav.docs, I.doc],
+    ["profile", "Профиль", HOME_ASSETS.nav.profile, I.user],
+  ];
+  return <div style={{
+    position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
+    width: "100%", maxWidth: 420, zIndex: 40, minHeight: 70,
+    padding: `6px 6px max(${bottomStr}, 10px)`, display: "flex",
+    background: "rgba(3,11,23,.96)", backdropFilter: "blur(16px)",
+    borderTop: `1px solid ${HOME_T.border}`,
+    boxShadow: "0 -14px 36px rgba(0,0,0,.22)"
+  }}>
+    {items.map(([k, label, src, fallbackIcon]) => {
+      const active = tab === k;
+      return <button key={k} onClick={() => {
+        trackPage(YM_TAB_PATH[k] || "/" + k, YM_TAB_TITLE[k] || label);
+        if (k === "hotels") trackGoal("hotels_opened");
+        else if (k === "docs") trackGoal("documents_opened");
+        setTab(k);
+      }} className="press" style={{
+        flex: 1, minWidth: 0, background: "none", border: "none", cursor: "pointer",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        gap: 2, padding: "2px 0 0", color: active ? HOME_T.pink : HOME_T.subDim
+      }}>
+        <div style={{ width: 36, height: 36, display: "grid", placeItems: "center", flexShrink: 0 }}>
+          <UiImage src={src} alt="" style={{
+            width: 34, height: 34, objectFit: "contain",
+            opacity: active ? 1 : .56,
+            filter: active ? "none" : "saturate(.62) brightness(.84)",
+            transition: "opacity .16s ease, filter .16s ease"
+          }} fallback={<Icon d={fallbackIcon} size={22} color={active ? HOME_T.pink : HOME_T.subDim} />} />
+        </div>
+        <span style={{ fontSize: 10, lineHeight: 1.1, fontWeight: active ? 700 : 500, whiteSpace: "nowrap" }}>{label}</span>
+      </button>;
+    })}
   </div>;
 }
 function Toast({ msg }) { if (!msg) return null; return <div style={{ position: "fixed", left: "50%", bottom: 86, transform: "translateX(-50%)", zIndex: 100, background: "#1c1c40", border: `1px solid ${T.line2}`, color: T.text, fontSize: 13, fontWeight: 600, padding: "10px 18px", borderRadius: 999, boxShadow: "0 8px 30px rgba(0,0,0,.5)", animation: "fadeUp .25s ease" }}>{msg}</div>; }
@@ -358,58 +442,131 @@ function SearchSheet({ form, setForm, onClose, onSubmit, setToast }) {
 
 /* ================================ Главная =============================== */
 function Home({ onSearch, onPickDest, goTab, openServices }) {
-  const tiles = [
-    ["Отели", "Промокоды\nи скидки", I.hotel, () => goTab("hotels")],
-    ["Документы", "Визы, чек-листы\nи помощь ИИ", I.doc, () => goTab("docs")],
-    ["Сервисы", "eSIM, страховка,\nбизнес-залы", I.bag, openServices],
+  const ideas = [
+    ["Бали", "через Сингапур", "/graphics/bali.png", "SIN", "bali"],
+    ["Токио", "через Сеул", "/graphics/tokyo.png", "ICN", "tokyo"],
+    ["Мальдивы", "через Дубай", "/graphics/male.png", "DXB", "maldives"],
+    ["Пхукет", "через Куала-Лумпур", "/graphics/phuket.png", "KUL", "phuket"],
   ];
-  const ideas = [["Бали", "через Сингапур", "20–40%", "/graphics/bali.png", "SIN", "bali"], ["Токио", "через Сеул", "30–50%", "/graphics/tokyo.png", "ICN", "tokyo"], ["Мальдивы", "через Дубай", "25–45%", "/graphics/male.png", "DXB", "maldives"], ["Пхукет", "через Куала-Лумпур", "20–40%", "/graphics/phuket.png", "KUL", "phuket"]];
-  return <div style={{ paddingBottom: 16, animation: "fadeUp .18s ease-out" }}>
-    <div style={{ padding: "18px 30px 0" }}>
-      <div style={{ display: "flex", gap: 12 }}>
-        <div style={{ flex: 1 }}><h1 style={{ fontFamily: "Sora,sans-serif", fontSize: 30, lineHeight: 1.08, margin: 0, fontWeight: 800, color: T.text }}>Куда<br />хочется<br /><span style={{ background: "linear-gradient(90deg,#48dcdc,#7c5cff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>отправиться?</span></h1><p style={{ color: T.sub, fontSize: 13, marginTop: 12, lineHeight: 1.4 }}>Найдём лучшие маршруты,<br />о которых вы не знали</p></div>
-<div
-  style={{
-    width: 170,
-    height: 150,
-    borderRadius: 22,
-    overflow: "hidden",
-    backgroundImage: "url('/graphics/main.png')",
-    backgroundSize: "contain",
-    backgroundPosition: "center center",
-    backgroundRepeat: "no-repeat"
-  }}
-/>
+
+  const ArrowAsset = ({ size = 38 }) => <UiImage
+    src={HOME_ASSETS.actionArrow}
+    alt=""
+    style={{ width: size, height: size, objectFit: "contain" }}
+    fallback={<div style={{ width: size, height: size, borderRadius: 12, background: HOME_T.surface3, border: `1px solid ${HOME_T.border}`, display: "grid", placeItems: "center" }}><Icon d={I.arrow} size={17} color={HOME_T.text} /></div>}
+  />;
+
+  return <div style={{ paddingBottom: 14, animation: "fadeUp .18s ease-out", color: HOME_T.text }}>
+    {/* HERO: исходная идея сохранена, арт лишь чуть компактнее и выше. */}
+    <div style={{ padding: "13px 18px 0" }}>
+      <div style={{ display: "flex", alignItems: "center", minHeight: 164, gap: 4 }}>
+        <div style={{ flex: "1 1 49%", minWidth: 0, position: "relative", zIndex: 2 }}>
+          <h1 style={{ fontFamily: "Sora,sans-serif", fontSize: 30, lineHeight: 1.08, margin: 0, fontWeight: 800, color: HOME_T.text, letterSpacing: "-.45px" }}>
+            Куда<br />хочется<br />
+            <span style={{ background: `linear-gradient(90deg,${HOME_T.pink},${HOME_T.violet} 48%,${HOME_T.cyan})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>отправиться?</span>
+          </h1>
+          <p style={{ color: HOME_T.sub, fontSize: 13, margin: "12px 0 0", lineHeight: 1.42 }}>Найдём лучшие маршруты,<br />о которых вы не знали</p>
+        </div>
+        <div style={{ flex: "1 1 51%", minWidth: 0, height: 160, display: "flex", alignItems: "center", justifyContent: "flex-end", transform: "translate(7px,-5px)" }}>
+          <UiImage src={HOME_ASSETS.hero} alt="Паспорт и билеты" style={{ width: "100%", maxWidth: 178, height: 158, objectFit: "contain", objectPosition: "center" }} />
+        </div>
       </div>
     </div>
-    <div style={{ padding: "18px 30px 0" }}>
-      <div onClick={onSearch} className="press" style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, padding: 14, cursor: "pointer", boxShadow: "0 8px 30px -12px rgba(124,92,255,.5)" }}>
-        <div style={{ width: 34, height: 34, borderRadius: 10, background: GRAD.violet, display: "grid", placeItems: "center" }}><Icon d={I.pin} size={18} color="#fff" /></div>
-        <span style={{ color: T.sub, flex: 1, fontSize: 15 }}>Выберите направление</span>
-        <div style={{ width: 38, height: 38, borderRadius: 12, background: GRAD.cta, display: "grid", placeItems: "center" }}><Icon d={I.spark} size={18} color="#fff" /></div>
+
+    {/* Поиск — основной CTA экрана. */}
+    <div style={{ padding: "11px 16px 0" }}>
+      <div style={{
+        padding: 1, borderRadius: 21,
+        background: `linear-gradient(100deg,rgba(214,108,241,.72),rgba(126,116,226,.28) 46%,rgba(49,199,243,.64))`,
+        boxShadow: "-12px 0 28px -23px rgba(214,108,241,.95), 12px 0 28px -23px rgba(49,199,243,.95)"
+      }}>
+        <div onClick={onSearch} className="press" style={{
+          minHeight: 58, display: "flex", alignItems: "center", gap: 11,
+          background: `linear-gradient(110deg,${HOME_T.surface2},${HOME_T.surface})`,
+          borderRadius: 20, padding: "7px 8px", cursor: "pointer",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,.025)"
+        }}>
+          <UiImage src={HOME_ASSETS.actionLocation} alt="" style={{ width: 44, height: 44, objectFit: "contain", flexShrink: 0 }} fallback={<div style={{ width: 44, height: 44, borderRadius: 13, background: HOME_T.surface3, display: "grid", placeItems: "center" }}><Icon d={I.pin} size={20} color={HOME_T.text} /></div>} />
+          <span style={{ color: HOME_T.sub, flex: 1, minWidth: 0, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Куда планируете поехать?</span>
+          <UiImage src={HOME_ASSETS.actionAi} alt="Подобрать маршрут" style={{ width: 46, height: 46, objectFit: "contain", flexShrink: 0 }} fallback={<div style={{ width: 46, height: 46, borderRadius: 14, background: HOME_T.surface3, display: "grid", placeItems: "center" }}><Icon d={I.spark} size={19} color={HOME_T.text} /></div>} />
+        </div>
       </div>
     </div>
-    {/* три продающие плитки-ярлыка (макет): ведут в разделы */}
-    <div style={{ padding: "16px 20px 0", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-      {tiles.map(([t, s, ic, go]) => (
-        <div key={t} onClick={go} className="press" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, padding: "14px 12px 12px", cursor: "pointer", display: "flex", flexDirection: "column", minHeight: 128 }}>
-          <div style={{ width: 42, height: 42, borderRadius: 13, background: T.violet + "1e", border: `1px solid ${T.violet}44`, display: "grid", placeItems: "center" }}><Icon d={ic} size={21} color={T.violet} /></div>
-          <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 14.5, marginTop: 10 }}>{t}</div>
-          <div style={{ fontSize: 10.5, color: T.subd, marginTop: 3, lineHeight: 1.25, whiteSpace: "pre-line", flex: 1 }}>{s}</div>
-          <div style={{ alignSelf: "flex-end", width: 28, height: 28, borderRadius: 999, background: "rgba(255,255,255,.06)", border: `1px solid ${T.line}`, display: "grid", placeItems: "center", marginTop: 8 }}><Icon d={I.arrow} size={13} color={T.sub} /></div>
-        </div>))}
-    </div>
-    <div style={{ padding: "24px 0 0 20px" }}>
-      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 17, marginBottom: 12 }}>Идеи для выгодных маршрутов ✨</div>
-      <div className="carousel" style={{ display: "flex", gap: 12, overflowX: "auto", paddingRight: 20, paddingBottom: 4, scrollSnapType: "x mandatory" }}>
-        {ideas.map(([name, via, save, g, code, id]) => (<div key={name} onClick={() => onPickDest(id)} className="press" style={{ minWidth: 160, cursor: "pointer", scrollSnapAlign: "start" }}><Porthole image={g} h={110} label={name} sub={via} codeRight={"→ " + code} style={{ borderRadius: 16 }} /><div style={{ marginTop: 8, fontSize: 11, color: T.subd }}>Скидка</div><div style={{ fontSize: 15, fontWeight: 800, color: T.green, fontFamily: "Sora,sans-serif" }}>{save}</div></div>))}
+
+    {/* Bento: документы приоритетнее, отели и сервисы — справа. */}
+    <div style={{ padding: "9px 16px 0", display: "grid", gridTemplateColumns: "minmax(0,.94fr) minmax(0,1.54fr)", gap: 8, height: 206 }}>
+      <div onClick={() => goTab("docs")} className="press" style={{
+        position: "relative", overflow: "hidden", cursor: "pointer",
+        background: `linear-gradient(155deg,${HOME_T.surface2},${HOME_T.surface})`,
+        border: `1px solid ${HOME_T.border}`, borderRadius: 18,
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,.025)"
+      }}>
+        <UiImage src={HOME_ASSETS.documents} alt="Документы" style={{ position: "absolute", left: -2, top: 3, width: "101%", height: 129, objectFit: "contain", objectPosition: "center top" }} />
+        <div style={{ position: "absolute", left: 13, right: 12, bottom: 12 }}>
+          <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: HOME_T.text, fontSize: 15 }}>Документы</div>
+          <div style={{ color: HOME_T.subDim, fontSize: 11, lineHeight: 1.35, marginTop: 3, paddingRight: 34 }}>Визы, чек-листы<br />и помощь ИИ</div>
+        </div>
+        <div style={{ position: "absolute", right: 9, bottom: 8 }}><ArrowAsset size={36} /></div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 8, minWidth: 0 }}>
+        <div onClick={() => goTab("hotels")} className="press" style={{
+          position: "relative", overflow: "hidden", cursor: "pointer",
+          display: "grid", gridTemplateColumns: "56% 44%", alignItems: "stretch",
+          background: `linear-gradient(140deg,${HOME_T.surface2},${HOME_T.surface})`,
+          border: `1px solid ${HOME_T.border}`, borderRadius: 18
+        }}>
+          <UiImage src={HOME_ASSETS.hotels} alt="Отели" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }} />
+          <div style={{ position: "relative", minWidth: 0, padding: "14px 9px 9px 3px" }}>
+            <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: HOME_T.text, fontSize: 15 }}>Отели</div>
+            <div style={{ color: HOME_T.subDim, fontSize: 10.8, lineHeight: 1.28, marginTop: 3 }}>Промокоды<br />и скидки</div>
+            <div style={{ position: "absolute", right: 7, bottom: 6 }}><ArrowAsset size={34} /></div>
+          </div>
+        </div>
+
+        <div onClick={openServices} className="press" style={{
+          position: "relative", overflow: "hidden", cursor: "pointer",
+          display: "grid", gridTemplateColumns: "56% 44%", alignItems: "stretch",
+          background: `linear-gradient(140deg,${HOME_T.surface2},${HOME_T.surface})`,
+          border: `1px solid ${HOME_T.border}`, borderRadius: 18
+        }}>
+          <UiImage src={HOME_ASSETS.services} alt="Сервисы" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }} />
+          <div style={{ position: "relative", minWidth: 0, padding: "13px 7px 8px 3px" }}>
+            <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: HOME_T.text, fontSize: 15 }}>Сервисы</div>
+            <div style={{ color: HOME_T.subDim, fontSize: 10.5, lineHeight: 1.26, marginTop: 3 }}>Бизнес-залы,<br />eSIM, страховка</div>
+            <div style={{ position: "absolute", right: 7, bottom: 6 }}><ArrowAsset size={34} /></div>
+          </div>
+        </div>
       </div>
     </div>
-    {/* тизер комплексного ведения поездки -> «Путешествия» */}
-    <div style={{ padding: "15px 20px 0" }}>
-      <div onClick={() => goTab("routes")} className="press" style={{ display: "flex", alignItems: "center", gap: 14, background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, padding: 16, cursor: "pointer" }}>
-        <div style={{ flex: 1 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>Подготовьте поездку целиком</div><div style={{ color: T.subd, fontSize: 12, marginTop: 4, lineHeight: 1.35 }}>TripWise поможет с визой, документами, скидками на отели и напомнит о важных датах.</div></div>
-        <div style={{ width: 42, height: 42, borderRadius: 12, background: GRAD.cta, display: "grid", placeItems: "center", flexShrink: 0 }}><Icon d={I.arrow} size={18} color="#fff" /></div>
+
+    {/* Статичные карточки в обычной горизонтальной карусели: без скидок и прогрессбара. */}
+    <div style={{ padding: "10px 16px 0" }}>
+      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: HOME_T.text, fontSize: 16, margin: "0 0 8px 4px" }}>Идеи для выгодных маршрутов ✨</div>
+      <div className="carousel" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2, scrollSnapType: "x proximity" }}>
+        {ideas.map(([name, via, image, code, id]) => <div key={name} onClick={() => onPickDest(id)} className="press" style={{
+          flex: "0 0 calc((100% - 16px)/3)", minWidth: 116, cursor: "pointer", scrollSnapAlign: "start"
+        }}>
+          <Porthole image={image} h={111} label={name} sub={via} codeRight={"→ " + code} style={{ borderRadius: 15, border: `1px solid ${HOME_T.border}`, boxShadow: "inset 0 0 34px rgba(0,0,0,.22)" }} />
+        </div>)}
+      </div>
+    </div>
+
+    {/* Комплексная поездка: иллюстрация слева, текст по центру, действие справа. */}
+    <div style={{ padding: "9px 16px 0" }}>
+      <div onClick={() => goTab("routes")} className="press" style={{
+        minHeight: 104, display: "grid", gridTemplateColumns: "37% minmax(0,1fr) 40px",
+        alignItems: "center", gap: 7, overflow: "hidden", cursor: "pointer",
+        background: `linear-gradient(120deg,${HOME_T.surface2},${HOME_T.surface})`,
+        border: `1px solid ${HOME_T.borderStrong}`, borderRadius: 18,
+        padding: "7px 8px 7px 5px"
+      }}>
+        <UiImage src={HOME_ASSETS.fullTrip} alt="Подготовка поездки" style={{ width: "100%", height: 92, objectFit: "contain", objectPosition: "center" }} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: HOME_T.text, fontSize: 14.5, lineHeight: 1.12 }}>Подготовьте<br />поездку целиком</div>
+          <div style={{ color: HOME_T.subDim, fontSize: 10.5, lineHeight: 1.3, marginTop: 5 }}>TripWise поможет с визой, документами, билетами и полезными сервисами.</div>
+        </div>
+        <div style={{ display: "grid", placeItems: "center" }}><ArrowAsset size={38} /></div>
       </div>
     </div>
   </div>;
@@ -2851,9 +3008,12 @@ export default function App() {
       input,select,textarea{font-size:16px}
       html,body{touch-action:pan-y;background:#0a0a18}
       .app-root{height:100vh;height:100dvh}
+      @media(max-width:370px){
+        .home-compact-title{font-size:27px!important}
+      }
     `}</style>
-    <div className="app-root" style={{ width: "100%", maxWidth: 420, paddingTop: safeTop, background: `radial-gradient(120% 60% at 80% 0%, #1a1340 0%, ${T.bg} 55%)`, color: T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", top: inset.logoTop != null ? inset.logoTop + "px" : "calc(env(safe-area-inset-top, 0px) + 14px)", zIndex: 30, pointerEvents: "none" }}><Logo /></div>
+    <div className="app-root" style={{ width: "100%", maxWidth: 420, paddingTop: safeTop, background: tab === "home" ? `radial-gradient(105% 54% at 78% 0%, #0d1830 0%, ${HOME_T.bg} 48%, ${HOME_T.bgDeep} 100%)` : `radial-gradient(120% 60% at 80% 0%, #1a1340 0%, ${T.bg} 55%)`, color: tab === "home" ? HOME_T.text : T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", top: inset.logoTop != null ? inset.logoTop + "px" : "calc(env(safe-area-inset-top, 0px) + 14px)", zIndex: 30, pointerEvents: "none" }}><Logo home={tab === "home"} /></div>
       <div style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", background: "transparent", paddingTop: 10, paddingBottom: 92 }}>{main}</div>
       {!kb && <BottomNav tab={tab} setTab={(k) => { if (k === tab && (k === "routes" || k === "profile" || k === "hotels" || k === "docs")) setStack([]); if (k === "routes" && tab === "routes") setStack([]); setTab(k); }} bottomStr={inset.bottomStr} />}
       {sheet && <SearchSheet form={form} setForm={setForm} onClose={() => setSheet(false)} onSubmit={() => runSearch()} setToast={setToast} />}
