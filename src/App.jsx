@@ -50,11 +50,11 @@ const GRAD = {
 const HOME_T = {
   bg: "#020914",
   bgDeep: "#010610",
-  surface: "#071323",
-  surface2: "#09182a",
-  surface3: "#0b1a2e",
-  border: "rgba(129,156,204,.18)",
-  borderStrong: "rgba(141,171,228,.34)",
+  surface: "#061321",
+  surface2: "#091a2c",
+  surface3: "#0d1d32",
+  border: "rgba(129,156,204,.22)",
+  borderStrong: "rgba(141,171,228,.38)",
   text: "#f7f8fc",
   sub: "#9aa3b8",
   subDim: "#737e97",
@@ -307,11 +307,11 @@ function BottomNav({ tab, setTab, bottomStr = "0px" }) {
   ];
   return <div style={{
     position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
-    width: "100%", maxWidth: 420, zIndex: 40, minHeight: 70,
-    padding: `6px 6px max(${bottomStr}, 10px)`, display: "flex",
-    background: "rgba(3,11,23,.96)", backdropFilter: "blur(16px)",
+    width: "100%", maxWidth: 420, zIndex: 40, minHeight: 82,
+    padding: `8px 7px max(${bottomStr}, 12px)`, display: "flex",
+    background: "rgba(3,11,23,.97)", backdropFilter: "blur(18px)",
     borderTop: `1px solid ${HOME_T.border}`,
-    boxShadow: "0 -14px 36px rgba(0,0,0,.22)"
+    boxShadow: "0 -10px 28px rgba(0,0,0,.18)"
   }}>
     {items.map(([k, label, src, fallbackIcon]) => {
       const active = tab === k;
@@ -323,17 +323,17 @@ function BottomNav({ tab, setTab, bottomStr = "0px" }) {
       }} className="press" style={{
         flex: 1, minWidth: 0, background: "none", border: "none", cursor: "pointer",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        gap: 2, padding: "2px 0 0", color: active ? HOME_T.pink : HOME_T.subDim
+        gap: 4, padding: "1px 0 0", color: active ? HOME_T.pink : HOME_T.subDim
       }}>
-        <div style={{ width: 36, height: 36, display: "grid", placeItems: "center", flexShrink: 0 }}>
+        <div style={{ width: 42, height: 42, display: "grid", placeItems: "center", flexShrink: 0 }}>
           <UiImage src={src} alt="" style={{
-            width: 34, height: 34, objectFit: "contain",
-            opacity: active ? 1 : .56,
-            filter: active ? "none" : "saturate(.62) brightness(.84)",
+            width: 38, height: 38, objectFit: "contain",
+            opacity: active ? 1 : .7,
+            filter: active ? "none" : "saturate(.72) brightness(.9)",
             transition: "opacity .16s ease, filter .16s ease"
-          }} fallback={<Icon d={fallbackIcon} size={22} color={active ? HOME_T.pink : HOME_T.subDim} />} />
+          }} fallback={<Icon d={fallbackIcon} size={24} color={active ? HOME_T.pink : HOME_T.subDim} />} />
         </div>
-        <span style={{ fontSize: 10, lineHeight: 1.1, fontWeight: active ? 700 : 500, whiteSpace: "nowrap" }}>{label}</span>
+        <span style={{ fontSize: 11, lineHeight: 1.05, fontWeight: active ? 700 : 500, whiteSpace: "nowrap" }}>{label}</span>
       </button>;
     })}
   </div>;
@@ -456,29 +456,46 @@ function Home({ onSearch, onPickDest, goTab, openServices }) {
     fallback={<div style={{ width: size, height: size, borderRadius: 12, background: HOME_T.surface3, border: `1px solid ${HOME_T.border}`, display: "grid", placeItems: "center" }}><Icon d={I.arrow} size={17} color={HOME_T.text} /></div>}
   />;
 
-  return <div style={{ paddingBottom: 14, animation: "fadeUp .18s ease-out", color: HOME_T.text }}>
-    {/* HERO: исходная идея сохранена, арт лишь чуть компактнее и выше. */}
+  const IdeaCard = ({ name, via, image, code, id }) => <div
+    onClick={() => onPickDest(id)}
+    className="press"
+    style={{
+      position: "relative", flex: "0 0 calc((100% - 16px)/3)", minWidth: 116,
+      height: 111, overflow: "hidden", cursor: "pointer", scrollSnapAlign: "start",
+      borderRadius: 15, border: `1px solid ${HOME_T.border}`,
+      backgroundImage: `url(${image})`, backgroundSize: "cover", backgroundPosition: "center",
+      boxShadow: "inset 0 0 34px rgba(0,0,0,.18)"
+    }}
+  >
+    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg,rgba(1,6,16,.02) 35%,rgba(1,6,16,.42) 62%,rgba(1,6,16,.94) 100%)" }} />
+    <div style={{ position: "absolute", left: 10, right: 10, bottom: 8, minWidth: 0 }}>
+      <div style={{ color: "#fff", fontFamily: "Sora,sans-serif", fontWeight: 700, fontSize: 14.5, lineHeight: 1.1, textShadow: "0 1px 8px rgba(0,0,0,.55)" }}>{name}</div>
+      <div style={{ color: "rgba(255,255,255,.84)", fontSize: 10.5, lineHeight: 1.2, marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textShadow: "0 1px 6px rgba(0,0,0,.6)" }}>{via} → {code}</div>
+    </div>
+  </div>;
+
+  return <div style={{ paddingBottom: 16, animation: "fadeUp .18s ease-out", color: HOME_T.text }}>
+    {/* HERO: композиция не меняется; нижняя зона PNG слегка обрезается, чтобы не тянуть встроенное свечение. */}
     <div style={{ padding: "13px 18px 0" }}>
       <div style={{ display: "flex", alignItems: "center", minHeight: 164, gap: 4 }}>
         <div style={{ flex: "1 1 49%", minWidth: 0, position: "relative", zIndex: 2 }}>
-          <h1 style={{ fontFamily: "Sora,sans-serif", fontSize: 30, lineHeight: 1.08, margin: 0, fontWeight: 800, color: HOME_T.text, letterSpacing: "-.45px" }}>
+          <h1 className="home-compact-title" style={{ fontFamily: "Sora,sans-serif", fontSize: 30, lineHeight: 1.08, margin: 0, fontWeight: 800, color: HOME_T.text, letterSpacing: "-.45px" }}>
             Куда<br />хочется<br />
             <span style={{ background: `linear-gradient(90deg,${HOME_T.pink},${HOME_T.violet} 48%,${HOME_T.cyan})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>отправиться?</span>
           </h1>
           <p style={{ color: HOME_T.sub, fontSize: 13, margin: "12px 0 0", lineHeight: 1.42 }}>Найдём лучшие маршруты,<br />о которых вы не знали</p>
         </div>
-        <div style={{ flex: "1 1 51%", minWidth: 0, height: 160, display: "flex", alignItems: "center", justifyContent: "flex-end", transform: "translate(7px,-5px)" }}>
-          <UiImage src={HOME_ASSETS.hero} alt="Паспорт и билеты" style={{ width: "100%", maxWidth: 178, height: 158, objectFit: "contain", objectPosition: "center" }} />
+        <div style={{ flex: "1 1 51%", minWidth: 0, height: 160, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "flex-end", transform: "translate(7px,-5px)" }}>
+          <UiImage src={HOME_ASSETS.hero} alt="Паспорт и билеты" style={{ width: "100%", maxWidth: 178, height: 166, objectFit: "contain", objectPosition: "center", transform: "translateY(-5px)", clipPath: "inset(0 0 7% 0)" }} />
         </div>
       </div>
     </div>
 
-    {/* Поиск — основной CTA экрана. */}
+    {/* Поиск — главный CTA, но без неонового ореола вокруг рамки. */}
     <div style={{ padding: "11px 16px 0" }}>
       <div style={{
         padding: 1, borderRadius: 21,
-        background: `linear-gradient(100deg,rgba(214,108,241,.72),rgba(126,116,226,.28) 46%,rgba(49,199,243,.64))`,
-        boxShadow: "-12px 0 28px -23px rgba(214,108,241,.95), 12px 0 28px -23px rgba(49,199,243,.95)"
+        background: `linear-gradient(100deg,rgba(214,108,241,.54),rgba(126,116,226,.24) 46%,rgba(49,199,243,.52))`
       }}>
         <div onClick={onSearch} className="press" style={{
           minHeight: 58, display: "flex", alignItems: "center", gap: 11,
@@ -487,24 +504,24 @@ function Home({ onSearch, onPickDest, goTab, openServices }) {
           boxShadow: "inset 0 1px 0 rgba(255,255,255,.025)"
         }}>
           <UiImage src={HOME_ASSETS.actionLocation} alt="" style={{ width: 44, height: 44, objectFit: "contain", flexShrink: 0 }} fallback={<div style={{ width: 44, height: 44, borderRadius: 13, background: HOME_T.surface3, display: "grid", placeItems: "center" }}><Icon d={I.pin} size={20} color={HOME_T.text} /></div>} />
-          <span style={{ color: HOME_T.sub, flex: 1, minWidth: 0, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Куда планируете поехать?</span>
+          <span style={{ color: "#aeb6ca", flex: 1, minWidth: 0, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Куда планируете поехать?</span>
           <UiImage src={HOME_ASSETS.actionAi} alt="Подобрать маршрут" style={{ width: 46, height: 46, objectFit: "contain", flexShrink: 0 }} fallback={<div style={{ width: 46, height: 46, borderRadius: 14, background: HOME_T.surface3, display: "grid", placeItems: "center" }}><Icon d={I.spark} size={19} color={HOME_T.text} /></div>} />
         </div>
       </div>
     </div>
 
-    {/* Bento: документы приоритетнее, отели и сервисы — справа. */}
-    <div style={{ padding: "9px 16px 0", display: "grid", gridTemplateColumns: "minmax(0,.94fr) minmax(0,1.54fr)", gap: 8, height: 206 }}>
+    {/* Bento: размеры артов и стрелок сохранены, текстовые зоны уплотнены. */}
+    <div style={{ padding: "9px 16px 0", display: "grid", gridTemplateColumns: "minmax(0,.94fr) minmax(0,1.54fr)", gap: 8, height: 210 }}>
       <div onClick={() => goTab("docs")} className="press" style={{
         position: "relative", overflow: "hidden", cursor: "pointer",
         background: `linear-gradient(155deg,${HOME_T.surface2},${HOME_T.surface})`,
         border: `1px solid ${HOME_T.border}`, borderRadius: 18,
         boxShadow: "inset 0 1px 0 rgba(255,255,255,.025)"
       }}>
-        <UiImage src={HOME_ASSETS.documents} alt="Документы" style={{ position: "absolute", left: -2, top: 3, width: "101%", height: 129, objectFit: "contain", objectPosition: "center top" }} />
-        <div style={{ position: "absolute", left: 13, right: 12, bottom: 12 }}>
+        <UiImage src={HOME_ASSETS.documents} alt="Документы" style={{ position: "absolute", left: -2, top: 1, width: "101%", height: 129, objectFit: "contain", objectPosition: "center top" }} />
+        <div style={{ position: "absolute", left: 13, right: 10, bottom: 11 }}>
           <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: HOME_T.text, fontSize: 15 }}>Документы</div>
-          <div style={{ color: HOME_T.subDim, fontSize: 11, lineHeight: 1.35, marginTop: 3, paddingRight: 34 }}>Визы, чек-листы<br />и помощь ИИ</div>
+          <div style={{ color: HOME_T.subDim, fontSize: 10.6, lineHeight: 1.23, marginTop: 3, paddingRight: 38 }}>Визы, чек-листы и помощь ИИ</div>
         </div>
         <div style={{ position: "absolute", right: 9, bottom: 8 }}><ArrowAsset size={36} /></div>
       </div>
@@ -512,66 +529,61 @@ function Home({ onSearch, onPickDest, goTab, openServices }) {
       <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 8, minWidth: 0 }}>
         <div onClick={() => goTab("hotels")} className="press" style={{
           position: "relative", overflow: "hidden", cursor: "pointer",
-          display: "grid", gridTemplateColumns: "56% 44%", alignItems: "stretch",
+          display: "grid", gridTemplateColumns: "55% 45%", alignItems: "stretch",
           background: `linear-gradient(140deg,${HOME_T.surface2},${HOME_T.surface})`,
           border: `1px solid ${HOME_T.border}`, borderRadius: 18
         }}>
           <UiImage src={HOME_ASSETS.hotels} alt="Отели" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }} />
-          <div style={{ position: "relative", minWidth: 0, padding: "14px 9px 9px 3px" }}>
-            <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: HOME_T.text, fontSize: 15 }}>Отели</div>
-            <div style={{ color: HOME_T.subDim, fontSize: 10.8, lineHeight: 1.28, marginTop: 3 }}>Промокоды<br />и скидки</div>
+          <div style={{ position: "relative", minWidth: 0, padding: "13px 8px 8px 2px" }}>
+            <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: HOME_T.text, fontSize: 14.8, lineHeight: 1.08 }}>Отели</div>
+            <div style={{ color: HOME_T.subDim, fontSize: 10.4, lineHeight: 1.22, marginTop: 4, maxWidth: 72 }}>Промокоды и скидки</div>
             <div style={{ position: "absolute", right: 7, bottom: 6 }}><ArrowAsset size={34} /></div>
           </div>
         </div>
 
         <div onClick={openServices} className="press" style={{
           position: "relative", overflow: "hidden", cursor: "pointer",
-          display: "grid", gridTemplateColumns: "56% 44%", alignItems: "stretch",
+          display: "grid", gridTemplateColumns: "55% 45%", alignItems: "stretch",
           background: `linear-gradient(140deg,${HOME_T.surface2},${HOME_T.surface})`,
           border: `1px solid ${HOME_T.border}`, borderRadius: 18
         }}>
           <UiImage src={HOME_ASSETS.services} alt="Сервисы" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }} />
-          <div style={{ position: "relative", minWidth: 0, padding: "13px 7px 8px 3px" }}>
-            <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: HOME_T.text, fontSize: 15 }}>Сервисы</div>
-            <div style={{ color: HOME_T.subDim, fontSize: 10.5, lineHeight: 1.26, marginTop: 3 }}>Бизнес-залы,<br />eSIM, страховка</div>
+          <div style={{ position: "relative", minWidth: 0, padding: "12px 7px 8px 2px" }}>
+            <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: HOME_T.text, fontSize: 14.8, lineHeight: 1.08 }}>Сервисы</div>
+            <div style={{ color: HOME_T.subDim, fontSize: 10.1, lineHeight: 1.2, marginTop: 4, maxWidth: 76 }}>Бизнес-залы, eSIM и страховка</div>
             <div style={{ position: "absolute", right: 7, bottom: 6 }}><ArrowAsset size={34} /></div>
           </div>
         </div>
       </div>
     </div>
 
-    {/* Статичные карточки в обычной горизонтальной карусели: без скидок и прогрессбара. */}
-    <div style={{ padding: "10px 16px 0" }}>
-      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: HOME_T.text, fontSize: 16, margin: "0 0 8px 4px" }}>Идеи для выгодных маршрутов ✨</div>
+    {/* Обычная горизонтальная карусель: один текстовый ряд маршрута без наложений. */}
+    <div style={{ padding: "12px 16px 0" }}>
+      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: HOME_T.text, fontSize: 16, margin: "0 0 9px 4px" }}>Идеи для выгодных маршрутов ✨</div>
       <div className="carousel" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2, scrollSnapType: "x proximity" }}>
-        {ideas.map(([name, via, image, code, id]) => <div key={name} onClick={() => onPickDest(id)} className="press" style={{
-          flex: "0 0 calc((100% - 16px)/3)", minWidth: 116, cursor: "pointer", scrollSnapAlign: "start"
-        }}>
-          <Porthole image={image} h={111} label={name} sub={via} codeRight={"→ " + code} style={{ borderRadius: 15, border: `1px solid ${HOME_T.border}`, boxShadow: "inset 0 0 34px rgba(0,0,0,.22)" }} />
-        </div>)}
+        {ideas.map(([name, via, image, code, id]) => <IdeaCard key={name} name={name} via={via} image={image} code={code} id={id} />)}
       </div>
     </div>
 
-    {/* Комплексная поездка: иллюстрация слева, текст по центру, действие справа. */}
+    {/* Баннер ниже и плотнее; CTA-стрелка крупнее стрелок внутри bento. */}
     <div style={{ padding: "9px 16px 0" }}>
       <div onClick={() => goTab("routes")} className="press" style={{
-        minHeight: 104, display: "grid", gridTemplateColumns: "37% minmax(0,1fr) 40px",
+        minHeight: 88, display: "grid", gridTemplateColumns: "35% minmax(0,1fr) 48px",
         alignItems: "center", gap: 7, overflow: "hidden", cursor: "pointer",
         background: `linear-gradient(120deg,${HOME_T.surface2},${HOME_T.surface})`,
         border: `1px solid ${HOME_T.borderStrong}`, borderRadius: 18,
-        padding: "7px 8px 7px 5px"
+        padding: "4px 8px 4px 5px"
       }}>
-        <UiImage src={HOME_ASSETS.fullTrip} alt="Подготовка поездки" style={{ width: "100%", height: 92, objectFit: "contain", objectPosition: "center" }} />
+        <UiImage src={HOME_ASSETS.fullTrip} alt="Подготовка поездки" style={{ width: "100%", height: 82, objectFit: "contain", objectPosition: "center" }} />
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: HOME_T.text, fontSize: 14.5, lineHeight: 1.12 }}>Подготовьте<br />поездку целиком</div>
-          <div style={{ color: HOME_T.subDim, fontSize: 10.5, lineHeight: 1.3, marginTop: 5 }}>TripWise поможет с визой, документами, билетами и полезными сервисами.</div>
+          <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: HOME_T.text, fontSize: 14.2, lineHeight: 1.1 }}>Подготовьте<br />поездку целиком</div>
+          <div style={{ color: HOME_T.subDim, fontSize: 10.5, lineHeight: 1.24, marginTop: 5 }}>Документы, билеты и полезные сервисы</div>
         </div>
-        <div style={{ display: "grid", placeItems: "center" }}><ArrowAsset size={38} /></div>
+        <div style={{ display: "grid", placeItems: "center" }}><ArrowAsset size={46} /></div>
       </div>
     </div>
   </div>;
 }
-
 /* ================================ Результаты ============================ */
 function Skeleton() { return <div style={{ height: 150, borderRadius: 18, background: "linear-gradient(90deg,#14142e,#1a1a3a,#14142e)", backgroundSize: "200% 100%", animation: "sh 1.3s infinite" }} />; }
 function RouteCard({ r, onOpen, liked, onLike, i }) {
@@ -3014,7 +3026,7 @@ export default function App() {
     `}</style>
     <div className="app-root" style={{ width: "100%", maxWidth: 420, paddingTop: safeTop, background: tab === "home" ? `radial-gradient(105% 54% at 78% 0%, #0d1830 0%, ${HOME_T.bg} 48%, ${HOME_T.bgDeep} 100%)` : `radial-gradient(120% 60% at 80% 0%, #1a1340 0%, ${T.bg} 55%)`, color: tab === "home" ? HOME_T.text : T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", top: inset.logoTop != null ? inset.logoTop + "px" : "calc(env(safe-area-inset-top, 0px) + 14px)", zIndex: 30, pointerEvents: "none" }}><Logo home={tab === "home"} /></div>
-      <div style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", background: "transparent", paddingTop: 10, paddingBottom: 92 }}>{main}</div>
+      <div style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", background: "transparent", paddingTop: 10, paddingBottom: 108 }}>{main}</div>
       {!kb && <BottomNav tab={tab} setTab={(k) => { if (k === tab && (k === "routes" || k === "profile" || k === "hotels" || k === "docs")) setStack([]); if (k === "routes" && tab === "routes") setStack([]); setTab(k); }} bottomStr={inset.bottomStr} />}
       {sheet && <SearchSheet form={form} setForm={setForm} onClose={() => setSheet(false)} onSubmit={() => runSearch()} setToast={setToast} />}
       {traveler && <Traveler safeTop={safeTop} bottomStr={inset.bottomStr} onBack={() => setTraveler(false)} />}
