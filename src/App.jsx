@@ -180,15 +180,32 @@ async function apiSearch(req) {
 }
 // синхронизация поездки и настроек уведомлений на сервер (для пуш-напоминаний)
 function tgInitData() { try { return (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) || ""; } catch (e) { return ""; } }
-function syncTripToServer(trip) {
-  const initData = tgInitData(); if (!initData || !trip) return;
-  // шлём только то, что нужно для напоминаний (без лишних персональных данных)
-  const slim = { id: trip.id, title: trip.title, country: trip.country, dc: trip.dc, df: trip.df, dt: trip.dt, notify: !!trip.notify, checks: trip.checks || {}, route: trip.route ? { stopover: trip.route.stopover || null } : null };
-  fetch(API_BASE + "?action=save-trip", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData, trip: slim }) }).catch((e) => console.warn("[TripWiseAI] save-trip failed", e));
+async function sharedApi(action, payload = {}) {
+  const initData = tgInitData();
+  if (!initData) return { ok: false, error: "telegram required" };
+  try {
+    const r = await fetch(API_BASE + "?action=" + encodeURIComponent(action), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, initData }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok && d.ok !== true) return { ok: false, error: d.error || ("HTTP " + r.status) };
+    return d;
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 }
-function deleteTripOnServer(tripId) {
-  const initData = tgInitData(); if (!initData || !tripId) return;
-  fetch(API_BASE + "?action=delete-trip", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData, tripId }) }).catch((e) => console.warn("[TripWiseAI] delete-trip failed", e));
+function stripServerFields(trip) {
+  if (!trip) return trip;
+  const { members, askGroup, creatorId, shareCode, schemaVersion, updatedAt, _viewer, ...core } = trip;
+  return core;
+}
+async function syncTripToServer(trip) {
+  if (!trip) return { ok: false };
+  const d = await sharedApi("save-trip", { trip: stripServerFields(trip) });
+  if (!d.ok) console.warn("[TripWiseAI] save-trip failed", d.error);
+  return d;
+}
+async function deleteTripOnServer(tripId) {
+  if (!tripId) return { ok: false };
+  const d = await sharedApi("delete-trip", { tripId });
+  if (!d.ok) console.warn("[TripWiseAI] delete-trip failed", d.error);
+  return d;
 }
 function syncNotifyPrefs(prefs) {
   const initData = tgInitData(); if (!initData) return;
@@ -1778,34 +1795,43 @@ function docStatus(doc, df) {
 const ST_COLOR = { early: null, now: null, urgent: "#f59640", late: "#ff6db0", info: null };
 // прогресс: билеты + жильё + документы + ДОБАВЛЕННЫЕ услуги (опциональные считаются после добавления)
 function tripProgress(t) {
-  const b = tripBlocks(t);
+  const b = tripBlocks(t), checks = t.checks || {}, docChecks = checks.docs || {}, svcChecks = checks.services || {};
   const docs = b.docs ? tripDocs(t) : [];
   const items = [];
-  if (b.tickets) items.push(["tickets", t.checks.tickets]);
+  if (b.tickets) items.push(["tickets", !!checks.tickets]);
   if (b.lodging && !t.lodgingOff) {
-    items.push(["lodgeMain", t.checks.lodgeMain]);
-    if (t.route && t.route.stopover) items.push(["lodgeStop", t.checks.lodgeStop]);
+    items.push(["lodgeMain", !!checks.lodgeMain]);
+    if (t.route && t.route.stopover) items.push(["lodgeStop", !!checks.lodgeStop]);
   }
   for (const c of (t.custom || [])) items.push(["c:" + c.id, !!c.done]);
-  for (const d of docs) items.push(["doc:" + d.id, !!t.checks.docs[d.id]]);
-  for (const id of (t.servicesAdded || [])) items.push(["svc:" + id, !!t.checks.services[id]]);
+  for (const x of (t.transport || [])) items.push(["transport:" + x.id, !!x.done]);
+  for (const x of (t.activities || [])) items.push(["activity:" + x.id, !!x.done]);
+  for (const d of docs) items.push(["doc:" + d.id, !!docChecks[d.id]]);
+  for (const id of (t.servicesAdded || [])) items.push(["svc:" + id, !!svcChecks[id]]);
   const done = items.filter(([, v]) => v).length;
   return { done, total: items.length, pct: items.length ? Math.round(done / items.length * 100) : 0 };
 }
-// «следующее действие»: всегда ровно одно, по приоритету
+// «следующее действие»: одно конкретное действие, согласованное с readiness
 function nextAction(t) {
-  const b = tripBlocks(t);
+  const b = tripBlocks(t), checks = t.checks || {}, docChecks = checks.docs || {}, svcChecks = checks.services || {};
   const docs = b.docs ? tripDocs(t) : [], d = daysTo(t.df);
-  if (b.tickets && !t.route) return { block: "tickets", title: "Найдите билеты", sub: t.dcName ? `${t.dcName} · ваши даты` : "на ваши даты", btn: "Найти", act: "search", tone: T.violet };
-  const un = docs.filter((x) => !t.checks.docs[x.id]);
+  const hasFlight = !!t.route || (t.manualFlights || []).length > 0;
+  if (b.tickets && !hasFlight) return { block: "tickets", title: "Добавьте билеты", sub: t.dcName ? `${t.dcName} · ваши даты` : "на ваши даты", btn: "Найти", act: "search", tone: T.violet };
+  const un = docs.filter((x) => !docChecks[x.id]);
   const stOf = (x) => docStatus(x, t.df);
   const urgent = un.find((x) => ["urgent", "late"].includes(stOf(x).key));
-  if (urgent) return { block: "docs", title: `Срочно: ${urgent.name}`, sub: `вылет через ${d} дн.`, btn: "К документам", act: "docs", tone: "#f59640" };
-  if (b.tickets && t.route && !t.checks.tickets) return { block: "tickets", title: "Купите билеты", sub: "маршрут выбран — цены меняются", btn: "К билетам", act: "tickets", tone: T.violet };
+  if (urgent) return { block: "docs", title: `Срочно: ${urgent.name}`, sub: d != null ? `вылет через ${d} дн.` : "проверьте срок оформления", btn: "К документам", act: "docs", tone: "#f59640" };
+  if (b.tickets && hasFlight && !checks.tickets) return { block: "tickets", title: "Подтвердите покупку билетов", sub: "рейс уже в плане", btn: "К билетам", act: "tickets", tone: T.violet };
   const now = un.filter((x) => stOf(x).key === "now").sort((a, b) => (b.P || 0) - (a.P || 0))[0];
-  if (now) return { block: "docs", title: `Пора: ${now.name}`, sub: now.P ? `оформляется ${now.P} дн. · вылет через ${d} дн.` : `вылет через ${d} дн.`, btn: "К документам", act: "docs", tone: T.violet };
-  if (b.lodging && !t.lodgingOff && (!t.checks.lodgeMain || (t.route && t.route.stopover && !t.checks.lodgeStop))) return { block: "lodging", title: "Подберите жильё со скидкой", sub: "промокоды уже внутри", btn: "К отелям", act: "hotels", tone: T.violet };
-  const sun = (t.servicesAdded || []).find((id) => !t.checks.services[id]);
+  if (now) return { block: "docs", title: `Пора: ${now.name}`, sub: now.P ? `оформляется ${now.P} дн.${d != null ? ` · вылет через ${d} дн.` : ""}` : (d != null ? `вылет через ${d} дн.` : "можно оформить сейчас"), btn: "К документам", act: "docs", tone: T.violet };
+  if (b.lodging && !t.lodgingOff && (!checks.lodgeMain || (t.route && t.route.stopover && !checks.lodgeStop))) return { block: "lodging", title: "Подтвердите жильё", sub: "закройте все ночёвки поездки", btn: "К отелям", act: "hotels", tone: T.violet };
+  const transport = (t.transport || []).find((x) => !x.done);
+  if (transport) return { block: "transport", title: `Транспорт: ${transport.name}`, sub: "ещё не подтверждено", btn: null, act: null, tone: T.cyan };
+  const activity = (t.activities || []).find((x) => !x.done);
+  if (activity) return { block: "activities", title: `Решите: ${activity.name}`, sub: "активность ещё не подтверждена", btn: null, act: null, tone: T.cyan };
+  const custom = (t.custom || []).find((x) => !x.done);
+  if (custom) return { block: "prep", title: custom.name, sub: "осталось сделать перед поездкой", btn: null, act: null, tone: T.cyan };
+  const sun = (t.servicesAdded || []).find((id) => !svcChecks[id]);
   if (sun) { const s = EXTRA_SERVICES.find((x) => x.id === sun); return { block: "services", title: `Оформите: ${s ? s.title : sun}`, sub: "добавлено в план поездки", btn: "К услугам", act: "services", tone: T.cyan }; }
   const early = un.map((x) => ({ x, s: stOf(x) })).find((e) => e.s.key === "early");
   if (early) return { block: "docs", title: "Пока всё по плану", sub: `${early.x.name} — ${early.s.label}`, btn: null, act: null, tone: T.green };
@@ -1841,6 +1867,176 @@ function TripCard({ t, onOpen, soonest }) {
       <span style={{ fontSize: 12.5, fontWeight: 700, color: act.tone || T.violet, flex: 1 }}>{act.title}</span>
       {act.btn && <Icon d={I.arrow} size={14} color={act.tone || T.violet} />}
     </div>
+  </div>;
+}
+
+function sharedRouteSegments(route) {
+  const out = [];
+  const add = (arr) => { if (Array.isArray(arr)) for (const s of arr) if (s && s.mode !== "ferry") out.push(s); };
+  if (!route) return out;
+  add(route.segments);
+  if (route.outbound) add(route.outbound.segments);
+  if (route.return) add(route.return.segments);
+  if (route.returnRoute) add(route.returnRoute.segments);
+  return out;
+}
+function memberInitials(m) {
+  const n = String((m && (m.displayName || [m.firstName, m.lastName].filter(Boolean).join(" "))) || "?").trim();
+  return n.split(/\s+/).slice(0,2).map((x)=>x[0]).join("").toUpperCase() || "?";
+}
+function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTrip, onFindTickets, goHotels, goDocs, setToast, onReplaceTrip, bottomStr = "0px" }) {
+  const p = tripProgress(t), d = daysTo(t.df), act = nextAction(t), bOn = tripBlocks(t);
+  const docs = bOn.docs ? tripDocs(t) : [];
+  const isCreator = t._viewer ? !!t._viewer.isCreator : true;
+  const members = (t.members && t.members.length) ? t.members : [{ id:"local", displayName:"Вы" }];
+  const meId = t._viewer && String(t._viewer.id || "");
+  const [mode, setMode] = useState(initialBlk === "group" ? "group" : "trip");
+  const [open, setOpen] = useState(() => ({ tickets: initialBlk === "tickets", lodging: initialBlk === "lodging", transport:false, activities:false, docs: initialBlk === "docs", prep: initialBlk === "extras" }));
+  const [peopleOpen, setPeopleOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState(t.title || "");
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [askOpen, setAskOpen] = useState(false);
+  const [askTitle, setAskTitle] = useState("");
+  const [askDesc, setAskDesc] = useState("");
+  const [askOptions, setAskOptions] = useState(["Да", "Нет"]);
+  const [addSec, setAddSec] = useState(null);
+  const [addText, setAddText] = useState("");
+  const [flightOpen, setFlightOpen] = useState(false);
+  const [flightNo, setFlightNo] = useState("");
+  const [flightDate, setFlightDate] = useState(t.df || "");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatText, setChatText] = useState("");
+  const [chatBusy, setChatBusy] = useState(false);
+  const [messages, setMessages] = useState([{ role:"assistant", text:`Я знаю план «${t.title}». Спроси, что уже готово, что осталось сделать или что происходит дальше.` }]);
+  const upd = (fn) => { if (!isCreator) { setToast("Основной план меняет создатель поездки"); return; } onUpdate(t.id, fn); };
+  const replace = (trip) => { if (trip) onReplaceTrip(trip); };
+  const planeSegs = [...sharedRouteSegments(t.route), ...(t.manualFlights || [])];
+  const lodgeTotal = bOn.lodging && !t.lodgingOff ? 1 + (t.route && t.route.stopover ? 1 : 0) : 0;
+  const lodgeDone = lodgeTotal ? (t.checks.lodgeMain ? 1 : 0) + (t.route && t.route.stopover && t.checks.lodgeStop ? 1 : 0) : 0;
+  const docsDone = docs.filter((x)=>t.checks.docs && t.checks.docs[x.id]).length;
+  const prepItems = [
+    ...(t.servicesAdded || []).map((id)=>({ id:"svc:"+id, name:(EXTRA_SERVICES.find((x)=>x.id===id)||{}).title || id, done:!!(t.checks.services && t.checks.services[id]), kind:"svc", raw:id })),
+    ...(t.custom || []).map((x)=>({ id:"custom:"+x.id, name:x.name, done:!!x.done, kind:"custom", raw:x.id }))
+  ];
+  const toggleArr = (key,id) => upd((x)=>({ ...x, [key]:(x[key]||[]).map((y)=>y.id===id?{...y,done:!y.done}:y) }));
+  const addArr = () => { const v=addText.trim(); if(!v||!addSec)return; upd((x)=>({ ...x, [addSec]:[...(x[addSec]||[]),{id:addSec[0]+Date.now(),name:v,done:false}] })); setAddText(""); setAddSec(null); };
+  const toggleDoc = (id) => upd((x)=>({ ...x, checks:{...x.checks,docs:{...(x.checks&&x.checks.docs||{}),[id]:!(x.checks&&x.checks.docs&&x.checks.docs[id])}} }));
+  const togglePrep = (it) => {
+    if (it.kind === "svc") upd((x)=>({ ...x, checks:{...x.checks,services:{...(x.checks&&x.checks.services||{}),[it.raw]:!(x.checks&&x.checks.services&&x.checks.services[it.raw])}} }));
+    else upd((x)=>({ ...x, custom:(x.custom||[]).map((y)=>y.id===it.raw?{...y,done:!y.done}:y) }));
+  };
+  const invite = async () => {
+    if (!isCreator) return;
+    setInviteOpen(true); setInviteUrl("");
+    const r = await sharedApi("invite-trip", { tripId:t.id });
+    if (r.ok) setInviteUrl(r.url || ""); else setToast(r.error === "telegram required" ? "Откройте TripWise в Telegram для приглашения" : "Не удалось создать приглашение");
+  };
+  const shareInvite = () => {
+    if (!inviteUrl) return;
+    const text = `Присоединяйся к поездке «${t.title}» в TripWiseAI`;
+    const tg = typeof window!=="undefined" && window.Telegram && window.Telegram.WebApp;
+    const url=`https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
+    try { if(tg&&tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url,"_blank"); } catch(e) { navigator.clipboard && navigator.clipboard.writeText(inviteUrl); setToast("Ссылка скопирована"); }
+  };
+  const removeMember = async (m) => {
+    const r = await sharedApi("remove-member", { tripId:t.id, memberId:m.id });
+    if (r.ok && r.trip) { replace(r.trip); setToast(r.inviteRotated ? "Участник удалён · старая ссылка отозвана" : "Участник удалён"); } else setToast("Не удалось удалить участника");
+  };
+  const leaveTrip = async () => {
+    const r = await sharedApi("leave-trip", { tripId:t.id });
+    if (r.ok) { setSettingsOpen(false); setPeopleOpen(false); onLeaveTrip && onLeaveTrip(t.id); setToast("Вы вышли из поездки"); }
+    else setToast("Не удалось выйти из поездки");
+  };
+  const saveTitle = () => {
+    const title = renameValue.trim(); if (!title) { setToast("Название не может быть пустым"); return; }
+    upd((x)=>({ ...x, title:title.slice(0,80) })); setSettingsOpen(false); setToast("Название обновлено");
+  };
+  const createAsk = async () => {
+    const opts=askOptions.map((x)=>x.trim()).filter(Boolean); if(!askTitle.trim()||opts.length<2){setToast("Добавьте вопрос и минимум 2 варианта");return;}
+    const r=await sharedApi("ask-group-create",{tripId:t.id,title:askTitle,description:askDesc,options:opts});
+    if(r.ok&&r.trip){replace(r.trip);setAskOpen(false);setAskTitle("");setAskDesc("");setAskOptions(["Да","Нет"]);setToast("Вопрос отправлен группе");} else setToast("Не удалось создать Ask Group");
+  };
+  const vote = async (poll, optionId) => {
+    const r=await sharedApi("ask-group-vote",{tripId:t.id,pollId:poll.id,optionId}); if(r.ok&&r.trip) replace(r.trip); else setToast("Голос не сохранён");
+  };
+  const resolvePoll = async (poll, optionId) => {
+    const r=await sharedApi("ask-group-resolve",{tripId:t.id,pollId:poll.id,optionId}); if(r.ok&&r.trip){replace(r.trip);setToast("Решение зафиксировано");} else setToast("Не удалось зафиксировать решение");
+  };
+  const addFlight = async () => {
+    const no=flightNo.trim().toUpperCase(); if(!no){setToast("Введите номер рейса");return;}
+    const r=await sharedApi("flight-info",{tripId:t.id,flightNumber:no,date:flightDate});
+    const f=(r&&r.flight)||{flightNumber:no,date:flightDate};
+    upd((x)=>({ ...x, manualFlights:[...(x.manualFlights||[]),{id:"mf"+Date.now(),...f,date:flightDate,done:true}] }));
+    setFlightOpen(false);setFlightNo("");setToast(r&&r.found?"Рейс найден в маршруте":"Рейс добавлен; тип самолёта пока уточняется");
+  };
+  const askAI = async (q) => {
+    const text=String(q||chatText).trim(); if(!text||chatBusy)return;
+    setChatOpen(true);setChatText("");setMessages((m)=>[...m,{role:"user",text}]);setChatBusy(true);
+    const r=await sharedApi("trip-ai",{tripId:t.id,question:text});
+    setMessages((m)=>[...m,{role:"assistant",text:r.ok&&r.answer?r.answer:"Не смог получить ответ. Проверьте, что TripWise открыт внутри Telegram."}]);setChatBusy(false);
+  };
+  const quick = d != null && d <= 2 ? ["Что сегодня?","Во сколько выезжать?","Покажи мой рейс"] : d != null && d <= 14 ? ["Что ещё не готово?","Что взять с собой?","Проверь маршрут"] : ["Что ещё не готово?","Проверь маршрут","Что нужно решить группой?"];
+  const SectionHead = ({ k, icon, title, sub, done, total, action }) => <div onClick={()=>setOpen((x)=>({...x,[k]:!x[k]}))} className="press" style={{display:"flex",alignItems:"center",gap:10,padding:"13px 2px",cursor:"pointer",borderTop:`1px solid ${T.line}`}}>
+    <div style={{width:34,height:34,borderRadius:11,background:T.card2,display:"grid",placeItems:"center",fontSize:17}}>{icon}</div>
+    <div style={{flex:1,minWidth:0}}><div style={{fontSize:13.5,fontWeight:800,color:T.text,fontFamily:"Sora,sans-serif"}}>{title}</div><div style={{fontSize:10.8,color:T.subd,marginTop:2}}>{sub}</div></div>
+    {total>0 && <span style={{fontSize:10.5,fontWeight:800,color:done===total?T.green:T.subd}}>{done}/{total}</span>}
+    {action && isCreator && <span onClick={(e)=>{e.stopPropagation();action();}} className="press" style={{color:T.violet,fontSize:18,padding:"2px 4px"}}>＋</span>}
+    <span style={{transform:open[k]?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-flex"}}><Icon d={I.chevR} size={14} color={T.subd}/></span>
+  </div>;
+  const Empty = ({ children }) => <div style={{padding:"4px 0 13px 44px",fontSize:11.5,color:T.subd}}>{children}</div>;
+  return <div style={{animation:"slideIn .18s ease-out",padding:"12px 20px 150px"}}>
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+      <div onClick={onBack} className="press" style={{width:34,height:34,borderRadius:11,border:`1px solid ${T.line}`,display:"grid",placeItems:"center",cursor:"pointer"}}><Icon d={I.back} size={16} color={T.text}/></div>
+      <div style={{flex:1}} />
+      <div onClick={()=>setPeopleOpen(true)} className="press" style={{display:"flex",alignItems:"center",cursor:"pointer"}}>
+        {members.slice(0,4).map((m,i)=><div key={m.id||i} style={{width:30,height:30,borderRadius:999,marginLeft:i?-7:0,border:`2px solid ${T.bg}`,background:gradFor((m.displayName||"X").slice(0,2)),display:"grid",placeItems:"center",fontSize:9.5,fontWeight:800,color:"#fff",overflow:"hidden"}}>{m.photoUrl?<img src={m.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:memberInitials(m)}</div>)}
+      </div>
+      {isCreator && <div onClick={invite} className="press" style={{height:30,borderRadius:999,border:`1px solid ${T.violet}66`,background:T.violet+"1e",padding:"0 10px",display:"grid",placeItems:"center",color:T.violet,fontSize:12,fontWeight:800,cursor:"pointer"}}>＋ Invite</div>}
+      <div onClick={()=>{setRenameValue(t.title||"");setSettingsOpen(true);}} className="press" style={{width:30,height:30,borderRadius:999,border:`1px solid ${T.line}`,display:"grid",placeItems:"center",color:T.subd,fontSize:18,cursor:"pointer"}}>⋯</div>
+    </div>
+    <div style={{position:"relative",borderRadius:22,overflow:"hidden",background:gradFor(t.dc),padding:16,minHeight:116,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+      <div style={{position:"absolute",inset:0,background:"linear-gradient(transparent,rgba(5,5,20,.78))"}}/>
+      <div style={{position:"relative"}}><div style={{fontFamily:"Sora,sans-serif",fontWeight:800,fontSize:20,color:"#fff"}}>{t.title}</div><div style={{fontSize:12,color:"rgba(255,255,255,.84)",marginTop:3}}>{[t.dcName,t.country].filter(Boolean).join(", ")}{t.df?` · ${fmtShort(new Date(t.df))}`:""}{t.dt?` — ${fmtShort(new Date(t.dt))}`:""}{d!=null?` · через ${d} дн.`:""}</div></div>
+    </div>
+    <div style={{display:"flex",background:T.card,border:`1px solid ${T.line}`,borderRadius:13,padding:4,margin:"12px 0"}}>{[["trip","Trip"],["group","Ask Group"]].map(([k,l])=><div key={k} onClick={()=>setMode(k)} className="press" style={{flex:1,textAlign:"center",padding:"9px 8px",borderRadius:10,background:mode===k?T.violet+"25":"transparent",color:mode===k?T.text:T.subd,fontSize:12.5,fontWeight:800,cursor:"pointer"}}>{l}{k==="group"&&(t.askGroup||[]).filter((x)=>x.status==="open").length>0?` · ${(t.askGroup||[]).filter((x)=>x.status==="open").length}`:""}</div>)}</div>
+    {mode === "trip" ? <>
+      <div style={{background:"linear-gradient(135deg,rgba(124,92,255,.18),rgba(72,220,220,.08))",border:`1px solid ${T.violet}55`,borderRadius:18,padding:15,marginBottom:10}}>
+        <div style={{display:"flex",alignItems:"flex-end",gap:8}}><div style={{fontFamily:"Sora,sans-serif",fontSize:30,fontWeight:800,color:T.text,lineHeight:1}}>{p.pct}%</div><div style={{fontSize:12,fontWeight:800,color:p.pct===100?T.green:T.violet,paddingBottom:2}}>ready</div><div style={{flex:1}}/><div style={{fontSize:11,color:T.subd}}>{p.total-p.done} {plural(p.total-p.done,"действие","действия","действий")} осталось</div></div>
+        <div style={{height:9,borderRadius:999,background:"rgba(255,255,255,.08)",marginTop:12,overflow:"hidden"}}><div style={{height:"100%",width:p.pct+"%",borderRadius:999,background:GRAD.cta,transition:"width .25s"}}/></div>
+        <div style={{fontSize:11.5,color:T.sub,marginTop:10}}>{p.pct===100?"Поездка готова. Можно ехать.":act.title+" — "+act.sub}</div>
+      </div>
+      <div style={{background:T.card,border:`1px solid ${T.line}`,borderRadius:18,padding:"0 12px",marginBottom:10}}>
+        <SectionHead k="tickets" icon="✈️" title="Билеты" sub={planeSegs.length?`${planeSegs.length} ${plural(planeSegs.length,"рейс","рейса","рейсов")}${t.checks.tickets?" · куплены":" · требуют подтверждения"}`:"Рейсы ещё не добавлены"} done={t.checks.tickets?1:0} total={1} action={()=>setFlightOpen(true)}/>
+        {open.tickets && <div style={{padding:"0 0 12px 44px"}}>{planeSegs.length?planeSegs.map((s,i)=><div key={s.id||i} style={{background:T.card2,border:`1px solid ${T.line}`,borderRadius:12,padding:10,marginBottom:7}}><div style={{display:"flex",gap:8,alignItems:"center"}}><div style={{fontSize:13,fontWeight:800,color:T.text,flex:1}}>{s.flightNumber||"Рейс"} · {s.fromCode||"?"} → {s.toCode||"?"}</div><span style={{fontSize:10.5,color:T.subd}}>{s.date||s.departISO&&String(s.departISO).slice(0,10)||""}</span></div><div style={{fontSize:11,color:T.subd,marginTop:4}}>{s.departTime||s.departISO&&String(s.departISO).slice(11,16)||""}{s.durationMin?` · ${Math.floor(s.durationMin/60)}ч ${s.durationMin%60}м`:""} · Самолёт: {s.aircraft||"уточняется"}</div></div>):<Empty>Добавьте номер рейса или сначала найдите маршрут.</Empty>}{isCreator&&<div style={{display:"flex",gap:8}}>{!t.route&&<div onClick={()=>onFindTickets(t)} className="press" style={{fontSize:11.5,fontWeight:800,color:T.violet,cursor:"pointer"}}>Найти билеты</div>}<div onClick={()=>upd((x)=>({...x,checks:{...x.checks,tickets:!x.checks.tickets}}))} className="press" style={{fontSize:11.5,fontWeight:800,color:t.checks.tickets?T.green:T.subd,cursor:"pointer"}}>{t.checks.tickets?"✓ Билеты куплены":"Отметить билеты купленными"}</div></div>}</div>}
+        <SectionHead k="lodging" icon="🏠" title="Жильё" sub={lodgeTotal?`${lodgeDone} из ${lodgeTotal} подтверждено`:"Жильё ещё не добавлено"} done={lodgeDone} total={lodgeTotal}/>
+        {open.lodging && <div style={{padding:"0 0 12px 44px"}}>{bOn.lodging&&!t.lodgingOff?<><div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0"}}><Check on={!!t.checks.lodgeMain} onClick={()=>upd((x)=>({...x,checks:{...x.checks,lodgeMain:!x.checks.lodgeMain}}))}/><span style={{fontSize:12,color:T.text,flex:1}}>{t.dcName||"Основное жильё"}</span></div>{t.route&&t.route.stopover&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0"}}><Check on={!!t.checks.lodgeStop} onClick={()=>upd((x)=>({...x,checks:{...x.checks,lodgeStop:!x.checks.lodgeStop}}))}/><span style={{fontSize:12,color:T.text,flex:1}}>{t.route.stopover.city} · {t.route.stopover.nights} ноч.</span></div>}<div onClick={goHotels} className="press" style={{fontSize:11.5,fontWeight:800,color:T.violet,cursor:"pointer",marginTop:5}}>Подобрать жильё</div></>:<Empty>Раздел жилья не включён.</Empty>}</div>}
+        <SectionHead k="transport" icon="🚗" title="Транспорт" sub={(t.transport||[]).length?`${(t.transport||[]).filter((x)=>x.done).length} из ${(t.transport||[]).length} готово`:"Машина, паром, трансферы"} done={(t.transport||[]).filter((x)=>x.done).length} total={(t.transport||[]).length} action={()=>{setAddSec("transport");setAddText("");}}/>
+        {open.transport && <div style={{padding:"0 0 12px 44px"}}>{(t.transport||[]).length?(t.transport||[]).map((x)=><div key={x.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0"}}><Check on={!!x.done} onClick={()=>toggleArr("transport",x.id)}/><span style={{fontSize:12,color:T.text,flex:1}}>{x.name}</span></div>):<Empty>Добавьте аренду авто, паром или трансфер.</Empty>}</div>}
+        <SectionHead k="activities" icon="🍽️" title="Активности" sub={(t.activities||[]).length?`${(t.activities||[]).filter((x)=>x.done).length} из ${(t.activities||[]).length} подтверждено`:"Рестораны, места и активности"} done={(t.activities||[]).filter((x)=>x.done).length} total={(t.activities||[]).length} action={()=>{setAddSec("activities");setAddText("");}}/>
+        {open.activities && <div style={{padding:"0 0 12px 44px"}}>{(t.activities||[]).length?(t.activities||[]).map((x)=><div key={x.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0"}}><Check on={!!x.done} onClick={()=>toggleArr("activities",x.id)}/><span style={{fontSize:12,color:T.text,flex:1}}>{x.name}</span></div>):<Empty>Добавьте ресторан, экскурсию или место.</Empty>}</div>}
+        <SectionHead k="docs" icon="📄" title="Документы" sub={docs.length?`${docsDone} из ${docs.length} готово`:"Нет обязательных пунктов"} done={docsDone} total={docs.length}/>
+        {open.docs && <div style={{padding:"0 0 12px 44px"}}>{docs.map((doc)=><div key={doc.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0"}}><Check on={!!(t.checks.docs&&t.checks.docs[doc.id])} onClick={()=>toggleDoc(doc.id)}/><span onClick={()=>goDocs(doc.id)} style={{fontSize:12,color:T.text,flex:1,cursor:"pointer"}}>{doc.name}</span><TimeBadge st={docStatus(doc,t.df)}/></div>)}</div>}
+        <SectionHead k="prep" icon="🧳" title="Сборы" sub={prepItems.length?`${prepItems.filter((x)=>x.done).length} из ${prepItems.length} готово`:"Страховка, eSIM и свои пункты"} done={prepItems.filter((x)=>x.done).length} total={prepItems.length} action={()=>{setAddSec("custom");setAddText("");}}/>
+        {open.prep && <div style={{padding:"0 0 12px 44px"}}>{prepItems.length?prepItems.map((it)=><div key={it.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0"}}><Check on={it.done} onClick={()=>togglePrep(it)}/><span style={{fontSize:12,color:T.text,flex:1}}>{it.name}</span></div>):<Empty>Пока пусто. Старые пользовательские пункты продолжат отображаться здесь.</Empty>}</div>}
+      </div>
+      {!isCreator && <div style={{background:T.card,border:`1px solid ${T.line}`,borderRadius:14,padding:11,fontSize:11.5,color:T.subd}}>План общий. Изменения маршрута фиксирует создатель поездки; предложения можно вынести в <b style={{color:T.text}}>Ask Group</b>.</div>}
+    </> : <>
+      <div style={{display:"flex",alignItems:"center",margin:"2px 2px 10px"}}><div style={{flex:1}}><div style={{fontFamily:"Sora,sans-serif",fontSize:16,fontWeight:800,color:T.text}}>Решения группы</div><div style={{fontSize:11,color:T.subd,marginTop:2}}>Любой участник может предложить вариант и собрать голоса.</div></div><div onClick={()=>setAskOpen(true)} className="press" style={{borderRadius:999,background:T.violet+"22",border:`1px solid ${T.violet}55`,padding:"7px 11px",color:T.violet,fontSize:11.5,fontWeight:800,cursor:"pointer"}}>＋ Спросить</div></div>
+      {(t.askGroup||[]).length?(t.askGroup||[]).map((q)=>{const counts=Object.fromEntries((q.options||[]).map((o)=>[o.id,0]));Object.values(q.votes||{}).forEach((v)=>{if(counts[v]!=null)counts[v]++});const myVote=q.votes&&q.votes[meId];const resolved=(q.options||[]).find((o)=>o.id===q.resolvedOptionId);return <div key={q.id} style={{background:T.card,border:`1px solid ${q.status==="open"?T.violet+"55":T.line}`,borderRadius:17,padding:13,marginBottom:9}}><div style={{display:"flex",gap:8}}><div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:T.text}}>{q.title}</div>{q.description&&<div style={{fontSize:11,color:T.subd,marginTop:3}}>{q.description}</div>}<div style={{fontSize:10,color:T.subd,marginTop:5}}>от {q.createdByName||"участника"}</div></div>{q.status!=="open"&&<span style={{fontSize:10.5,fontWeight:800,color:T.green}}>РЕШЕНО</span>}</div><div style={{display:"flex",flexDirection:"column",gap:7,marginTop:11}}>{(q.options||[]).map((o)=><div key={o.id} onClick={()=>q.status==="open"&&vote(q,o.id)} className="press" style={{display:"flex",alignItems:"center",gap:8,border:`1px solid ${myVote===o.id?T.violet:T.line}`,background:myVote===o.id?T.violet+"18":T.card2,borderRadius:11,padding:"9px 10px",cursor:q.status==="open"?"pointer":"default"}}><span style={{fontSize:12.5,color:T.text,flex:1}}>{o.label}</span><span style={{fontSize:11,fontWeight:800,color:myVote===o.id?T.violet:T.subd}}>{counts[o.id]||0}</span>{isCreator&&q.status==="open"&&<span onClick={(e)=>{e.stopPropagation();resolvePoll(q,o.id)}} style={{fontSize:10,color:T.subd,paddingLeft:5,cursor:"pointer"}}>зафиксировать</span>}</div>)}</div>{resolved&&<div style={{fontSize:11.5,color:T.green,marginTop:9}}>✓ Решение: {resolved.label}</div>}</div>}):<div style={{background:T.card,border:`1px dashed ${T.line}`,borderRadius:17,padding:22,textAlign:"center"}}><div style={{fontSize:24}}>🙋</div><div style={{fontSize:13.5,fontWeight:800,color:T.text,marginTop:6}}>Пока ничего не обсуждаем</div><div style={{fontSize:11.5,color:T.subd,marginTop:4}}>Предложите отель, ресторан, активность или любой другой вариант.</div></div>}
+    </>}
+    <div style={{position:"fixed",left:"50%",transform:"translateX(-50%)",bottom:0,width:"100%",maxWidth:420,padding:"8px 14px",paddingBottom:`max(${bottomStr}, 12px)`,background:"linear-gradient(transparent,#0a0a18 22%)",zIndex:24}}>
+      <div className="carousel" style={{display:"flex",gap:6,overflowX:"auto",padding:"10px 1px 7px"}}>{quick.map((q)=><div key={q} onClick={()=>askAI(q)} className="press" style={{flexShrink:0,border:`1px solid ${T.line}`,background:T.card,borderRadius:999,padding:"6px 10px",fontSize:10.8,color:T.sub,cursor:"pointer"}}>{q}</div>)}</div>
+      <div onClick={()=>setChatOpen(true)} className="press" style={{display:"flex",alignItems:"center",gap:9,background:T.card2,border:`1px solid ${T.violet}55`,boxShadow:"0 8px 28px rgba(0,0,0,.35)",borderRadius:15,padding:"11px 12px",cursor:"text"}}><div style={{width:27,height:27,borderRadius:9,background:GRAD.cta,display:"grid",placeItems:"center",fontSize:13}}>✦</div><span style={{fontSize:13,color:T.subd,flex:1}}>Ask TripWise…</span><Icon d={I.arrow} size={15} color={T.violet}/></div>
+    </div>
+    {peopleOpen&&<Overlay onClose={()=>setPeopleOpen(false)}><SheetHead title={`Участники · ${members.length}`} onClose={()=>setPeopleOpen(false)}/><div style={{display:"flex",flexDirection:"column",gap:7}}>{members.map((m)=><div key={m.id} style={{display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.line}`,borderRadius:13,padding:10}}><div style={{width:36,height:36,borderRadius:999,background:gradFor((m.displayName||"X").slice(0,2)),display:"grid",placeItems:"center",fontSize:11,fontWeight:800,color:"#fff",overflow:"hidden"}}>{m.photoUrl?<img src={m.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:memberInitials(m)}</div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:T.text}}>{m.displayName||m.username||"Путешественник"}{String(m.id)===String(t.creatorId)?" · создатель":""}</div><div style={{fontSize:10.5,color:T.subd}}>{m.joinedAt?`в поездке с ${String(m.joinedAt).slice(0,10)}`:"участник"}</div></div>{isCreator&&String(m.id)!==String(t.creatorId)&&<span onClick={()=>removeMember(m)} className="press" style={{fontSize:11,color:"#ff6db0",cursor:"pointer"}}>Удалить</span>}</div>)}</div>{isCreator&&<div onClick={invite} className="press" style={{marginTop:12,textAlign:"center",background:GRAD.cta,borderRadius:13,padding:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>＋ Пригласить человека</div>}</Overlay>}
+    {settingsOpen&&<Overlay onClose={()=>setSettingsOpen(false)}><SheetHead title="Настройки поездки" onClose={()=>setSettingsOpen(false)}/>{isCreator?<><div style={{fontSize:11.5,color:T.subd,marginBottom:6}}>Название</div><input value={renameValue} onChange={(e)=>setRenameValue(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&saveTitle()} style={{width:"100%",background:T.card,border:`1px solid ${T.line}`,borderRadius:12,padding:"11px 12px",color:T.text,outline:"none",marginBottom:10}}/><div onClick={saveTitle} className="press" style={{textAlign:"center",background:T.card2,border:`1px solid ${T.line}`,borderRadius:12,padding:11,color:T.text,fontSize:12.5,fontWeight:800,cursor:"pointer",marginBottom:9}}>Сохранить название</div><div onClick={()=>upd((x)=>({...x,notify:!x.notify}))} className="press" style={{display:"flex",alignItems:"center",gap:10,background:T.card,border:`1px solid ${T.line}`,borderRadius:12,padding:11,cursor:"pointer",marginBottom:9}}><div style={{flex:1}}><div style={{fontSize:12.5,fontWeight:800,color:T.text}}>Напоминания по поездке</div><div style={{fontSize:10.5,color:T.subd,marginTop:2}}>Сохраняет совместимость с текущими Telegram-напоминаниями</div></div><div style={{fontSize:12,fontWeight:800,color:t.notify?T.green:T.subd}}>{t.notify?"ВКЛ":"ВЫКЛ"}</div></div><div onClick={()=>{if(typeof window==="undefined"||window.confirm(`Удалить поездку «${t.title}» у всех участников?`)){setSettingsOpen(false);onDelete(t.id);}}} className="press" style={{textAlign:"center",border:`1px solid #ff6db055`,background:"#ff6db012",borderRadius:12,padding:11,color:"#ff6db0",fontSize:12.5,fontWeight:800,cursor:"pointer"}}>Удалить поездку для всех</div></>:<><div style={{background:T.card,border:`1px solid ${T.line}`,borderRadius:13,padding:12,fontSize:11.5,color:T.subd,lineHeight:1.45,marginBottom:10}}>Основной план ведёт создатель. Вы можете следить за поездкой, голосовать в Ask Group и спрашивать TripWise.</div><div onClick={()=>{if(typeof window==="undefined"||window.confirm(`Выйти из поездки «${t.title}»?`))leaveTrip();}} className="press" style={{textAlign:"center",border:`1px solid #ff6db055`,background:"#ff6db012",borderRadius:12,padding:11,color:"#ff6db0",fontSize:12.5,fontWeight:800,cursor:"pointer"}}>Выйти из поездки</div></>}</Overlay>}
+    {inviteOpen&&<Overlay onClose={()=>setInviteOpen(false)}><SheetHead title="Пригласить в поездку" onClose={()=>setInviteOpen(false)}/><div style={{background:T.card,border:`1px solid ${T.line}`,borderRadius:14,padding:13}}><div style={{fontSize:13.5,fontWeight:800,color:T.text}}>Одна ссылка — один общий Trip</div><div style={{fontSize:11.5,color:T.subd,marginTop:5,lineHeight:1.45}}>Человек откроет TripWise в Telegram, нажмёт Join и сразу увидит актуальный план поездки.</div>{inviteUrl?<div style={{marginTop:11,background:T.card2,border:`1px dashed ${T.violet}66`,borderRadius:11,padding:10,fontSize:10.5,color:T.sub,wordBreak:"break-all"}}>{inviteUrl}</div>:<div style={{fontSize:11.5,color:T.subd,marginTop:11}}>Создаю ссылку…</div>}</div>{inviteUrl&&<div style={{display:"flex",gap:8,marginTop:12}}><div onClick={()=>{navigator.clipboard&&navigator.clipboard.writeText(inviteUrl);setToast("Ссылка скопирована")}} className="press" style={{flex:1,textAlign:"center",background:T.card,border:`1px solid ${T.line}`,borderRadius:12,padding:11,color:T.text,fontSize:12,fontWeight:800,cursor:"pointer"}}>Копировать</div><div onClick={shareInvite} className="press" style={{flex:1,textAlign:"center",background:GRAD.cta,borderRadius:12,padding:11,color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer"}}>Отправить в Telegram</div></div>}</Overlay>}
+    {askOpen&&<Overlay onClose={()=>setAskOpen(false)}><SheetHead title="Ask Group" onClose={()=>setAskOpen(false)}/><div style={{fontSize:11.5,color:T.subd,marginBottom:6}}>Что нужно решить?</div><input value={askTitle} onChange={(e)=>setAskTitle(e.target.value)} placeholder="Например: бронируем UNDER?" style={{width:"100%",background:T.card,border:`1px solid ${T.line}`,borderRadius:12,padding:"11px 12px",color:T.text,outline:"none",marginBottom:9}}/><textarea value={askDesc} onChange={(e)=>setAskDesc(e.target.value)} placeholder="Контекст — необязательно" rows={2} style={{width:"100%",resize:"none",background:T.card,border:`1px solid ${T.line}`,borderRadius:12,padding:"10px 12px",color:T.text,outline:"none",marginBottom:9,fontFamily:"Manrope,sans-serif"}}/>{askOptions.map((v,i)=><div key={i} style={{display:"flex",gap:7,marginBottom:7}}><input value={v} onChange={(e)=>setAskOptions((a)=>a.map((x,j)=>j===i?e.target.value:x))} placeholder={`Вариант ${i+1}`} style={{flex:1,background:T.card,border:`1px solid ${T.line}`,borderRadius:11,padding:"9px 11px",color:T.text,outline:"none"}}/>{askOptions.length>2&&<div onClick={()=>setAskOptions((a)=>a.filter((_,j)=>j!==i))} className="press" style={{width:34,display:"grid",placeItems:"center",color:T.subd,cursor:"pointer"}}>×</div>}</div>)}{askOptions.length<6&&<div onClick={()=>setAskOptions((a)=>[...a,""])} className="press" style={{fontSize:11.5,color:T.violet,fontWeight:800,cursor:"pointer",margin:"4px 0 13px"}}>＋ Добавить вариант</div>}<div onClick={createAsk} className="press" style={{textAlign:"center",background:GRAD.cta,borderRadius:13,padding:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Спросить группу</div></Overlay>}
+    {addSec&&<Overlay onClose={()=>setAddSec(null)}><SheetHead title={addSec==="transport"?"Добавить транспорт":addSec==="custom"?"Добавить в сборы":"Добавить активность"} onClose={()=>setAddSec(null)}/><input autoFocus value={addText} onChange={(e)=>setAddText(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&addArr()} placeholder={addSec==="transport"?"BMW 740d, паром, трансфер…":addSec==="custom"?"Купить адаптер, собрать аптечку…":"UNDER, Atlantic Road, музей…"} style={{width:"100%",background:T.card,border:`1px solid ${T.line}`,borderRadius:12,padding:"11px 12px",color:T.text,outline:"none",marginBottom:10}}/><div onClick={addArr} className="press" style={{textAlign:"center",background:GRAD.cta,borderRadius:13,padding:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Добавить</div></Overlay>}
+    {flightOpen&&<Overlay onClose={()=>setFlightOpen(false)}><SheetHead title="Добавить рейс" onClose={()=>setFlightOpen(false)}/><div style={{fontSize:11.5,color:T.subd,marginBottom:6}}>Номер рейса</div><input value={flightNo} onChange={(e)=>setFlightNo(e.target.value.toUpperCase())} placeholder="SU2130" style={{width:"100%",background:T.card,border:`1px solid ${T.line}`,borderRadius:12,padding:"11px 12px",color:T.text,outline:"none",marginBottom:10,textTransform:"uppercase"}}/><div style={{fontSize:11.5,color:T.subd,marginBottom:6}}>Дата</div><input type="date" value={flightDate} onChange={(e)=>setFlightDate(e.target.value)} style={{width:"100%",background:T.card,border:`1px solid ${T.line}`,borderRadius:12,padding:"11px 12px",color:T.text,outline:"none",colorScheme:"dark",marginBottom:10}}/><div style={{fontSize:10.5,color:T.subd,lineHeight:1.4,marginBottom:11}}>Если рейс уже есть в маршруте Aviasales, TripWise подхватит аэропорты и время. Тип самолёта показывается только когда источник его реально знает — без выдумывания.</div><div onClick={addFlight} className="press" style={{textAlign:"center",background:GRAD.cta,borderRadius:13,padding:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Добавить рейс</div></Overlay>}
+    {chatOpen&&<Overlay onClose={()=>setChatOpen(false)}><SheetHead title="Ask TripWise" onClose={()=>setChatOpen(false)}/><div style={{maxHeight:"46vh",overflowY:"auto",display:"flex",flexDirection:"column",gap:8,marginBottom:10}}>{messages.map((m,i)=><div key={i} style={{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"88%",background:m.role==="user"?T.violet+"35":T.card,border:`1px solid ${m.role==="user"?T.violet+"55":T.line}`,borderRadius:13,padding:"9px 11px",fontSize:12.2,color:T.text,lineHeight:1.45,whiteSpace:"pre-wrap"}}>{m.text}</div>)}{chatBusy&&<div style={{fontSize:11.5,color:T.subd}}>TripWise думает…</div>}</div><div style={{display:"flex",gap:7}}><input value={chatText} onChange={(e)=>setChatText(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&askAI()} placeholder="Спроси про эту поездку…" style={{flex:1,background:T.card,border:`1px solid ${T.line}`,borderRadius:12,padding:"10px 11px",color:T.text,outline:"none"}}/><div onClick={()=>askAI()} className="press" style={{width:42,borderRadius:12,background:GRAD.cta,display:"grid",placeItems:"center",cursor:"pointer"}}><Icon d={I.arrow} size={16} color="#fff"/></div></div></Overlay>}
   </div>;
 }
 
@@ -2741,9 +2937,28 @@ export default function App() {
   const [traveler, setTraveler] = useState(false);
   const [svcOpen, setSvcOpen] = useState(false);      // оверлей «Сервисы» с главной
   const [trips, setTrips] = useState(() => store.get("trips", []));
+  const syncTimers = useRef({});
   const [notifyPrefs, setNotifyPrefs] = useState(() => store.get("notifyPrefs", { deals: true, promos: true, deadlines: true, news: true }));
   const changeNotifyPrefs = (next) => { setNotifyPrefs(next); store.set("notifyPrefs", next); syncNotifyPrefs(next); };
   useEffect(() => { store.set("trips", trips); }, [trips]);
+  // Первый запуск нового Shared Trip слоя: старые localStorage-поездки мягко мигрируют на сервер,
+  // затем серверные поездки становятся источником истины. В браузере без Telegram всё остаётся локальным.
+  useEffect(() => {
+    let dead = false;
+    const hydrate = async () => {
+      if (!tgInitData()) return;
+      const local = store.get("trips", []) || [];
+      for (const x of local.slice(0, 30)) if (!x.creatorId) await syncTripToServer(x);
+      const r = await sharedApi("list-trips");
+      if (!dead && r.ok && Array.isArray(r.trips)) {
+        const serverIds = new Set(r.trips.map((x) => x.id));
+        const unsynced = local.filter((x) => !serverIds.has(x.id) && !x.creatorId);
+        setTrips([...r.trips, ...unsynced]);
+      }
+    };
+    hydrate(); const tm = setTimeout(hydrate, 900);
+    return () => { dead = true; clearTimeout(tm); };
+  }, []);
   const [tripOpen, setTripOpen] = useState(null);
   const [tripSection, setTripSection] = useState(null); // раздел из deep link (docs/tickets/lodging/extras)      // id открытой поездки
   const [newTrip, setNewTrip] = useState(false);       // оверлей ручного создания
@@ -2833,7 +3048,7 @@ export default function App() {
   const b64urlDec = (s) => decodeURIComponent(escape(atob(s.split("-").join("+").split("_").join("/"))));
   const deepLinkDone = useRef(false);
   useEffect(() => {
-    const tryOpen = () => {
+    const tryOpen = async () => {
       if (deepLinkDone.current) return;
       try {
         const tg = (typeof window !== "undefined") && window.Telegram && window.Telegram.WebApp;
@@ -2842,19 +3057,36 @@ export default function App() {
         const m = h.match(/[#&]r=([^&]+)/);
         const raw = sp || (m && m[1]) || "";
         if (!raw) return;
+        // приглашение в Shared Trip: join_<tripId>_<shareCode>
+        if (raw.indexOf("join_") === 0) {
+          const mj = raw.match(/^join_([^_]+)_([a-fA-F0-9]+)$/);
+          if (mj) {
+            deepLinkDone.current = true;
+            const jr = await sharedApi("join-trip", { tripId: mj[1], code: mj[2] });
+            if (jr.ok && jr.trip) {
+              setTrips((p) => p.some((x)=>x.id===jr.trip.id) ? p.map((x)=>x.id===jr.trip.id?jr.trip:x) : [jr.trip,...p]);
+              setTripSection("overview"); setTripOpen(jr.trip.id); setTab("routes"); setStack(["trip"]);
+              setToast("Поездка добавлена");
+            } else setToast(jr.error === "trip full" ? "В поездке уже максимум участников" : "Ссылка приглашения недействительна или устарела");
+          }
+          try { history.replaceState(null, "", location.pathname); } catch (e) { }
+          return;
+        }
         // deep link из пуш-уведомления: trip_<id> | trip_<id>_section_<s> | trip_<id>_document_<docId>
         if (raw.indexOf("trip_") === 0) {
           const mt = raw.match(/^trip_([^_]+)(?:_section_([a-z]+))?(?:_document_([\w-]+))?$/);
           if (mt) {
             deepLinkDone.current = true;
             const tripId = mt[1], section = mt[2] || null, docId = mt[3] || null;
-            setTimeout(() => {
-              const exists = (store.get("trips", []) || []).some((x) => x.id === tripId);
-              if (!exists) return; // поездку удалили — молча игнорируем
-              if (docId) { setDocsPre(docId); setTab("docs"); return; }
-              setTripSection(section || "overview");
-              setTripOpen(tripId); setTab("routes"); setStack(["trip"]);
-            }, 0);
+            let trip = (store.get("trips", []) || []).find((x) => x.id === tripId) || null;
+            if (!trip && tgInitData()) {
+              const gr = await sharedApi("get-trip", { tripId });
+              if (gr.ok && gr.trip) { trip = gr.trip; setTrips((p)=>p.some((x)=>x.id===tripId)?p.map((x)=>x.id===tripId?gr.trip:x):[gr.trip,...p]); }
+            }
+            if (!trip) return; // поездку удалили или доступ отозван
+            if (docId) { setDocsPre(docId); setTab("docs"); return; }
+            setTripSection(section || "overview");
+            setTripOpen(tripId); setTab("routes"); setStack(["trip"]);
           }
           try { history.replaceState(null, "", location.pathname); } catch (e) { }
           return;
@@ -2899,7 +3131,17 @@ export default function App() {
     } catch (error) { console.warn("[TripWiseAI] runSearch failed", error); setSearchError(true); setRoutes([]); }
     setLoading(false);
   };
-  const updateTrip = (id, fn) => setTrips((p) => p.map((t) => t.id === id ? fn(t) : t));
+  const replaceSharedTrip = (trip) => { if (!trip || !trip.id) return; setTrips((p) => p.some((x)=>x.id===trip.id) ? p.map((x)=>x.id===trip.id?trip:x) : [trip,...p]); };
+  const updateTrip = (id, fn) => setTrips((p) => p.map((t) => {
+    if (t.id !== id) return t;
+    const next = fn(t);
+    // Shared core редактирует только creator. Дебаунс не спамит Cloud Function на каждый tap.
+    if (!next._viewer || next._viewer.isCreator !== false) {
+      clearTimeout(syncTimers.current[id]);
+      syncTimers.current[id] = setTimeout(async () => { const r = await syncTripToServer(next); if (r && r.ok && r.trip) replaceSharedTrip(r.trip); }, 350);
+    }
+    return next;
+  }));
   const openTripScreen = (id) => { setTripSection(null); setTripOpen(id); setTab("routes"); setStack(["trip"]); };
   // «Взять в поездку»: сперва подтверждение (пользователь осознаёт создание карточки поездки)
   const askTakeTrip = (r) => {
@@ -2992,14 +3234,14 @@ export default function App() {
   let main = null;
   if (tab === "routes") {
     const curTrip = trips.find((t) => t.id === tripOpen);
-    if (top === "trip" && curTrip) main = <TripScreen t={curTrip} initialBlk={tripSection} onBack={() => setStack([])} onUpdate={updateTrip} onDelete={(id) => { setTrips((p) => p.filter((x) => x.id !== id)); deleteTripOnServer(id); setStack([]); setToast("Поездка удалена"); }} onFindTickets={findTicketsForTrip} goHotels={() => { setHotelsPre(null); setTab("hotels"); }} goDocs={(docId) => { setDocsPre(typeof docId === "string" ? docId : null); setTab("docs"); }} setToast={setToast} />;
+    if (top === "trip" && curTrip) main = <SharedTripScreen t={curTrip} initialBlk={tripSection} onBack={() => setStack([])} onUpdate={updateTrip} onReplaceTrip={replaceSharedTrip} bottomStr={inset.bottomStr} onLeaveTrip={(id) => { setTrips((p) => p.filter((x) => x.id !== id)); setStack([]); }} onDelete={(id) => { setTrips((p) => p.filter((x) => x.id !== id)); deleteTripOnServer(id); setStack([]); setToast("Поездка удалена"); }} onFindTickets={findTicketsForTrip} goHotels={() => { setHotelsPre(null); setTab("hotels"); }} goDocs={(docId) => { setDocsPre(typeof docId === "string" ? docId : null); setTab("docs"); }} setToast={setToast} />;
     else if (top === "trip") main = <RoutesScreen trips={trips} onOpenTrip={openTripScreen} onNewTrip={() => setNewTrip(true)} onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved((p) => p.filter((x) => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => { const f = { ...s.form, dep: s.form.dep ? new Date(s.form.dep) : null, ret: s.form.ret ? new Date(s.form.ret) : null }; setForm(f); runSearch(f); }} />;
     else if (top === "detail") main = <Detail r={selected} query={query} onBack={() => setStack(["results"])} onEdit={() => { setTab("home"); setSheet(true); }} liked={isLiked(selected)} onLike={likeRoute} onShare={shareRoute} goHotels={(svc) => { setHotelsPre(svc || null); setTab("hotels"); }} onTakeTrip={askTakeTrip} inTrip={!!(selected && trips.some((t) => t.route && t.route.rid === selected.id && t.df === ((lastSearchRef.current || {}).df || "")))} />;
     else if (top === "results") { main = <Results query={query} routes={routes} loading={loading} error={searchError} onRetry={() => runSearch()} onEdit={() => { setTab("home"); setSheet(true); }} onBack={() => setStack([])} onOpen={(r) => { setSelected(r); setStack(["results", "detail"]); }} isLiked={isLiked} onLike={likeRoute} />; }
     else main = <RoutesScreen trips={trips} onOpenTrip={openTripScreen} onNewTrip={() => setNewTrip(true)} onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved(p => p.filter(x => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => { const f = { ...s.form, dep: s.form.dep ? new Date(s.form.dep) : null, ret: s.form.ret ? new Date(s.form.ret) : null }; setForm(f); runSearch(f); }} />;
   } else if (tab === "home") main = <Home onSearch={() => setSheet(true)} onPickDest={openSheetWithDest} goTab={setTab} openServices={() => (trackGoal("services_opened"), setSvcOpen(true))} />;
   else if (tab === "hotels") main = <Hotels setToast={setToast} preOpen={hotelsPre} onPreDone={() => setHotelsPre(null)} />;
-  else if (tab === "docs") main = <Docs trips={trips} preOpenDoc={docsPre} onPreDone={() => setDocsPre(null)} onOpenTrip={openTripScreen} onAddDocToTrip={(tripId, ids) => { updateTrip(tripId, (x) => { const cur = x.docsExtra || []; const base = (DOC_MATRIX[x.country] || DOC_BASE).map((dd) => dd.id); const add = (ids || []).filter((id) => !cur.includes(id) && !base.includes(id)); return { ...x, docsExtra: [...cur, ...add], blocksOn: { ...tripBlocks(x), docs: true } }; }); openTripScreen(tripId); }} onCreateTrip={(t) => { setTrips((p) => [t, ...p]); setToast("Поездка создана"); openTripScreen(t.id); }} setToast={setToast} />;
+  else if (tab === "docs") main = <Docs trips={trips} preOpenDoc={docsPre} onPreDone={() => setDocsPre(null)} onOpenTrip={openTripScreen} onAddDocToTrip={(tripId, ids) => { updateTrip(tripId, (x) => { const cur = x.docsExtra || []; const base = (DOC_MATRIX[x.country] || DOC_BASE).map((dd) => dd.id); const add = (ids || []).filter((id) => !cur.includes(id) && !base.includes(id)); return { ...x, docsExtra: [...cur, ...add], blocksOn: { ...tripBlocks(x), docs: true } }; }); openTripScreen(tripId); }} onCreateTrip={(t) => { setTrips((p) => [t, ...p]); syncTripToServer(t).then((r)=>r&&r.trip&&replaceSharedTrip(r.trip)); setToast("Поездка создана"); openTripScreen(t.id); }} setToast={setToast} />;
   else if (tab === "profile") main = <Profile name={name} onTraveler={() => setTraveler(true)} onEditName={() => setEditName(true)} setToast={setToast} notifyPrefs={notifyPrefs} onNotifyChange={changeNotifyPrefs} />;
 
   return <div style={{ minHeight: "100vh", background: T.bg, display: "flex", justifyContent: "center" }}>
@@ -3027,7 +3269,7 @@ export default function App() {
     <div className="app-root" style={{ width: "100%", maxWidth: 420, paddingTop: safeTop, background: tab === "home" ? `radial-gradient(105% 54% at 78% 0%, #0d1830 0%, ${HOME_T.bg} 48%, ${HOME_T.bgDeep} 100%)` : `radial-gradient(120% 60% at 80% 0%, #1a1340 0%, ${T.bg} 55%)`, color: tab === "home" ? HOME_T.text : T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", top: inset.logoTop != null ? inset.logoTop + "px" : "calc(env(safe-area-inset-top, 0px) + 14px)", zIndex: 30, pointerEvents: "none" }}><Logo home={tab === "home"} /></div>
       <div style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", background: "transparent", paddingTop: 10, paddingBottom: 108 }}>{main}</div>
-      {!kb && <BottomNav tab={tab} setTab={(k) => { if (k === tab && (k === "routes" || k === "profile" || k === "hotels" || k === "docs")) setStack([]); if (k === "routes" && tab === "routes") setStack([]); setTab(k); }} bottomStr={inset.bottomStr} />}
+      {!kb && top !== "trip" && <BottomNav tab={tab} setTab={(k) => { if (k === tab && (k === "routes" || k === "profile" || k === "hotels" || k === "docs")) setStack([]); if (k === "routes" && tab === "routes") setStack([]); setTab(k); }} bottomStr={inset.bottomStr} />}
       {sheet && <SearchSheet form={form} setForm={setForm} onClose={() => setSheet(false)} onSubmit={() => runSearch()} setToast={setToast} />}
       {traveler && <Traveler safeTop={safeTop} bottomStr={inset.bottomStr} onBack={() => setTraveler(false)} />}
       {confirmTrip && <Overlay onClose={() => setConfirmTrip(null)}>
@@ -3042,7 +3284,7 @@ export default function App() {
           <div onClick={() => { const r = confirmTrip; setConfirmTrip(null); takeTrip(r); }} className="press" style={{ flex: 1.4, textAlign: "center", background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>✈ Создать</div>
         </div>
       </Overlay>}
-      {newTrip && <NewTripSheet onClose={() => setNewTrip(false)} onCreate={(t) => { setTrips((p) => [t, ...p]); setNewTrip(false); setToast("Поездка создана"); openTripScreen(t.id); }} />}
+      {newTrip && <NewTripSheet onClose={() => setNewTrip(false)} onCreate={(t) => { setTrips((p) => [t, ...p]); syncTripToServer(t).then((r)=>r&&r.trip&&replaceSharedTrip(r.trip)); setNewTrip(false); setToast("Поездка создана"); openTripScreen(t.id); }} />}
       {svcOpen && <Overlay onClose={() => setSvcOpen(false)}><SheetHead title="Сервисы для поездки" onClose={() => setSvcOpen(false)} /><ServiceGrid setToast={setToast} /></Overlay>}
       {editName && <NameEdit name={name} onClose={() => setEditName(false)} onSave={(n) => { setName(n); setEditName(false); setToast("Имя сохранено"); }} />}
       <Toast msg={toast} />
