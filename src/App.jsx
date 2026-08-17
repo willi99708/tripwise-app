@@ -28,10 +28,12 @@ function trackAppOpenBackend() {
 }
 
 const T = {
-  bg: "#0a0a18", bg2: "#0d0d20", card: "#14142e", card2: "#1a1a3a",
-  line: "rgba(255,255,255,0.08)", line2: "rgba(255,255,255,0.14)",
-  text: "#f4f5ff", sub: "#9aa0c4", subd: "#6b7099",
-  violet: "#7c5cff", cyan: "#48dcdc", green: "#39d98a", gold: "#f5c451", pink: "#ff6db0",
+  // v4: общая визуальная система приведена к главной странице — глубокий navy,
+  // спокойные поверхности и один акцент вместо «фиолетового SaaS» на каждом экране.
+  bg: "#020914", bg2: "#010610", card: "#061321", card2: "#091a2c",
+  line: "rgba(129,156,204,.22)", line2: "rgba(141,171,228,.38)",
+  text: "#f7f8fc", sub: "#9aa3b8", subd: "#737e97",
+  violet: "#9364f5", cyan: "#31c7f3", green: "#39d98a", gold: "#d7b46a", pink: "#d66cf1",
 };
 /* ФОТО-ЗАГЛУШКИ: все «фото» (иллюминаторы, идеи, отели, hero) — это CSS-градиенты ниже.
    Чтобы заменить на реальные фото: в компоненте Porthole вместо `background: grad`
@@ -371,6 +373,44 @@ function Overlay({ children, onClose }) {
 }
 function SheetHead({ title, onClose }) { return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}><span style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, fontSize: 17, color: T.text }}>{title}</span><div onClick={onClose} className="press" style={{ cursor: "pointer" }}><Icon d={I.close} size={20} color={T.sub} /></div></div>; }
 
+function FullScreenOverlay({ children, onClose }) {
+  useEffect(()=>{ if(typeof window==="undefined"||!onClose)return; const prev=window.__tripwiseModalBack||null; window.__tripwiseModalBack=onClose; const tg=window.Telegram&&window.Telegram.WebApp, bb=tg&&tg.BackButton, wasVisible=!!(bb&&bb.isVisible); const localBack=()=>{try{onClose();}catch(e){}}; try{if(bb){bb.show();bb.onClick&&bb.onClick(localBack);}}catch(e){} return()=>{ if(window.__tripwiseModalBack===onClose) window.__tripwiseModalBack=prev; try{if(bb){bb.offClick&&bb.offClick(localBack);if(wasVisible)bb.show();else bb.hide();}}catch(e){} }; },[onClose]);
+  return <div style={{ position:"fixed", inset:0, zIndex:72, background:`radial-gradient(110% 58% at 82% 0%,#0d1830 0%,${T.bg} 52%,#010610 100%)`, maxWidth:420, margin:"0 auto", overflowY:"auto", overscrollBehavior:"contain", padding:"calc(env(safe-area-inset-top,0px) + 58px) 18px calc(28px + env(safe-area-inset-bottom,0px))", animation:"slideIn .18s ease-out" }}>
+    {children}
+  </div>;
+}
+function ScreenHero({ title, sub, image, eyebrow, action, onAction }) {
+  return <div style={{ margin:"0 16px 14px", minHeight:118, borderRadius:22, overflow:"hidden", position:"relative", background:`linear-gradient(135deg,${HOME_T.surface2},${HOME_T.surface})`, border:`1px solid ${HOME_T.borderStrong}`, padding:"18px 16px", display:"flex", alignItems:"center", gap:10 }}>
+    <div style={{ flex:1, minWidth:0, position:"relative", zIndex:2 }}>
+      {eyebrow && <div style={{ color:HOME_T.cyan, fontSize:10.5, fontWeight:800, letterSpacing:.45, textTransform:"uppercase", marginBottom:6 }}>{eyebrow}</div>}
+      <div style={{ fontFamily:"Sora,sans-serif", fontWeight:800, fontSize:22, color:HOME_T.text, lineHeight:1.08 }}>{title}</div>
+      {sub && <div style={{ color:HOME_T.sub, fontSize:11.7, lineHeight:1.38, marginTop:7, maxWidth:230 }}>{sub}</div>}
+      {action && <div onClick={onAction} className="press" style={{ display:"inline-flex", marginTop:10, padding:"7px 11px", borderRadius:999, border:`1px solid ${HOME_T.borderStrong}`, background:"rgba(255,255,255,.04)", color:HOME_T.text, fontSize:11.5, fontWeight:800, cursor:"pointer" }}>{action}</div>}
+    </div>
+    {image && <UiImage src={image} alt="" style={{ width:105, height:100, objectFit:"contain", flexShrink:0, opacity:.96 }} />}
+  </div>;
+}
+function EmptyState({ icon="✦", title, sub, action, onAction, compact=false }) {
+  return <div style={{ textAlign:"center", padding:compact?"18px 12px":"34px 18px", background:T.card, border:`1px solid ${T.line}`, borderRadius:18 }}>
+    <div style={{ width:42, height:42, borderRadius:14, margin:"0 auto 10px", background:`linear-gradient(135deg,${T.card2},rgba(147,100,245,.22))`, border:`1px solid ${T.line}`, display:"grid", placeItems:"center", fontSize:18 }}>{icon}</div>
+    <div style={{ fontFamily:"Sora,sans-serif", fontSize:14, fontWeight:800, color:T.text }}>{title}</div>
+    {sub && <div style={{ fontSize:11.5, lineHeight:1.45, color:T.subd, margin:"6px auto 0", maxWidth:280 }}>{sub}</div>}
+    {action && <div onClick={onAction} className="press" style={{ display:"inline-block", marginTop:12, color:T.cyan, fontSize:12, fontWeight:800, cursor:"pointer" }}>{action} →</div>}
+  </div>;
+}
+function ErrorState({ title="Что-то пошло не так", sub="Попробуйте ещё раз.", onRetry }) {
+  return <EmptyState icon="!" title={title} sub={sub} action={onRetry ? "Повторить" : null} onAction={onRetry} />;
+}
+function ConfirmSheet({ title, text, danger=false, confirmLabel="Подтвердить", onConfirm, onClose }) {
+  return <Overlay onClose={onClose}><SheetHead title={title} onClose={onClose} />
+    <div style={{ fontSize:12.5, color:T.sub, lineHeight:1.5, marginBottom:14 }}>{text}</div>
+    <div style={{ display:"flex", gap:9 }}><div onClick={onClose} className="press" style={{ flex:1, textAlign:"center", border:`1px solid ${T.line}`, background:T.card, borderRadius:13, padding:12, color:T.text, fontSize:12.5, fontWeight:800, cursor:"pointer" }}>Отмена</div><div onClick={onConfirm} className="press" style={{ flex:1.25, textAlign:"center", border:`1px solid ${danger?"#ff6db055":T.violet+"55"}`, background:danger?"#ff6db018":GRAD.cta, borderRadius:13, padding:12, color:danger?"#ff7ba9":"#fff", fontSize:12.5, fontWeight:800, cursor:"pointer" }}>{confirmLabel}</div></div>
+  </Overlay>;
+}
+function ActionToast({ data }) { if(!data)return null; return <div style={{ position:"fixed", left:"50%", bottom:94, transform:"translateX(-50%)", zIndex:120, width:"calc(100% - 32px)", maxWidth:388, background:"#081728", border:`1px solid ${T.line2}`, boxShadow:"0 14px 40px rgba(0,0,0,.45)", borderRadius:15, padding:"11px 12px", display:"flex", alignItems:"center", gap:10, animation:"fadeUp .2s ease" }}><span style={{ flex:1, color:T.text, fontSize:12.5, fontWeight:700 }}>{data.text}</span>{data.action && <span onClick={data.onAction} className="press" style={{ color:T.cyan, fontSize:12, fontWeight:900, cursor:"pointer" }}>{data.action}</span>}</div>; }
+const addIsoDays=(v,n)=>{if(!v)return"";const d=new Date(v+"T12:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
+const promoHeadline=(p)=>{const disc=Number(p&&p.discountRub)||0,min=Number(p&&p.minSpendRub)||0;if(disc&&min)return `−${disc.toLocaleString("ru-RU")} ₽ от ${min.toLocaleString("ru-RU")} ₽`;if(disc)return `−${disc.toLocaleString("ru-RU")} ₽`;return (p&&p.header)||"Промокод";};
+
 /* ---- выбор аэропорта с поиском ---- */
 function AirportPicker({ title, onPick, onClose }) {
   const [q, setQ] = useState("");
@@ -607,7 +647,7 @@ function Home({ onSearch, onPickDest, goTab, openServices }) {
   </div>;
 }
 /* ================================ Результаты ============================ */
-function Skeleton() { return <div style={{ height: 150, borderRadius: 18, background: "linear-gradient(90deg,#14142e,#1a1a3a,#14142e)", backgroundSize: "200% 100%", animation: "sh 1.3s infinite" }} />; }
+function Skeleton() { return <div style={{ height: 150, borderRadius: 18, background: `linear-gradient(90deg,${T.card},${T.card2},${T.card})`, border:`1px solid ${T.line}`, backgroundSize: "200% 100%", animation: "sh 1.3s infinite" }} />; }
 function RouteCard({ r, onOpen, liked, onLike, i }) {
   const grad = r.badge === "cheapest" ? GRAD.sunset : r.badge === "unexpected" ? GRAD.city : GRAD.night;
   const dur = legDur(r.segments);
@@ -662,7 +702,7 @@ function Results({ query, routes, loading, error, onRetry, onBack, onEdit, onOpe
       <div style={{ position: "absolute", left: 0, right: 0, textAlign: "center", transform: "translateY(-4px)", pointerEvents: "none" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 15 }}>{query.origin} → {query.destName}</div><div style={{ fontSize: 11, color: T.subd }}>{query.datesLabel}</div></div>
       <span onClick={onEdit} className="press" style={{ color: T.violet, fontSize: 13, fontWeight: 700, cursor: "pointer", transform: "translateY(1px)", zIndex: 5 }}>Изменить</span>
     </div>
-    {error ? <div style={{ textAlign: "center", padding: "40px 20px" }}><div style={{ fontSize: 15, color: T.text, fontWeight: 700 }}>Не удалось загрузить данные</div><div style={{ fontSize: 13, marginTop: 6, marginBottom: 16, color: T.subd }}>Проверьте соединение и попробуйте ещё раз</div><Btn onClick={onRetry}>Повторить</Btn></div> : <>
+    {error ? <div style={{padding:"24px 20px"}}><ErrorState title="Не удалось загрузить маршруты" sub="Поиск сохранён. Проверьте соединение и повторите запрос." onRetry={onRetry}/></div> : <>
     <div style={{ padding: "9px 20px 0" }}>
       <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 20, color: T.text }}>{loading ? "Ищем лучшие варианты…" : <>Нашли <span style={{ color: T.violet }}>{routes.length} {plural(routes.length, "хитрый способ", "хитрых способа", "хитрых способов")}</span> добраться</>}</div>
       <div style={{ color: T.subd, fontSize: 12.5, marginTop: 4 }}>Показываем только лучшее — не сотни билетов.</div>
@@ -672,7 +712,7 @@ function Results({ query, routes, loading, error, onRetry, onBack, onEdit, onOpe
     </div></>}
   </div>;
 }
-function Empty({ onEdit }) { return <div style={{ textAlign: "center", padding: "40px 20px" }}><div style={{ fontSize: 15, color: T.text, fontWeight: 700 }}>Ничего не найдено</div><div style={{ fontSize: 13, marginTop: 6, marginBottom: 16, color: T.subd }}>Попробуйте изменить параметры</div><Btn onClick={onEdit}>Изменить параметры поиска</Btn></div>; }
+function Empty({ onEdit }) { return <EmptyState icon="⌕" title="Подходящего маршрута пока нет" sub="Измените даты, аэропорты или количество пассажиров — текущий поиск останется сохранён." action="Изменить параметры" onAction={onEdit} />; }
 
 /* ================================ Детали ================================ */
 /* ЛОГОТИПЫ АВИАКОМПАНИЙ.
@@ -699,7 +739,7 @@ function AirlineLogo({ code }) {
     {code && <img src={`/graphics/airlines/${String(code).toUpperCase()}.png`} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} />}
   </div>;
 }
-function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, onTakeTrip, inTrip }) {
+function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, onTakeTrip, inTrip, takeLabel }) {
   const dur = legDur(r.segments);
   const segs = r.segments || [];
   const twoTicketNote = (segs.length === 2 && (r.notes || []).some(n => /раздельны|отдельных билета|два отдельных/i.test(n))) ? "Два отдельных билета" : null;
@@ -786,7 +826,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
         <a href={r.bookingLinks[0].url} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Btn>Купить билет туда-обратно · {rub(r.total)}</Btn></a>
       </div>)}
     <div style={{ padding: "16px 20px 8px", display: "flex", gap: 10 }}>
-      <Btn style={{ flex: 1 }} onClick={() => onTakeTrip(r)}>{inTrip ? "Открыть поездку" : "✈ Взять в поездку"}</Btn>
+      <Btn style={{ flex: 1 }} onClick={() => onTakeTrip(r)}>{inTrip ? "Открыть поездку" : (takeLabel || "✈ Взять в поездку")}</Btn>
       <div onClick={() => onShare(r)} className="press" style={{ width: 52, borderRadius: 16, border: `1px solid ${T.line}`, display: "grid", placeItems: "center", background: T.card, cursor: "pointer" }}><Icon d={I.share} size={19} color={T.subd} /></div>
       <div onClick={() => onLike(r)} className="press" style={{ width: 52, borderRadius: 16, border: `1px solid ${T.line}`, display: "grid", placeItems: "center", background: T.card, cursor: "pointer" }}><Icon d={I.heart} size={20} color={liked ? T.pink : T.subd} /></div>
     </div>
@@ -803,52 +843,74 @@ function NotifyToggle({ label, sub, icon, on, onToggle }) {
     </div>
   </div>;
 }
-function Profile({ name, onTraveler, onEditName, setToast, notifyPrefs, onNotifyChange }) {
-  const np = notifyPrefs || { deals: true, promos: true, deadlines: true, group: true, changes: true, news: true };
-  const setPref = (k) => { const next = { ...np, [k]: !np[k] }; onNotifyChange && onNotifyChange(next); };
-  return <div style={{ animation: "fadeUp .18s ease-out" }}>
-    <Header />
-    <div style={{ padding: "10px 20px 0", display: "flex", alignItems: "center", gap: 14 }}>
-      <div style={{ width: 60, height: 60, borderRadius: 999, background: GRAD.night, display: "grid", placeItems: "center", fontSize: 26 }}>🧑‍✈️</div>
-      <div style={{ flex: 1 }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 19, color: T.text }}>{name}</div></div>
-      <div onClick={onEditName} className="press" style={{ cursor: "pointer", padding: 6 }}><Icon d={I.chevR} size={20} color={T.subd} /></div>
+function ProfileDataEditor({ profile, onSave, onClose }) {
+  const [f,setF]=useState(()=>({ fullName:"",birthDate:"",citizenship:"",passport:"",passportExpiry:"",email:"",phone:"",homeAirport:"",defaultCurrency:"EUR",...(profile||{}) }));
+  const st={width:"100%",background:T.card,border:`1px solid ${T.line}`,borderRadius:12,padding:"11px 12px",color:T.text,outline:"none",marginTop:5,colorScheme:"dark"};
+  const row=(k,label,type="text",ph="")=><div style={{marginBottom:11}}><div style={{fontSize:10.5,color:T.subd,fontWeight:700}}>{label}</div><input type={type} value={f[k]||""} onChange={(e)=>setF(x=>({...x,[k]:e.target.value}))} placeholder={ph} style={st}/></div>;
+  return <FullScreenOverlay onClose={onClose}><SheetHead title="Данные путешественника" onClose={onClose}/>
+    <div style={{fontSize:11.5,color:T.subd,lineHeight:1.45,marginBottom:14}}>Заполните один раз — TripWise сможет подставлять эти данные в документы и не спрашивать их заново.</div>
+    {row("fullName","ФИО как в загранпаспорте","text","IVAN IVANOV")}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>{row("birthDate","Дата рождения","date")}{row("citizenship","Гражданство","text","Россия")}</div>
+    {row("passport","Номер загранпаспорта","text","72 1234567")}
+    {row("passportExpiry","Действителен до","date")}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>{row("email","Email","email")}{row("phone","Телефон","tel","+7…")}</div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 110px",gap:9}}>{row("homeAirport","Домашний аэропорт","text","MOW")}{<div style={{marginBottom:11}}><div style={{fontSize:10.5,color:T.subd,fontWeight:700}}>Валюта</div><select value={f.defaultCurrency||"EUR"} onChange={(e)=>setF(x=>({...x,defaultCurrency:e.target.value}))} style={{...st,marginTop:5}}>{["EUR","USD","RUB","GBP","AED","NOK","JPY","CNY","THB"].map(c=><option key={c}>{c}</option>)}</select></div>}</div>
+    <Btn onClick={()=>onSave(f)}>Сохранить данные</Btn>
+  </FullScreenOverlay>;
+}
+function NotificationSettings({ prefs, onChange, onClose }) {
+  const np=prefs||{deals:true,promos:true,deadlines:true,group:true,changes:true,news:true};
+  const toggle=(k)=>onChange({...np,[k]:!np[k]});
+  return <FullScreenOverlay onClose={onClose}><SheetHead title="Уведомления" onClose={onClose}/>
+    <div style={{fontSize:11.5,color:T.subd,lineHeight:1.45,marginBottom:13}}>В Telegram отправляем только то, что требует внимания. Обычные изменения поездки собираются в тихий дайджест.</div>
+    <div style={{background:T.card,border:`1px solid ${T.line}`,borderRadius:17,overflow:"hidden"}}>
+      <NotifyToggle label="Дешёвые авиабилеты" sub="выгодные цены по вашим направлениям" icon="🎫" on={np.deals} onToggle={()=>toggle("deals")}/><div style={{height:1,background:T.line}}/>
+      <NotifyToggle label="Промокоды на отели" sub="новые скидки от сервисов" icon="🏷️" on={np.promos} onToggle={()=>toggle("promos")}/><div style={{height:1,background:T.line}}/>
+      <NotifyToggle label="Дедлайны по поездкам" sub="визы, документы, чек-ин" icon="⏰" on={np.deadlines} onToggle={()=>toggle("deadlines")}/><div style={{height:1,background:T.line}}/>
+      <NotifyToggle label="Ask Group" sub="когда группе нужно ваше решение" icon="👥" on={np.group!==false} onToggle={()=>toggle("group")}/><div style={{height:1,background:T.line}}/>
+      <NotifyToggle label="Изменения в поездках" sub="дайджест вместо сообщения на каждое изменение" icon="🧾" on={np.changes!==false} onToggle={()=>toggle("changes")}/><div style={{height:1,background:T.line}}/>
+      <NotifyToggle label="Новости приложения" sub="редкие продуктовые обновления" icon="📣" on={np.news} onToggle={()=>toggle("news")}/>
     </div>
-    <div style={{ padding: "18px 20px 0" }}>
-      <div onClick={onTraveler} className="press" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, padding: 16, cursor: "pointer" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}><Icon d={I.user} size={18} color={T.violet} /><span style={{ fontSize: 13, color: T.sub, fontWeight: 700 }}>Путешественник</span></div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}><Icon d={I.pin} size={18} color={T.violet} /><div style={{ flex: 1 }}><div style={{ fontSize: 14, color: T.text, fontWeight: 600 }}>Паспорт, гражданство и визы</div><div style={{ fontSize: 11.5, color: T.subd }}>Россия, Шенген, Таиланд и ещё 2</div></div><Icon d={I.chevR} size={18} color={T.subd} /></div>
-        <div style={{ marginTop: 12, fontSize: 11.5, color: T.subd }}>✓ Эти данные помогают подбирать маршруты с учётом визовых требований</div>
+  </FullScreenOverlay>;
+}
+function Profile({ name, onTraveler, onEditName, onOpenDocs, setToast, notifyPrefs, onNotifyChange, profile, onProfileSave, trips=[] }) {
+  const [profileOpen,setProfileOpen]=useState(false),[notifyOpen,setNotifyOpen]=useState(false);
+  const np=notifyPrefs||{deals:true,promos:true,deadlines:true,group:true,changes:true,news:true};
+  const mine=store.get("mydocs",[])||[];
+  const cit=store.get("cit",{})||{}, vis=store.get("vis",{})||{};
+  const actualProfile={...(profile||{}),fullName:(profile&&profile.fullName)||name};
+  const keys=["fullName","birthDate","citizenship","passport","passportExpiry","email","phone"];
+  const filled=keys.filter(k=>String(actualProfile[k]||"").trim()).length, pct=Math.round(filled/keys.length*100);
+  const countries=[...new Set((trips||[]).map(t=>t.country).filter(Boolean))];
+  const enabled=Object.values(np).filter(Boolean).length;
+  const readyDocs=mine.filter(d=>d.status==="ready").length,draftDocs=mine.filter(d=>d.status!=="ready").length;
+  const initials=String(name||"TW").split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase();
+  const row=(title,sub,onClick,right)=><div onClick={onClick} className="press" style={{display:"flex",alignItems:"center",gap:10,padding:"13px 14px",borderTop:`1px solid ${T.line}`,cursor:"pointer"}}><div style={{flex:1,minWidth:0}}><div style={{fontSize:13.5,fontWeight:700,color:T.text}}>{title}</div>{sub&&<div style={{fontSize:10.8,color:T.subd,marginTop:3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{sub}</div>}</div>{right&&<span style={{fontSize:11,color:T.subd}}>{right}</span>}<Icon d={I.chevR} size={15} color={T.subd}/></div>;
+  return <div style={{animation:"fadeUp .18s ease-out",paddingBottom:18}}>
+    <Header/>
+    <ScreenHero title={name} eyebrow="Профиль путешественника" sub={`${countries.length} ${plural(countries.length,"страна","страны","стран")} · ${(trips||[]).length} ${plural((trips||[]).length,"поездка","поездки","поездок")}`} image={HOME_ASSETS.fullTrip}/>
+    <div style={{padding:"0 16px"}}>
+      <div onClick={()=>setProfileOpen(true)} className="press" style={{background:`linear-gradient(135deg,${T.card2},${T.card})`,border:`1px solid ${T.line2}`,borderRadius:19,padding:15,cursor:"pointer",marginBottom:11}}>
+        <div style={{display:"flex",alignItems:"center",gap:11}}><div style={{width:48,height:48,borderRadius:16,background:"linear-gradient(135deg,#d66cf1,#9364f5,#31c7f3)",display:"grid",placeItems:"center",fontFamily:"Sora,sans-serif",fontSize:15,fontWeight:800,color:"#fff"}}>{initials}</div><div style={{flex:1}}><div style={{fontFamily:"Sora,sans-serif",fontSize:14.5,fontWeight:800,color:T.text}}>Данные путешественника</div><div style={{fontSize:10.8,color:T.subd,marginTop:3}}>{pct<100?`Заполнено ${pct}% · меньше ручного ввода в документах`:"Профиль заполнен · готов к автоподстановке"}</div></div><span style={{color:pct===100?T.green:T.cyan,fontSize:12,fontWeight:900}}>{pct}%</span></div>
+        <div style={{height:5,background:"rgba(255,255,255,.06)",borderRadius:99,overflow:"hidden",marginTop:12}}><div style={{height:"100%",width:pct+"%",background:GRAD.cta,borderRadius:99}}/></div>
+      </div>
+      <div style={{background:T.card,border:`1px solid ${T.line}`,borderRadius:17,overflow:"hidden",marginBottom:11}}>
+        {row("Гражданство и визы",`${Object.keys(cit).filter(k=>cit[k]).length||0} гражданств · ${Object.keys(vis).filter(k=>vis[k]).length||0} действующих виз`,onTraveler)}
+        {row("Мои документы",mine.length?`${readyDocs} готово${draftDocs?` · ${draftDocs} черновик${draftDocs>1?"а":""}`:""}`:"Документы и анкеты появятся здесь после заполнения",()=>onOpenDocs&&onOpenDocs(),mine.length?String(mine.length):null)}
+        {row("Уведомления",`${enabled} категорий включено`,()=>setNotifyOpen(true))}
+      </div>
+      <div style={{fontFamily:"Sora,sans-serif",fontSize:12,fontWeight:800,color:T.subd,margin:"17px 4px 8px"}}>О приложении</div>
+      <div style={{background:T.card,border:`1px solid ${T.line}`,borderRadius:17,overflow:"hidden"}}>
+        {row("Поддержка","Помощь по TripWise",()=>setToast("Раздел поддержки подключим перед релизом"))}
+        {row("Конфиденциальность","Как хранятся данные",()=>setToast("Политика будет доступна перед публикацией"))}
+        <div style={{display:"flex",alignItems:"center",padding:"13px 14px",borderTop:`1px solid ${T.line}`}}><span style={{fontSize:13.5,color:T.text,flex:1}}>Версия</span><span style={{fontSize:11.5,color:T.subd}}>4.0 UX</span></div>
       </div>
     </div>
-    <div style={{ padding: "22px 20px 0" }}>
-      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 16, marginBottom: 6 }}>Уведомления в Telegram</div>
-      <div style={{ fontSize: 11.5, color: T.subd, marginBottom: 12 }}>Бот присылает только то, что вы выбрали</div>
-      <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, overflow: "hidden" }}>
-        <NotifyToggle label="Дешёвые авиабилеты" sub="выгодные цены по вашим направлениям" icon="🎫" on={np.deals} onToggle={() => setPref("deals")} />
-        <div style={{ height: 1, background: T.line }} />
-        <NotifyToggle label="Промокоды на отели" sub="новые скидки от сервисов" icon="🏷️" on={np.promos} onToggle={() => setPref("promos")} />
-        <div style={{ height: 1, background: T.line }} />
-        <NotifyToggle label="Дедлайны по поездкам" sub="визы, документы, чек-ин — по поездкам с 🔔" icon="⏰" on={np.deadlines} onToggle={() => setPref("deadlines")} />
-        <div style={{ height: 1, background: T.line }} />
-        <NotifyToggle label="Ask Group" sub="когда участникам нужно ваше решение" icon="👥" on={np.group !== false} onToggle={() => setPref("group")} />
-        <div style={{ height: 1, background: T.line }} />
-        <NotifyToggle label="Изменения в поездках" sub="тихий дайджест вместо сообщения на каждое изменение" icon="🧾" on={np.changes !== false} onToggle={() => setPref("changes")} />
-        <div style={{ height: 1, background: T.line }} />
-        <NotifyToggle label="Новости приложения" sub="обновления и новые возможности" icon="📣" on={np.news} onToggle={() => setPref("news")} />
-      </div>
-    </div>
-    <div style={{ padding: "22px 20px 0" }}>
-      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 16, marginBottom: 12 }}>Полезные сервисы</div>
-      <ServiceGrid setToast={setToast} />
-    </div>
-    <div style={{ padding: "22px 20px 0" }}>
-      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 16, marginBottom: 12 }}>О приложении</div>
-      <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, overflow: "hidden" }}>
-        {[["Поддержка", ""], ["Политика конфиденциальности", ""], ["Версия приложения", "1.0.0"]].map(([t, v], i) => (<div key={t} onClick={() => v || setToast("Раздел в разработке")} className="press" style={{ display: "flex", alignItems: "center", gap: 10, padding: 15, borderTop: i ? `1px solid ${T.line}` : "none", cursor: "pointer" }}><span style={{ flex: 1, fontSize: 14, color: T.text }}>{t}</span>{v && <span style={{ fontSize: 12.5, color: T.subd }}>{v}</span>}<Icon d={I.chevR} size={16} color={T.subd} /></div>))}
-      </div>
-    </div>
+    {profileOpen&&<ProfileDataEditor profile={actualProfile} onClose={()=>setProfileOpen(false)} onSave={(v)=>{onProfileSave&&onProfileSave(v);setProfileOpen(false);setToast("Данные сохранены");}}/>}
+    {notifyOpen&&<NotificationSettings prefs={np} onChange={onNotifyChange} onClose={()=>setNotifyOpen(false)}/>} 
   </div>;
 }
+
 function NameEdit({ name, onSave, onClose }) {
   const [v, setV] = useState(name);
   return <Overlay onClose={onClose}><SheetHead title="Изменить имя" onClose={onClose} />
@@ -1577,13 +1639,14 @@ function validateField(f, v) {
   return null;
 }
 
-function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
+function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = false, tripContext = null }) {
+  const Wrap = fullScreen ? FullScreenOverlay : Overlay;
   const cfg = docConfig(doc.id, doc.name, doc.country);
   const persistRequest = (status) => {
     try {
       const list = store.get("mydocs", []);
       const rid = savedId || (doc.id + "-" + Date.now().toString(36));
-      const rec = { id: rid, docKey: doc.id, name: doc.name, country: doc.country || "", ans: {}, status, kind: "request", updatedAt: Date.now() };
+      const rec = { id: rid, docKey: doc.id, name: doc.name, country: doc.country || "", tripId: tripContext && tripContext.id || null, ans: {}, status, kind: "request", updatedAt: Date.now() };
       const i = list.findIndex((d) => d.id === rid);
       if (i >= 0) list[i] = rec; else list.unshift(rec);
       store.set("mydocs", list); onSaved && onSaved();
@@ -1593,7 +1656,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
   const [docId] = useState(savedId || (doc.id + "-" + Date.now().toString(36)));
   const [ans, setAns] = useState(() => {
     if (saved && saved.ans) return saved.ans;
-    return cfg ? autofillFrom(cfg, store.get("trips", [])) : {};
+    return cfg ? autofillFrom(cfg, tripContext ? [tripContext] : store.get("trips", [])) : {};
   });
   const [stepIdx, setStepIdx] = useState(saved && saved.stepIdx ? saved.stepIdx : 0);
   const [mode, setMode] = useState(saved && saved.status === "ready" ? "result" : "form");
@@ -1605,7 +1668,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
   const rq = REQUEST_DOCS[doc.id];
   if (rq) {
     const copyTpl = async () => { (await copyText(rq.template || "")) ? setToast("Шаблон скопирован") : setToast("Не удалось скопировать"); };
-    return <Overlay onClose={onClose}><SheetHead title={rq.name} onClose={onClose} />
+    return <Wrap onClose={onClose}><SheetHead title={rq.name} onClose={onClose} />
       <div style={{ maxHeight: "64vh", overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain", paddingRight: 2 }}>
         <div style={{ background: T.violet + "14", border: `1px solid ${T.violet}44`, borderRadius: 14, padding: 12, marginBottom: 12 }}>
           <div style={{ fontSize: 11, color: T.violet, fontWeight: 800, marginBottom: 4 }}>У КОГО ЗАПРОСИТЬ</div>
@@ -1638,11 +1701,11 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
         <div style={{ fontSize: 10.5, color: T.subd, marginTop: 12 }}>Требования проверены {rq.checked}. Перед подачей сверьтесь с сайтом консульства — правила меняются.</div>
       </div>
       <div onClick={() => { persistRequest("ready"); onClose(); setToast("Отмечено как готовое"); }} className="press" style={{ marginTop: 12, textAlign: "center", background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 13.5, fontWeight: 800, cursor: "pointer" }}>Документ получен</div>
-    </Overlay>;
+    </Wrap>;
   }
-  if (!cfg) return <Overlay onClose={onClose}><SheetHead title={doc.name} onClose={onClose} />
+  if (!cfg) return <Wrap onClose={onClose}><SheetHead title={doc.name} onClose={onClose} />
     <div style={{ fontSize: 13, color: T.subd, lineHeight: 1.5, padding: "4px 0 12px" }}>Мастер для этого документа появится позже. Пока воспользуйтесь официальным сайтом.</div>
-  </Overlay>;
+  </Wrap>;
 
   // шаги, где нет ни одного видимого поля (напр. «Принимающая сторона» при туризме), пропускаем
   const steps = cfg.steps.filter((st) => st.groups.some((g) => g.fields.some((f) => fieldVisible(f, ans))));
@@ -1656,7 +1719,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
   const persist = (nextAns, status, si) => {
     try {
       const list = store.get("mydocs", []);
-      const rec = { id: docId, docKey: doc.id, name: doc.name, country: doc.country || cfg.country || "", ans: nextAns, status, stepIdx: si == null ? stepIdx : si, updatedAt: Date.now() };
+      const rec = { id: docId, docKey: doc.id, name: doc.name, country: doc.country || cfg.country || "", tripId: tripContext && tripContext.id || null, ans: nextAns, status, stepIdx: si == null ? stepIdx : si, updatedAt: Date.now() };
       const i = list.findIndex((d) => d.id === docId);
       if (i >= 0) list[i] = rec; else list.unshift(rec);
       store.set("mydocs", list); onSaved && onSaved();
@@ -1719,7 +1782,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
   // ---------- экран результата ----------
   if (mode === "result") {
     const ready = allVisible.filter((f) => ans[f.k]);
-    return <Overlay onClose={onClose}><SheetHead title="Документ готов" onClose={onClose} />
+    return <Wrap onClose={onClose}><SheetHead title="Документ готов" onClose={onClose} />
       <div style={{ maxHeight: "62vh", overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain" }}>
         <div style={{ fontSize: 12, color: T.subd, marginBottom: 12, lineHeight: 1.45 }}>Значения подготовлены в формате официальной формы{cfg.officialUrl ? " — перенесите их на официальный сайт" : ""}. Данные хранятся только на вашем устройстве.</div>
         {ready.map((f) => <div key={f.k} style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
@@ -1732,12 +1795,12 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
         <div onClick={copyAll} className="press" style={{ flex: 1.3, textAlign: "center", background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Скопировать всё</div>
       </div>
       {cfg.officialUrl && <div onClick={() => { try { window.open(cfg.officialUrl, "_blank"); } catch (e) { } }} className="press" style={{ textAlign: "center", fontSize: 12.5, color: T.violet, fontWeight: 700, cursor: "pointer", padding: "12px 0 2px" }}>Открыть официальный сайт →</div>}
-    </Overlay>;
+    </Wrap>;
   }
 
   // ---------- экран проверки ----------
   if (mode === "review") {
-    return <Overlay onClose={onClose}><SheetHead title="Проверка документа" onClose={onClose} />
+    return <Wrap onClose={onClose}><SheetHead title="Проверка документа" onClose={onClose} />
       <div style={{ maxHeight: "62vh", overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain" }}>
         {steps.map((st) => {
           const sf = allVisible.filter((f) => f.stepId === st.id && f.req);
@@ -1754,12 +1817,12 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
         <div onClick={() => setMode("form")} className="press" style={{ flex: 1, textAlign: "center", background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 13, color: T.text, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Назад</div>
         <div onClick={() => { if (problems.length) { setTouched(Object.fromEntries(reqAll.map((f) => [f.k, true]))); return setToast("Остались незаполненные поля"); } setMode("result"); persist(ans, "ready"); }} className="press" style={{ flex: 1.3, textAlign: "center", background: problems.length ? T.card : GRAD.cta, border: problems.length ? `1px solid ${T.line}` : "none", borderRadius: 14, padding: 13, color: problems.length ? T.subd : "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Сформировать</div>
       </div>
-    </Overlay>;
+    </Wrap>;
   }
 
   // ---------- экран шага ----------
   const last = stepIdx >= steps.length - 1;
-  return <Overlay onClose={onClose}>
+  return <Wrap onClose={onClose}>
     <SheetHead title={cfg.title} onClose={onClose} />
     <div style={{ marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
@@ -1784,7 +1847,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved }) {
       <div onClick={() => stepIdx === 0 ? onClose() : goStep(stepIdx - 1)} className="press" style={{ flex: 1, textAlign: "center", background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 13, color: T.text, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Назад</div>
       <div onClick={() => { if (last) { setTouched(Object.fromEntries(reqAll.map((f) => [f.k, true]))); setMode("review"); } else goStep(stepIdx + 1); }} className="press" style={{ flex: 1.4, textAlign: "center", background: GRAD.cta, borderRadius: 14, padding: 13, color: "#fff", fontSize: 13.5, fontWeight: 800, cursor: "pointer" }}>{last ? "Проверить документ" : "Продолжить"}</div>
     </div>
-  </Overlay>;
+  </Wrap>;
 }
 // какие блоки включены (по источнику создания поездки); старые поездки — все блоки
 const tripBlocks = (t) => t.blocksOn || { tickets: true, lodging: true, docs: true };
@@ -2015,7 +2078,7 @@ function prettyFlightNumber(v){const n=String(v||"").toUpperCase().replace(/[^A-
 function legGapMin(a,b){try{const x=new Date(a&&a.arriveISO||0),y=new Date(b&&b.departISO||0),m=Math.round((y-x)/60000);return Number.isFinite(m)&&m>0&&m<1440?m:null;}catch(e){return null;}}
 function journeyWarnings(legs){const out=[];for(let i=1;i<(legs||[]).length;i++){const a=legs[i-1]||{},b=legs[i]||{};if(a.toCode&&b.fromCode&&String(a.toCode).toUpperCase()!==String(b.fromCode).toUpperCase())out.push(`Между рейсами смена аэропорта: ${a.toCode} → ${b.fromCode}`);try{if(a.arriveISO&&b.departISO&&new Date(b.departISO)<=new Date(a.arriveISO))out.push(`Проверьте порядок рейсов ${prettyFlightNumber(a.flightNumber)} → ${prettyFlightNumber(b.flightNumber)}: время пересекается`);}catch(e){}}return out;}
 
-function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTrip, onFindTickets, goHotels, goDocs, setToast, onReplaceTrip, bottomStr = "0px" }) {
+function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTrip, onFindTickets, goHotels, goDocs, setToast, onReplaceTrip, onUndoable, bottomStr = "0px" }) {
   const p = tripProgress(t), d = daysTo(t.df), act = nextAction(t), bOn = tripBlocks(t), docs = bOn.docs ? tripDocs(t) : [];
   const isCreator = t._viewer ? !!t._viewer.isCreator : true;
   const members = (t.members && t.members.length) ? t.members : [{ id: "local", displayName: "Вы" }];
@@ -2045,6 +2108,8 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
   const [settleBusy, setSettleBusy] = useState(false);
   const [importOpen, setImportOpen] = useState(false), [importText, setImportText] = useState(""), [importBusy, setImportBusy] = useState(false), [importResult, setImportResult] = useState(null);
   const [activitySeen, setActivitySeen] = useState(() => store.get(`activity_seen_${t.id}`, ""));
+  const [confirmDanger, setConfirmDanger] = useState(null);
+  const [docsExpanded, setDocsExpanded] = useState(initialBlk === "docs");
 
   const upd = (fn) => { if (!isCreator) { setToast("Основной план меняет создатель поездки"); return; } onUpdate(t.id, fn); };
   const replace = (trip) => { if (trip) onReplaceTrip(trip); };
@@ -2069,11 +2134,11 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
   const addPlanItem = () => {
     const name = addForm.name.trim(); if (!name || !addSec) { setToast("Введите название"); return; }
     const key = addSec;
-    const item = { id: key[0] + Date.now(), name, done: false, priceAmount: Number(addForm.priceAmount) || null, currency: addForm.currency || "EUR", pricingMode: addForm.pricingMode || "total", splitTravelerIds: (addForm.splitTravelerIds || []).length ? addForm.splitTravelerIds : travelers.map((x) => x.id), payments: normalizePayments(addForm), startDate: addForm.startDate || "", endDate: addForm.endDate || "", startTime: addForm.startTime || "", endTime: addForm.endTime || "", location: addForm.location || "", notes: addForm.notes || "", createdAt: new Date().toISOString() };
+    const item = { id: key[0] + Date.now(), name, done: false, status: "saved", priceAmount: Number(addForm.priceAmount) || null, currency: addForm.currency || "EUR", pricingMode: addForm.pricingMode || "total", splitTravelerIds: (addForm.splitTravelerIds || []).length ? addForm.splitTravelerIds : travelers.map((x) => x.id), payments: normalizePayments(addForm), startDate: addForm.startDate || "", endDate: addForm.endDate || "", startTime: addForm.startTime || "", endTime: addForm.endTime || "", location: addForm.location || "", notes: addForm.notes || "", createdAt: new Date().toISOString() };
     upd((x) => ({ ...x, [key]: [...(x[key] || []), item], baseCurrency: x.baseCurrency || addForm.currency || "EUR" })); setAddSec(null);
   };
   const patchArrayItem = (key, id, patch) => upd((x) => ({ ...x, [key]: (x[key] || []).map((y) => y.id === id ? { ...y, ...patch } : y) }));
-  const toggleArr = (key, id) => patchArrayItem(key, id, { done: !(t[key] || []).find((x) => x.id === id)?.done });
+  const toggleArr = (key, id) => { const cur=(t[key]||[]).find((x)=>x.id===id); const done=!cur?.done; patchArrayItem(key,id,{done,status:done?"confirmed":"saved"}); };
   const toggleDoc = (id) => upd((x) => ({ ...x, checks: { ...x.checks, docs: { ...(x.checks && x.checks.docs || {}), [id]: !(x.checks && x.checks.docs && x.checks.docs[id]) } } }));
   const togglePrep = (it) => { if (it.kind === "svc") upd((x) => ({ ...x, checks: { ...x.checks, services: { ...(x.checks && x.checks.services || {}), [it.raw]: !(x.checks && x.checks.services && x.checks.services[it.raw]) } } })); else patchArrayItem("custom", it.raw, { done: !it.done }); };
   const openCost = (kind, item) => {
@@ -2082,8 +2147,16 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
   };
   const saveCost = () => {
     if (!editCost) return;
-    const patch = { name: String(editCost.name || "").trim() || "Пункт", priceAmount: Number(editCost.priceAmount) || null, currency: editCost.currency || "EUR", pricingMode: editCost.pricingMode || "total", splitTravelerIds: (editCost.splitTravelerIds || []).length ? editCost.splitTravelerIds : travelers.map((x) => x.id), payments: normalizePayments(editCost), paidByTravelerId: null, startDate: editCost.startDate || "", endDate: editCost.endDate || "", startTime: editCost.startTime || "", endTime: editCost.endTime || "", location: editCost.location || "", notes: editCost.notes || "" };
+    const patch = { name: String(editCost.name || "").trim() || "Пункт", status: editCost.status || (editCost.done ? "confirmed" : "saved"), priceAmount: Number(editCost.priceAmount) || null, currency: editCost.currency || "EUR", pricingMode: editCost.pricingMode || "total", splitTravelerIds: (editCost.splitTravelerIds || []).length ? editCost.splitTravelerIds : travelers.map((x) => x.id), payments: normalizePayments(editCost), paidByTravelerId: null, startDate: editCost.startDate || "", endDate: editCost.endDate || "", startTime: editCost.startTime || "", endTime: editCost.endTime || "", location: editCost.location || "", notes: editCost.notes || "" };
     if (editCost.kind === "journey") patchArrayItem("flightJourneys", editCost.id, patch); else patchArrayItem(editCost.kind, editCost.id, patch); setEditCost(null);
+  };
+  const removePlanItem = (row) => {
+    if (!row) return;
+    const key=row.kind === "journey" ? "flightJourneys" : row.kind;
+    const source=(t[key]||[]), idx=source.findIndex((x)=>x.id===row.id), removed=source[idx];
+    if (!removed) return;
+    upd((x)=>({...x,[key]:(x[key]||[]).filter((y)=>y.id!==row.id)})); setEditCost(null);
+    onUndoable && onUndoable("Пункт удалён",()=>upd((x)=>{const cur=[...(x[key]||[])];if(cur.some((y)=>y.id===removed.id))return x;cur.splice(Math.max(0,Math.min(idx,cur.length)),0,removed);return {...x,[key]:cur};}));
   };
   const PriceBadge = ({ kind, item }) => { const c = itemCost(t, item); return <span onClick={(e) => { e.stopPropagation(); isCreator && openCost(kind, item); }} className="press" style={{ fontSize: 10.5, fontWeight: 800, color: c ? T.cyan : T.subd, border: `1px solid ${c ? T.cyan + "55" : T.line}`, borderRadius: 999, padding: "3px 7px", cursor: isCreator ? "pointer" : "default", whiteSpace: "nowrap" }}>{c ? money(c.total, c.currency) : "＋ цена"}</span>; };
 
@@ -2113,7 +2186,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
     const id = "fj" + Date.now();
     const fallbackLegs = rows.map((row) => ({ flightNumber: prettyFlightNumber(row.flightNumber), compactFlightNumber: String(row.flightNumber || "").toUpperCase().replace(/[^A-Z0-9]/g, ""), date: row.date, aircraft: null, source: "manual" }));
     const initialName = fallbackLegs.length > 1 ? `Перелёт · ${fallbackLegs.map((x) => x.flightNumber).join(" → ")}` : `Перелёт ${fallbackLegs[0].flightNumber}`;
-    const j = { id, name: initialName, legs: fallbackLegs, done: true, priceAmount: Number(journeyCost.priceAmount) || null, currency: journeyCost.currency || "EUR", pricingMode: journeyCost.pricingMode || "total", splitTravelerIds: (journeyCost.splitTravelerIds || []).length ? journeyCost.splitTravelerIds : travelers.map((x) => x.id), payments: normalizePayments(journeyCost), createdAt: new Date().toISOString() };
+    const j = { id, name: initialName, legs: fallbackLegs, done: true, status: "confirmed", priceAmount: Number(journeyCost.priceAmount) || null, currency: journeyCost.currency || "EUR", pricingMode: journeyCost.pricingMode || "total", splitTravelerIds: (journeyCost.splitTravelerIds || []).length ? journeyCost.splitTravelerIds : travelers.map((x) => x.id), payments: normalizePayments(journeyCost), createdAt: new Date().toISOString() };
     // Сохраняем сразу: внешний flight API больше не блокирует создание перелёта.
     upd((x) => ({ ...x, flightJourneys: [...(x.flightJourneys || []), j], baseCurrency: x.baseCurrency || j.currency }));
     setFlightOpen(false); setJourneyLegs([{ flightNumber: "", date: t.df || "" }]); setJourneyCost(emptyCost());
@@ -2144,7 +2217,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
   const analyzeImport = async () => { const text = importText.trim(); if (text.length < 12) { setToast("Вставьте текст бронирования или письма"); return; } setImportBusy(true); setImportResult(null); const r = await sharedApi("booking-import", { tripId: t.id, text }); setImportBusy(false); if (r.ok && r.booking) setImportResult(r.booking); else setToast("Не удалось распознать бронирование"); };
   const importFile = async (e) => { const f = e.target.files && e.target.files[0]; if (!f) return; if (!/text|message/.test(f.type || "") && !/\.(txt|eml)$/i.test(f.name || "")) { setToast("Сейчас импортируем текст письма/брони. Для PDF и скрина нужен OCR-слой."); return; } try { setImportText((await f.text()).slice(0, 14000)); } catch (err) { setToast("Не удалось прочитать файл"); } };
   const applyImport = async () => {
-    const b = importResult; if (!b || !isCreator) return; const common = { id: "im" + Date.now(), name: b.title || "Импортированное бронирование", done: true, priceAmount: Number(b.priceAmount) || null, currency: b.currency || t.baseCurrency || "EUR", pricingMode: b.pricingMode || "total", splitTravelerIds: travelers.map((x) => x.id), payments: [], startDate: b.startDate || "", endDate: b.endDate || "", startTime: b.startTime || "", endTime: b.endTime || "", location: b.location || "", notes: b.notes || "", imported: true, createdAt: new Date().toISOString() };
+    const b = importResult; if (!b || !isCreator) return; const common = { id: "im" + Date.now(), name: b.title || "Импортированное бронирование", done: true, status: "confirmed", priceAmount: Number(b.priceAmount) || null, currency: b.currency || t.baseCurrency || "EUR", pricingMode: b.pricingMode || "total", splitTravelerIds: travelers.map((x) => x.id), payments: [], startDate: b.startDate || "", endDate: b.endDate || "", startTime: b.startTime || "", endTime: b.endTime || "", location: b.location || "", notes: b.notes || "", imported: true, createdAt: new Date().toISOString() };
     if (b.kind === "flight" && (b.flightLegs || []).length) { const { legs } = await enrichLegs(b.flightLegs); upd((x) => ({ ...x, flightJourneys: [...(x.flightJourneys || []), { ...common, id: "fj" + Date.now(), legs }], baseCurrency: x.baseCurrency || common.currency })); }
     else if (b.kind === "stay") upd((x) => ({ ...x, stays: [...(x.stays || []), common] }));
     else if (b.kind === "transport") upd((x) => ({ ...x, transport: [...(x.transport || []), common] }));
@@ -2160,10 +2233,10 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 
   const SectionHead = ({ k, icon, title, sub, done, total, action }) => <div onClick={() => setOpen((x) => ({ ...x, [k]: !x[k] }))} className="press" style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 2px", cursor: "pointer", borderTop: `1px solid ${T.line}` }}><div style={{ width: 34, height: 34, borderRadius: 11, background: T.card2, display: "grid", placeItems: "center", fontSize: 17 }}>{icon}</div><div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, fontFamily: "Sora,sans-serif" }}>{title}</div><div style={{ fontSize: 10.8, color: T.subd, marginTop: 2 }}>{sub}</div></div>{total > 0 && <span style={{ fontSize: 10.5, fontWeight: 800, color: done === total ? T.green : T.subd }}>{done}/{total}</span>}{action && isCreator && <span onClick={(e) => { e.stopPropagation(); action(); }} className="press" style={{ color: T.violet, fontSize: 18, padding: "2px 4px" }}>＋</span>}<span style={{ transform: open[k] ? "rotate(90deg)" : "none", transition: "transform .15s", display: "inline-flex" }}><Icon d={I.chevR} size={14} color={T.subd} /></span></div>;
   const Empty = ({ children }) => <div style={{ fontSize: 11.5, color: T.subd, padding: "6px 0 9px" }}>{children}</div>;
-  const ScheduleFields = ({ kind, form, setForm }) => <div style={{ marginTop: 10 }}><div style={{ fontSize: 10.5, color: T.subd, marginBottom: 6 }}>Когда и где</div>{kind === "stays" ? <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}><input type="date" value={form.startDate || ""} onChange={(e) => setForm((x) => ({ ...x, startDate: e.target.value }))} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: 9, color: T.text, colorScheme: "dark" }} /><input type="date" value={form.endDate || ""} onChange={(e) => setForm((x) => ({ ...x, endDate: e.target.value }))} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: 9, color: T.text, colorScheme: "dark" }} /></div> : <div style={{ display: "grid", gridTemplateColumns: "1fr 95px 95px", gap: 7 }}><input type="date" value={form.startDate || ""} onChange={(e) => setForm((x) => ({ ...x, startDate: e.target.value }))} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: 9, color: T.text, colorScheme: "dark" }} /><input type="time" value={form.startTime || ""} onChange={(e) => setForm((x) => ({ ...x, startTime: e.target.value }))} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: 9, color: T.text, colorScheme: "dark" }} /><input type="time" value={form.endTime || ""} onChange={(e) => setForm((x) => ({ ...x, endTime: e.target.value }))} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: 9, color: T.text, colorScheme: "dark" }} /></div>}<input value={form.location || ""} onChange={(e) => setForm((x) => ({ ...x, location: e.target.value }))} placeholder="Место / адрес — необязательно" style={{ width: "100%", marginTop: 7, background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 10px", color: T.text, outline: "none" }} /></div>;
+  const ScheduleFields = ({ kind, form, setForm }) => <div style={{ marginTop: 10 }}><div style={{ fontSize: 10.5, color: T.subd, marginBottom: 6 }}>Когда и где</div>{kind === "stays" ? <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}><input type="date" value={form.startDate || ""} onChange={(e) => setForm((x) => ({ ...x, startDate: e.target.value, endDate: x.endDate && x.endDate <= e.target.value ? addIsoDays(e.target.value, 1) : x.endDate }))} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: 9, color: T.text, colorScheme: "dark" }} /><input type="date" min={form.startDate ? addIsoDays(form.startDate,1) : undefined} value={form.endDate || ""} onChange={(e) => setForm((x) => ({ ...x, endDate: x.startDate && e.target.value <= x.startDate ? addIsoDays(x.startDate,1) : e.target.value }))} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: 9, color: T.text, colorScheme: "dark" }} /></div> : <div style={{ display: "grid", gridTemplateColumns: "1fr 95px 95px", gap: 7 }}><input type="date" value={form.startDate || ""} onChange={(e) => setForm((x) => ({ ...x, startDate: e.target.value }))} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: 9, color: T.text, colorScheme: "dark" }} /><input type="time" value={form.startTime || ""} onChange={(e) => setForm((x) => ({ ...x, startTime: e.target.value }))} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: 9, color: T.text, colorScheme: "dark" }} /><input type="time" value={form.endTime || ""} onChange={(e) => setForm((x) => ({ ...x, endTime: e.target.value }))} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: 9, color: T.text, colorScheme: "dark" }} /></div>}<input value={form.location || ""} onChange={(e) => setForm((x) => ({ ...x, location: e.target.value }))} placeholder="Место / адрес — необязательно" style={{ width: "100%", marginTop: 7, background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 10px", color: T.text, outline: "none" }} /></div>;
   const CostFields = ({ form, setForm }) => <><div style={{ display: "grid", gridTemplateColumns: "1fr 95px", gap: 8, marginTop: 9 }}><input inputMode="decimal" value={form.priceAmount || ""} onChange={(e) => setForm((x) => ({ ...x, priceAmount: e.target.value.replace(",", ".") }))} placeholder="Цена (необязательно)" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 11, padding: "10px 11px", color: T.text, outline: "none" }} /><select value={form.currency || "EUR"} onChange={(e) => setForm((x) => ({ ...x, currency: e.target.value }))} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 11, padding: 9, color: T.text, outline: "none" }}>{COST_CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select></div><div style={{ display: "flex", gap: 7, marginTop: 8 }}>{[["total", "За всех"], ["per_person", "За человека"]].map(([v, l]) => <div key={v} onClick={() => setForm((x) => ({ ...x, pricingMode: v }))} className="press" style={{ flex: 1, textAlign: "center", border: `1px solid ${form.pricingMode === v ? T.violet : T.line}`, background: form.pricingMode === v ? T.violet + "18" : T.card, borderRadius: 10, padding: 8, fontSize: 11, fontWeight: 800, color: form.pricingMode === v ? T.violet : T.subd, cursor: "pointer" }}>{l}</div>)}</div><div style={{ fontSize: 10.5, color: T.subd, marginTop: 10, marginBottom: 5 }}>На кого делим</div><div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{travelers.map((tr) => { const on = (form.splitTravelerIds || []).includes(tr.id); return <span key={tr.id} onClick={() => toggleSplit(setForm, tr.id)} className="press" style={{ fontSize: 10.5, fontWeight: 700, color: on ? T.violet : T.subd, border: `1px solid ${on ? T.violet + "66" : T.line}`, background: on ? T.violet + "15" : T.card, borderRadius: 999, padding: "5px 8px", cursor: "pointer" }}>{tr.name}</span>; })}</div><div style={{ fontSize: 10.5, color: T.subd, marginTop: 11, marginBottom: 5 }}>Кто уже оплатил</div>{(form.payments || []).map((pay, i) => <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 110px 28px", gap: 6, marginBottom: 6 }}><select value={pay.travelerId || ""} onChange={(e) => setForm((x) => ({ ...x, payments: (x.payments || []).map((p, j) => j === i ? { ...p, travelerId: e.target.value } : p) }))} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 9, padding: 8, color: T.text }}><option value="">Плательщик</option>{travelers.map((tr) => <option key={tr.id} value={tr.id}>{tr.name}</option>)}</select><input inputMode="decimal" value={pay.amount || ""} onChange={(e) => setForm((x) => ({ ...x, payments: (x.payments || []).map((p, j) => j === i ? { ...p, amount: e.target.value.replace(",", ".") } : p) }))} placeholder="Сумма" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 9, padding: 8, color: T.text, outline: "none" }} /><div onClick={() => setForm((x) => ({ ...x, payments: (x.payments || []).filter((_, j) => j !== i) }))} style={{ display: "grid", placeItems: "center", color: "#ff6db0", cursor: "pointer" }}>×</div></div>)}<div onClick={() => setForm((x) => ({ ...x, payments: [...(x.payments || []), { travelerId: travelers[0]?.id || "", amount: "" }] }))} style={{ fontSize: 11, color: T.violet, fontWeight: 800, cursor: "pointer", marginTop: 3 }}>＋ Добавить оплату</div></>;
   const JourneyCard = ({ j, legacy = false }) => { const legs = legacy ? [j] : (j.legs || []), warnings = journeyWarnings(legs); return <div style={{ background: T.card2, border: `1px solid ${warnings.length ? "#ffb45c55" : T.line}`, borderRadius: 13, padding: 10, marginBottom: 8 }}><div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: legs.length > 1 ? 8 : 2 }}><div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, flex: 1 }}>{j.name || `${legs[0]?.fromCode || "?"} → ${legs[legs.length - 1]?.toCode || "?"}`}</div>{!legacy && j.id && <PriceBadge kind="journey" item={j} />}{isCreator && !legacy && j.id && <span onClick={() => refreshJourney(j)} style={{ fontSize: 10.5, color: T.violet, cursor: "pointer" }}>обновить</span>}</div>{warnings.map((w,i)=><div key={i} style={{fontSize:10.3,color:"#ffb45c",background:"#ffb45c12",borderRadius:8,padding:"6px 8px",marginBottom:6}}>⚠ {w}</div>)}{legs.map((s, i) => { const gap = i ? legGapMin(legs[i - 1], s) : null; return <React.Fragment key={s.id || i}>{gap && <div style={{ fontSize: 10.5, color: T.cyan, margin: "5px 0 5px 11px" }}>↳ пересадка {hm(gap)}</div>}<div style={{ borderLeft: `2px solid ${T.violet}55`, paddingLeft: 9, paddingBottom: i < legs.length - 1 ? 7 : 0 }}><div style={{ display: "flex", gap: 7, alignItems: "center" }}><div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, flex: 1 }}>{prettyFlightNumber(s.flightNumber) || "Рейс"} · {s.fromCode || "?"} → {s.toCode || "?"}</div><span style={{ fontSize: 10, color: T.subd }}>{s.date || s.departISO && String(s.departISO).slice(0, 10) || ""}</span></div><div style={{ fontSize: 10.7, color: T.subd, marginTop: 3 }}>{s.departTime || s.departISO && String(s.departISO).slice(11, 16) || ""}{s.arriveTime ? ` → ${s.arriveTime}` : ""}{s.durationMin ? ` · ${hm(s.durationMin)}` : ""}</div><div style={{ fontSize: 10.7, color: T.subd, marginTop: 2 }}>✈ {s.aircraft || "самолёт уточняется"}{s.aircraftReg ? ` · ${s.aircraftReg}` : ""}{s.status ? ` · ${s.status}` : ""}{s.departureTerminal ? ` · терминал ${s.departureTerminal}` : ""}{s.departureGate ? ` · gate ${s.departureGate}` : ""}</div>{s.operatedBy && <div style={{ fontSize: 10, color: T.subd, marginTop: 2 }}>Выполняет: {s.operatedBy}</div>}</div></React.Fragment>; })}</div>; };
-  const PlanRow = ({ kind, item }) => <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0" }}><Check on={!!item.done} onClick={() => toggleArr(kind, item.id)} /><div onClick={() => isCreator && openCost(kind, item)} style={{ flex: 1, minWidth: 0, cursor: isCreator ? "pointer" : "default" }}><div style={{ fontSize: 12, color: T.text }}>{item.name}</div>{(item.startDate || item.location) && <div style={{ fontSize: 9.8, color: T.subd, marginTop: 2 }}>{[item.startDate && `${item.startDate}${item.startTime ? ` · ${item.startTime}` : ""}`, item.location].filter(Boolean).join(" · ")}</div>}</div><PriceBadge kind={kind} item={item} /></div>;
+  const PlanRow = ({ kind, item }) => { const st=item.status||(item.done?"confirmed":"saved"), sl=st==="confirmed"?"подтверждено":st==="draft"?"черновик":"сохранено", sc=st==="confirmed"?T.green:st==="draft"?"#e0a53a":T.subd; return <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0"}}><Check on={!!item.done} onClick={()=>toggleArr(kind,item.id)}/><div onClick={()=>isCreator&&openCost(kind,item)} style={{flex:1,minWidth:0,cursor:isCreator?"pointer":"default"}}><div style={{display:"flex",alignItems:"center",gap:6,minWidth:0}}><div style={{fontSize:12,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.name}</div><span style={{fontSize:8.7,color:sc,border:`1px solid ${sc}44`,background:sc+"12",borderRadius:999,padding:"2px 5px",whiteSpace:"nowrap"}}>{sl}</span></div>{(item.startDate||item.location)&&<div style={{fontSize:9.8,color:T.subd,marginTop:2}}>{[item.startDate&&`${item.startDate}${item.startTime?` · ${item.startTime}`:""}`,item.location].filter(Boolean).join(" · ")}</div>}</div><PriceBadge kind={kind} item={item}/></div>; };
   const TimelinePreview = () => { const upcoming = timeline.filter((e) => e.date >= today.today).slice(0, 4); return <div onClick={() => setTimelineOpen(true)} className="press" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, padding: 13, marginBottom: 10, cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ fontSize: 18 }}>🗓️</div><div style={{ fontSize: 13.5, fontWeight: 800, color: T.text, flex: 1 }}>Таймлайн поездки</div><span style={{ fontSize: 10.5, color: T.subd }}>{timeline.length ? `${timeline.length} событий` : "добавьте даты"}</span><Icon d={I.chevR} size={14} color={T.subd} /></div>{upcoming.length > 0 && <div style={{ marginTop: 8 }}>{upcoming.map((e) => <div key={e.id} style={{ display: "flex", gap: 8, padding: "4px 0", fontSize: 11 }}><span style={{ color: T.subd, minWidth: 74 }}>{fmtShort(new Date(e.date))}{e.time ? ` · ${e.time}` : ""}</span><span style={{ color: T.sub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.title}</span></div>)}</div>}</div>; };
 
   const hasTelegramBack = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.BackButton;
@@ -2191,7 +2264,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
         {open.lodging && <div style={{ padding: "0 0 12px 44px" }}>{stays.length ? stays.map((x) => <PlanRow key={x.id} kind="stays" item={x} />) : bOn.lodging && !t.lodgingOff ? <><div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0" }}><Check on={!!checks.lodgeMain} onClick={() => upd((x) => ({ ...x, checks: { ...x.checks, lodgeMain: !x.checks.lodgeMain } }))} /><span style={{ fontSize: 12, color: T.text, flex: 1 }}>{t.dcName || "Основное жильё"}</span><span onClick={() => startAdd("stays")} style={{ fontSize: 10.5, color: T.violet, cursor: "pointer" }}>добавить бронь</span></div>{t.route && t.route.stopover && <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0" }}><Check on={!!checks.lodgeStop} onClick={() => upd((x) => ({ ...x, checks: { ...x.checks, lodgeStop: !x.checks.lodgeStop } }))} /><span style={{ fontSize: 12, color: T.text, flex: 1 }}>{t.route.stopover.city} · {t.route.stopover.nights} ноч.</span></div>}</> : <Empty>Жильё ещё не добавлено.</Empty>}<div onClick={goHotels} className="press" style={{ fontSize: 11.5, fontWeight: 800, color: T.violet, cursor: "pointer", marginTop: 5 }}>Подобрать жильё</div></div>}
         <SectionHead k="transport" icon="🚗" title="Транспорт" sub={(t.transport || []).length ? `${(t.transport || []).filter((x) => x.done).length} из ${(t.transport || []).length} готово` : "Машина, паром, трансферы"} done={(t.transport || []).filter((x) => x.done).length} total={(t.transport || []).length} action={() => startAdd("transport")} />{open.transport && <div style={{ padding: "0 0 12px 44px" }}>{(t.transport || []).length ? (t.transport || []).map((x) => <PlanRow key={x.id} kind="transport" item={x} />) : <Empty>Добавьте аренду авто, паром или трансфер.</Empty>}</div>}
         <SectionHead k="activities" icon="🍽️" title="Активности" sub={(t.activities || []).length ? `${(t.activities || []).filter((x) => x.done).length} из ${(t.activities || []).length} подтверждено` : "Рестораны, места и активности"} done={(t.activities || []).filter((x) => x.done).length} total={(t.activities || []).length} action={() => startAdd("activities")} />{open.activities && <div style={{ padding: "0 0 12px 44px" }}>{(t.activities || []).length ? (t.activities || []).map((x) => <PlanRow key={x.id} kind="activities" item={x} />) : <Empty>Добавьте ресторан, экскурсию или место.</Empty>}</div>}
-        <SectionHead k="docs" icon="📄" title="Документы" sub={docs.length ? `${docsDone} из ${docs.length} готово · у каждого свой статус` : "Нет обязательных пунктов"} done={docsDone} total={docs.length} />{open.docs && <div style={{ padding: "0 0 12px 44px" }}>{docs.map((doc) => { const myState = viewerTraveler && t.travelerStates && t.travelerStates[viewerTraveler.id] && t.travelerStates[viewerTraveler.id].docs; const myDone = myState && myState[doc.id] !== undefined ? !!myState[doc.id] : !!docChecks[doc.id]; return <div key={doc.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0" }}>{isCreator ? <Check on={!!docChecks[doc.id]} onClick={() => toggleDoc(doc.id)} /> : <Check on={myDone} onClick={() => viewerTraveler && setTravelerDoc(viewerTraveler, doc, !myDone)} />}<span onClick={() => setDocOpen({ ...doc, country: t.country, _fromTrip: true })} style={{ fontSize: 12, color: T.text, flex: 1, cursor: "pointer" }}>{doc.name}</span>{viewerTraveler && <span style={{ fontSize: 9.5, color: myDone ? T.green : T.subd }}>{myDone ? "мой ✓" : "мой"}</span>}<TimeBadge st={docStatus(doc, t.df)} /></div>; })}</div>}
+        <SectionHead k="docs" icon="📄" title="Документы" sub={docs.length ? `${docsDone} из ${docs.length} готово · сначала только актуальное` : "Нет обязательных пунктов"} done={docsDone} total={docs.length} />{open.docs && (()=>{const stateFor=(doc)=>{const myState=viewerTraveler&&t.travelerStates&&t.travelerStates[viewerTraveler.id]&&t.travelerStates[viewerTraveler.id].docs;return myState&&myState[doc.id]!==undefined?!!myState[doc.id]:!!docChecks[doc.id];};const sorted=[...docs].sort((a,b)=>Number(stateFor(a))-Number(stateFor(b))),shown=docsExpanded?sorted:sorted.slice(0,Math.min(5,sorted.length)),left=sorted.length-shown.length;return <div style={{padding:"0 0 12px 44px"}}><div style={{fontSize:10,color:T.subd,margin:"2px 0 4px"}}>{docsDone===docs.length&&docs.length?"Все документы отмечены готовыми":"Нужно сделать"}</div>{shown.map((doc)=>{const myDone=stateFor(doc);return <div key={doc.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0"}}>{isCreator?<Check on={!!docChecks[doc.id]} onClick={()=>toggleDoc(doc.id)}/>:<Check on={myDone} onClick={()=>viewerTraveler&&setTravelerDoc(viewerTraveler,doc,!myDone)}/>}<span onClick={()=>setDocOpen({...doc,country:t.country,_fromTrip:true})} style={{fontSize:12,color:T.text,flex:1,cursor:"pointer"}}>{doc.name}</span>{viewerTraveler&&<span style={{fontSize:9.5,color:myDone?T.green:T.subd}}>{myDone?"мой ✓":"мой"}</span>}<TimeBadge st={docStatus(doc,t.df)}/></div>})}{left>0&&<div onClick={()=>setDocsExpanded(true)} className="press" style={{fontSize:11.5,color:T.cyan,fontWeight:800,padding:"8px 0",cursor:"pointer"}}>Ещё {left} {plural(left,"документ","документа","документов")} ↓</div>}{docsExpanded&&docs.length>5&&<div onClick={()=>setDocsExpanded(false)} className="press" style={{fontSize:11,color:T.subd,fontWeight:700,padding:"5px 0",cursor:"pointer"}}>Свернуть</div>}</div>;})()}
         <SectionHead k="prep" icon="🧳" title="Сборы" sub={prepItems.length ? `${prepItems.filter((x) => x.done).length} из ${prepItems.length} готово` : "Страховка, eSIM и свои пункты"} done={prepItems.filter((x) => x.done).length} total={prepItems.length} action={() => startAdd("custom")} />{open.prep && <div style={{ padding: "0 0 12px 44px" }}>{prepItems.length ? prepItems.map((it) => <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0" }}><Check on={it.done} onClick={() => togglePrep(it)} /><span style={{ fontSize: 12, color: T.text, flex: 1 }}>{it.name}</span>{it.item && <PriceBadge kind="custom" item={it.item} />}</div>) : <Empty>Пока пусто.</Empty>}</div>}
       </div>
       {isCreator && <div style={{ display: "flex", gap: 8 }}><div onClick={() => setImportOpen(true)} className="press" style={{ flex: 1, textAlign: "center", border: `1px solid ${T.violet}55`, background: T.violet + "12", borderRadius: 13, padding: 11, color: T.violet, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>✦ Импорт брони</div><div onClick={() => setPeopleOpen(true)} className="press" style={{ flex: 1, textAlign: "center", border: `1px solid ${T.line}`, background: T.card, borderRadius: 13, padding: 11, color: T.text, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>Готовность людей</div></div>}
@@ -2203,7 +2276,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 
     <div style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: 0, width: "100%", maxWidth: 420, padding: "8px 14px", paddingBottom: `max(${bottomStr}, 12px)`, background: "linear-gradient(transparent,#0a0a18 22%)", zIndex: 24 }}><div className="carousel" style={{ display: "flex", gap: 6, overflowX: "auto", padding: "10px 1px 7px" }}>{quick.map((q) => <div key={q} onClick={() => askAI(q)} className="press" style={{ flexShrink: 0, border: `1px solid ${T.line}`, background: T.card, borderRadius: 999, padding: "6px 10px", fontSize: 10.8, color: T.sub, cursor: "pointer" }}>{q}</div>)}</div><div onClick={() => setChatOpen(true)} className="press" style={{ display: "flex", alignItems: "center", gap: 9, background: T.card2, border: `1px solid ${T.violet}55`, boxShadow: "0 8px 28px rgba(0,0,0,.35)", borderRadius: 15, padding: "11px 12px", cursor: "text" }}><div style={{ width: 27, height: 27, borderRadius: 9, background: GRAD.cta, display: "grid", placeItems: "center", fontSize: 13 }}>✦</div><span style={{ fontSize: 13, color: T.subd, flex: 1 }}>Ask TripWise…</span><Icon d={I.arrow} size={15} color={T.violet} /></div></div>
 
-    {peopleOpen && <Overlay onClose={() => setPeopleOpen(false)}><SheetHead title={`Путешественники · ${travelers.length}`} onClose={() => setPeopleOpen(false)} /><div style={{ fontSize: 11, color: T.subd, marginBottom: 10 }}>{members.length} в TripWise · финансовый план считается по {travelers.length} {plural(travelers.length, "человеку", "людям", "людям")}</div><div style={{ display: "flex", flexDirection: "column", gap: 7 }}>{travelers.map((tr) => { const m = members.find((x) => String(x.id) === String(tr.memberId || "")), r = travelerReadiness(t, tr, budget); return <div key={tr.id} onClick={() => setTravelerOpen(tr)} className="press" style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 13, padding: 10, cursor: "pointer" }}><div style={{ width: 36, height: 36, borderRadius: 999, background: gradFor(tr.name.slice(0, 2)), display: "grid", placeItems: "center", fontSize: 11, fontWeight: 800, color: "#fff", overflow: "hidden" }}>{m && m.photoUrl ? <img src={m.photoUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : memberInitials({ displayName: tr.name })}</div><div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{tr.name}</div><div style={{ fontSize: 10.5, color: m ? T.green : T.subd }}>{m ? `✓ в TripWise${String(m.id) === String(t.creatorId) ? " · создатель" : ""}` : "без аккаунта · участвует в расчётах"}</div></div><div style={{ textAlign: "right" }}><div style={{ fontSize: 13, fontWeight: 800, color: r.pct === 100 ? T.green : T.violet }}>{r.pct}%</div><div style={{ fontSize: 9.5, color: T.subd }}>лично</div></div>{isCreator && m && String(m.id) !== String(t.creatorId) && <span onClick={(e) => { e.stopPropagation(); removeMember(m); }} style={{ fontSize: 10.5, color: "#ff6db0", cursor: "pointer" }}>×</span>}{isCreator && !m && travelers.length > 1 && <span onClick={(e) => { e.stopPropagation(); removeTraveler(tr); }} style={{ fontSize: 10.5, color: T.subd, cursor: "pointer" }}>×</span>}</div>; })}</div>{isCreator && <><div style={{ display: "flex", gap: 7, marginTop: 12 }}><input value={travelerName} onChange={(e) => setTravelerName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTraveler()} placeholder="Имя нового путешественника" style={{ flex: 1, background: T.card, border: `1px solid ${T.line}`, borderRadius: 11, padding: "10px 11px", color: T.text, outline: "none" }} /><div onClick={addTraveler} className="press" style={{ background: T.card2, border: `1px solid ${T.line}`, borderRadius: 11, padding: "10px 12px", color: T.violet, fontWeight: 800, cursor: "pointer" }}>＋</div></div><div onClick={invite} className="press" style={{ marginTop: 9, textAlign: "center", background: GRAD.cta, borderRadius: 13, padding: 12, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Пригласить пользователя TripWise</div></>}</Overlay>}
+    {peopleOpen && <Overlay onClose={() => setPeopleOpen(false)}><SheetHead title={`Путешественники · ${travelers.length}`} onClose={() => setPeopleOpen(false)} /><div style={{ fontSize: 11, color: T.subd, marginBottom: 10 }}>{members.length} в TripWise · финансовый план считается по {travelers.length} {plural(travelers.length, "человеку", "людям", "людям")}</div><div style={{ display: "flex", flexDirection: "column", gap: 7 }}>{travelers.map((tr) => { const m = members.find((x) => String(x.id) === String(tr.memberId || "")), r = travelerReadiness(t, tr, budget); return <div key={tr.id} onClick={() => setTravelerOpen(tr)} className="press" style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 13, padding: 10, cursor: "pointer" }}><div style={{ width: 36, height: 36, borderRadius: 999, background: gradFor(tr.name.slice(0, 2)), display: "grid", placeItems: "center", fontSize: 11, fontWeight: 800, color: "#fff", overflow: "hidden" }}>{m && m.photoUrl ? <img src={m.photoUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : memberInitials({ displayName: tr.name })}</div><div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{tr.name}</div><div style={{ fontSize: 10.5, color: m ? T.green : T.subd }}>{m ? `✓ в TripWise${String(m.id) === String(t.creatorId) ? " · создатель" : ""}` : "без аккаунта · участвует в расчётах"}</div></div><div style={{ textAlign: "right" }}><div style={{ fontSize: 13, fontWeight: 800, color: r.pct === 100 ? T.green : T.violet }}>{r.pct}%</div><div style={{ fontSize: 9.5, color: T.subd }}>лично</div></div>{isCreator && m && String(m.id) !== String(t.creatorId) && <span onClick={(e) => { e.stopPropagation(); setConfirmDanger({ title:"Удалить участника?", text:`${m.displayName || "Участник"} потеряет доступ к поездке. Его финансовый слот останется в истории расходов. Старая invite-ссылка будет отозвана.`, label:"Удалить", action:()=>removeMember(m) }); }} style={{ fontSize: 10.5, color: "#ff6db0", cursor: "pointer" }}>×</span>}{isCreator && !m && travelers.length > 1 && <span onClick={(e) => { e.stopPropagation(); setConfirmDanger({ title:"Убрать путешественника?", text:`${tr.name} будет убран из будущих расчётов. Уже созданные расходы не пересчитаются.`, label:"Убрать", action:()=>removeTraveler(tr) }); }} style={{ fontSize: 10.5, color: T.subd, cursor: "pointer" }}>×</span>}</div>; })}</div>{isCreator && <><div style={{ display: "flex", gap: 7, marginTop: 12 }}><input value={travelerName} onChange={(e) => setTravelerName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTraveler()} placeholder="Имя нового путешественника" style={{ flex: 1, background: T.card, border: `1px solid ${T.line}`, borderRadius: 11, padding: "10px 11px", color: T.text, outline: "none" }} /><div onClick={addTraveler} className="press" style={{ background: T.card2, border: `1px solid ${T.line}`, borderRadius: 11, padding: "10px 12px", color: T.violet, fontWeight: 800, cursor: "pointer" }}>＋</div></div><div onClick={invite} className="press" style={{ marginTop: 9, textAlign: "center", background: GRAD.cta, borderRadius: 13, padding: 12, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Пригласить пользователя TripWise</div></>}</Overlay>}
 
     {travelerOpen && (() => { const tr = travelerOpen, r = travelerReadiness(t, tr, budget), own = viewerTraveler && viewerTraveler.id === tr.id; return <Overlay onClose={() => setTravelerOpen(null)}><SheetHead title={`${tr.name} · ${r.pct}%`} onClose={() => setTravelerOpen(null)} /><div style={{ height: 8, borderRadius: 999, background: T.line, overflow: "hidden", marginBottom: 13 }}><div style={{ width: r.pct + "%", height: "100%", background: GRAD.cta }} /></div>{r.items.length ? r.items.map((it) => <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderTop: `1px solid ${T.line}` }}><div style={{ width: 20, height: 20, borderRadius: 7, border: `1px solid ${it.done ? T.green : T.line}`, display: "grid", placeItems: "center", color: T.green }}>{it.done ? "✓" : ""}</div><span style={{ fontSize: 12, color: it.done ? T.subd : T.text, flex: 1 }}>{it.label}</span>{it.kind === "doc" && (isCreator || own) && (() => { const docId = it.id.slice(4), doc = docs.find((x) => x.id === docId); return doc ? <span onClick={() => setTravelerDoc(tr, doc, !it.done)} style={{ fontSize: 10.5, color: T.violet, cursor: "pointer" }}>{it.done ? "снять" : "готово"}</span> : null; })()}</div>) : <Empty>Для этого участника сейчас нет незакрытых личных пунктов.</Empty>}</Overlay>; })()}
 
@@ -2213,7 +2286,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 
     {activityOpen && <Overlay onClose={() => setActivityOpen(false)}><SheetHead title="Что изменилось" onClose={() => setActivityOpen(false)} />{(t.activityLog || []).length ? (t.activityLog || []).slice(0, 60).map((e) => <div key={e.id} style={{ display: "flex", gap: 9, padding: "9px 0", borderTop: `1px solid ${T.line}` }}><div style={{ width: 7, height: 7, borderRadius: 99, background: e.type === "budget" ? T.cyan : e.type === "ask" ? T.violet : T.subd, marginTop: 6 }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, color: T.text }}>{e.text}</div><div style={{ fontSize: 9.8, color: T.subd, marginTop: 2 }}>{e.createdAt ? new Date(e.createdAt).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}</div></div></div>) : <Empty>Изменений пока нет.</Empty>}</Overlay>}
 
-    {settingsOpen && <Overlay onClose={() => setSettingsOpen(false)}><SheetHead title="Настройки поездки" onClose={() => setSettingsOpen(false)} />{isCreator ? <><div style={{ fontSize: 11.5, color: T.subd, marginBottom: 6 }}>Название</div><input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveTitle()} style={{ width: "100%", background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "11px 12px", color: T.text, outline: "none", marginBottom: 10 }} /><div onClick={saveTitle} className="press" style={{ textAlign: "center", background: T.card2, border: `1px solid ${T.line}`, borderRadius: 12, padding: 11, color: T.text, fontSize: 12.5, fontWeight: 800, cursor: "pointer", marginBottom: 9 }}>Сохранить название</div><div onClick={() => upd((x) => ({ ...x, notify: x.notify === false ? true : false }))} className="press" style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: 11, cursor: "pointer", marginBottom: 9 }}><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 800, color: T.text }}>Уведомления через бота</div><div style={{ fontSize: 10.5, color: T.subd, marginTop: 2 }}>Сразу — Ask Group и критичное; обычные изменения — тихим дайджестом.</div></div><span style={{ color: t.notify !== false ? T.green : T.subd }}>{t.notify !== false ? "Вкл" : "Выкл"}</span></div><div onClick={() => { setSettingsOpen(false); setImportOpen(true); }} className="press" style={{ textAlign: "center", background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: 11, color: T.violet, fontSize: 12.5, fontWeight: 800, cursor: "pointer", marginBottom: 9 }}>Импортировать бронь</div><div onClick={() => { setSettingsOpen(false); onDelete(t.id); }} className="press" style={{ textAlign: "center", background: "#ff6db015", border: "1px solid #ff6db044", borderRadius: 12, padding: 11, color: "#ff6db0", fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>Удалить поездку</div></> : <><div style={{ fontSize: 12, color: T.sub, lineHeight: 1.45, marginBottom: 12 }}>Участник видит общий план, может отвечать в Ask Group, отмечать свои документы и взаиморасчёты.</div><div onClick={leaveTrip} className="press" style={{ textAlign: "center", background: "#ff6db015", border: "1px solid #ff6db044", borderRadius: 12, padding: 11, color: "#ff6db0", fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>Выйти из поездки</div></>}</Overlay>}
+    {settingsOpen && <Overlay onClose={() => setSettingsOpen(false)}><SheetHead title="Настройки поездки" onClose={() => setSettingsOpen(false)} />{isCreator ? <><div style={{ fontSize: 11.5, color: T.subd, marginBottom: 6 }}>Название</div><input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveTitle()} style={{ width: "100%", background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "11px 12px", color: T.text, outline: "none", marginBottom: 10 }} /><div onClick={saveTitle} className="press" style={{ textAlign: "center", background: T.card2, border: `1px solid ${T.line}`, borderRadius: 12, padding: 11, color: T.text, fontSize: 12.5, fontWeight: 800, cursor: "pointer", marginBottom: 9 }}>Сохранить название</div><div onClick={() => upd((x) => ({ ...x, notify: x.notify === false ? true : false }))} className="press" style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: 11, cursor: "pointer", marginBottom: 9 }}><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 800, color: T.text }}>Уведомления через бота</div><div style={{ fontSize: 10.5, color: T.subd, marginTop: 2 }}>Сразу — Ask Group и критичное; обычные изменения — тихим дайджестом.</div></div><span style={{ color: t.notify !== false ? T.green : T.subd }}>{t.notify !== false ? "Вкл" : "Выкл"}</span></div><div onClick={() => { setSettingsOpen(false); setImportOpen(true); }} className="press" style={{ textAlign: "center", background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: 11, color: T.violet, fontSize: 12.5, fontWeight: 800, cursor: "pointer", marginBottom: 9 }}>Импортировать бронь</div><div onClick={() => { setSettingsOpen(false); setConfirmDanger({ title:"Удалить поездку?", text:"Поездка исчезнет у всех участников. После подтверждения будет несколько секунд, чтобы отменить удаление.", label:"Удалить поездку", action:()=>onDelete(t.id) }); }} className="press" style={{ textAlign: "center", background: "#ff6db015", border: "1px solid #ff6db044", borderRadius: 12, padding: 11, color: "#ff6db0", fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>Удалить поездку</div></> : <><div style={{ fontSize: 12, color: T.sub, lineHeight: 1.45, marginBottom: 12 }}>Участник видит общий план, может отвечать в Ask Group, отмечать свои документы и взаиморасчёты.</div><div onClick={() => { setSettingsOpen(false); setConfirmDanger({ title:"Выйти из поездки?", text:"Вы потеряете доступ к общему плану. Ваш финансовый слот и история расходов останутся у остальных участников.", label:"Выйти", action:leaveTrip }); }} className="press" style={{ textAlign: "center", background: "#ff6db015", border: "1px solid #ff6db044", borderRadius: 12, padding: 11, color: "#ff6db0", fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>Выйти из поездки</div></>}</Overlay>}
 
     {inviteOpen && <Overlay onClose={() => setInviteOpen(false)}><SheetHead title="Пригласить в поездку" onClose={() => setInviteOpen(false)} /><div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, padding: 13 }}><div style={{ fontSize: 13.5, fontWeight: 800, color: T.text }}>Одна ссылка — один общий Trip</div><div style={{ fontSize: 11.5, color: T.subd, marginTop: 5, lineHeight: 1.45 }}>Новый пользователь займёт свободный слот путешественника. Если слотов нет — TripWise добавит нового.</div>{inviteUrl ? <div style={{ marginTop: 11, background: T.card2, border: `1px dashed ${T.violet}66`, borderRadius: 11, padding: 10, fontSize: 10.5, color: T.sub, wordBreak: "break-all" }}>{inviteUrl}</div> : <div style={{ fontSize: 11.5, color: T.subd, marginTop: 11 }}>Создаю ссылку…</div>}</div>{inviteUrl && <div style={{ display: "flex", gap: 8, marginTop: 12 }}><div onClick={() => { navigator.clipboard && navigator.clipboard.writeText(inviteUrl); setToast("Ссылка скопирована"); }} className="press" style={{ flex: 1, textAlign: "center", background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: 11, color: T.text, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>Копировать</div><div onClick={shareInvite} className="press" style={{ flex: 1, textAlign: "center", background: GRAD.cta, borderRadius: 12, padding: 11, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>Отправить</div></div>}</Overlay>}
 
@@ -2221,14 +2294,15 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 
     {addSec && <Overlay onClose={() => setAddSec(null)}><SheetHead title={addSec === "stays" ? "Добавить жильё" : addSec === "transport" ? "Добавить транспорт" : addSec === "custom" ? "Добавить в сборы" : "Добавить активность"} onClose={() => setAddSec(null)} /><input autoFocus value={addForm.name} onChange={(e) => setAddForm((x) => ({ ...x, name: e.target.value }))} placeholder={addSec === "stays" ? "Hotel Norge" : addSec === "transport" ? "BMW 740d, паром, трансфер…" : addSec === "custom" ? "Страховка, eSIM, адаптер…" : "UNDER, музей, экскурсия…"} style={{ width: "100%", background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "11px 12px", color: T.text, outline: "none" }} />{ScheduleFields({ kind: addSec, form: addForm, setForm: setAddForm })}{CostFields({ form: addForm, setForm: setAddForm })}<div onClick={addPlanItem} className="press" style={{ marginTop: 12, textAlign: "center", background: GRAD.cta, borderRadius: 13, padding: 12, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Добавить</div></Overlay>}
 
-    {editCost && <Overlay onClose={() => setEditCost(null)}><SheetHead title={`Редактировать · ${editCost.name || "пункт"}`} onClose={() => setEditCost(null)} /><input value={editCost.name || ""} onChange={(e) => setEditCost((x) => ({ ...x, name: e.target.value }))} style={{ width: "100%", background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 11px", color: T.text, outline: "none" }} />{ScheduleFields({ kind: editCost.kind === "journey" ? "flight" : editCost.kind, form: editCost, setForm: setEditCost })}{CostFields({ form: editCost, setForm: setEditCost })}<div onClick={saveCost} className="press" style={{ marginTop: 12, textAlign: "center", background: GRAD.cta, borderRadius: 13, padding: 12, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Сохранить</div></Overlay>}
+    {editCost && <Overlay onClose={() => setEditCost(null)}><SheetHead title={`Редактировать · ${editCost.name || "пункт"}`} onClose={() => setEditCost(null)} /><input value={editCost.name || ""} onChange={(e) => setEditCost((x) => ({ ...x, name: e.target.value }))} style={{ width: "100%", background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 11px", color: T.text, outline: "none" }} />{ScheduleFields({ kind: editCost.kind === "journey" ? "flight" : editCost.kind, form: editCost, setForm: setEditCost })}{CostFields({ form: editCost, setForm: setEditCost })}<div onClick={saveCost} className="press" style={{ marginTop: 12, textAlign: "center", background: GRAD.cta, borderRadius: 13, padding: 12, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Сохранить</div><div onClick={()=>setConfirmDanger({title:"Удалить пункт?",text:`«${editCost.name||"Пункт"}» исчезнет из плана и бюджета. После удаления его можно сразу вернуть.`,label:"Удалить",action:()=>removePlanItem(editCost)})} className="press" style={{marginTop:8,textAlign:"center",border:"1px solid #ff6db044",background:"#ff6db010",borderRadius:13,padding:11,color:"#ff7ba9",fontSize:12,fontWeight:800,cursor:"pointer"}}>Удалить пункт</div></Overlay>}
 
     {flightOpen && <Overlay onClose={() => setFlightOpen(false)}><SheetHead title="Добавить перелёт" onClose={() => setFlightOpen(false)} /><div style={{ fontSize: 11, color: T.subd, lineHeight: 1.45, marginBottom: 10 }}>Один рейс — прямой перелёт. Несколько рейсов — единый journey с пересадками. CA-754, CA754 и CA 754 нормализуются одинаково.</div>{journeyLegs.map((leg, i) => <div key={i} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: 10, marginBottom: 8 }}><div style={{ fontSize: 10.5, color: T.subd, marginBottom: 6 }}>{i === 0 ? "Рейс" : `Рейс после пересадки ${i}`}</div><div style={{ display: "grid", gridTemplateColumns: "1fr 130px", gap: 7 }}><input value={leg.flightNumber} onChange={(e) => setJourneyLegs((a) => a.map((x, j) => j === i ? { ...x, flightNumber: e.target.value.toUpperCase() } : x))} placeholder="CA-754" style={{ background: T.card2, border: `1px solid ${T.line}`, borderRadius: 10, padding: 10, color: T.text, outline: "none", textTransform: "uppercase" }} /><input type="date" value={leg.date} onChange={(e) => setJourneyLegs((a) => a.map((x, j) => j === i ? { ...x, date: e.target.value } : x))} style={{ background: T.card2, border: `1px solid ${T.line}`, borderRadius: 10, padding: 10, color: T.text, outline: "none", colorScheme: "dark" }} /></div>{journeyLegs.length > 1 && <div onClick={() => setJourneyLegs((a) => a.filter((_, j) => j !== i))} style={{ fontSize: 10.5, color: "#ff6db0", marginTop: 6, cursor: "pointer" }}>Убрать этот рейс</div>}</div>)}<div onClick={addJourneyLeg} className="press" style={{ fontSize: 11.5, color: T.violet, fontWeight: 800, cursor: "pointer", margin: "4px 0 10px" }}>＋ Добавить пересадку</div>{CostFields({ form: journeyCost, setForm: setJourneyCost })}<div onClick={addFlightJourney} className="press" style={{ marginTop: 12, textAlign: "center", background: GRAD.cta, borderRadius: 13, padding: 12, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Добавить перелёт</div></Overlay>}
 
     {importOpen && <Overlay onClose={() => setImportOpen(false)}><SheetHead title="Импорт бронирования" onClose={() => setImportOpen(false)} /><div style={{ fontSize: 11.5, color: T.subd, lineHeight: 1.45, marginBottom: 9 }}>Вставьте текст письма от авиакомпании, отеля, аренды авто или сервиса бронирования. TripWise извлечёт даты, сумму и тип брони.</div><textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={8} placeholder="Вставьте сюда письмо или текст бронирования…" style={{ width: "100%", resize: "vertical", background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: 11, color: T.text, outline: "none", fontFamily: "Manrope,sans-serif" }} /><div style={{ display: "flex", gap: 8, marginTop: 8 }}><label className="press" style={{ flex: 1, textAlign: "center", background: T.card, border: `1px solid ${T.line}`, borderRadius: 11, padding: 9, color: T.sub, fontSize: 11, fontWeight: 800, cursor: "pointer" }}>Загрузить .txt / .eml<input type="file" accept=".txt,.eml,text/plain,message/rfc822" onChange={importFile} style={{ display: "none" }} /></label><div onClick={analyzeImport} className="press" style={{ flex: 1, textAlign: "center", background: GRAD.cta, borderRadius: 11, padding: 9, color: "#fff", fontSize: 11, fontWeight: 800, cursor: "pointer" }}>{importBusy ? "Разбираю…" : "Распознать"}</div></div>{importResult && <div style={{ background: T.card2, border: `1px solid ${T.violet}55`, borderRadius: 14, padding: 12, marginTop: 11 }}><div style={{ fontSize: 10, color: T.violet, fontWeight: 800 }}>{String(importResult.kind || "").toUpperCase()} · уверенность {Math.round((importResult.confidence || 0) * 100)}%</div><div style={{ fontSize: 14, fontWeight: 800, color: T.text, marginTop: 4 }}>{importResult.title || "Бронирование"}</div><div style={{ fontSize: 11, color: T.subd, marginTop: 5 }}>{[importResult.startDate, importResult.endDate, importResult.location, importResult.priceAmount && money(importResult.priceAmount, importResult.currency)].filter(Boolean).join(" · ")}</div>{(importResult.flightLegs || []).length > 0 && <div style={{ fontSize: 11, color: T.sub, marginTop: 6 }}>{importResult.flightLegs.map((x) => `${x.flightNumber} · ${x.date}`).join(" → ")}</div>}<div onClick={applyImport} className="press" style={{ marginTop: 10, textAlign: "center", background: GRAD.cta, borderRadius: 11, padding: 10, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>Добавить в поездку</div></div>}<div style={{ fontSize: 10, color: T.subd, marginTop: 10 }}>PDF и скриншоты пока не распознаются без OCR: из них можно скопировать текст и вставить сюда.</div></Overlay>}
 
     {docOpen && (() => { const info = DOC_INFO[docOpen.id] || {}, links = (info.links || []).filter((l) => l.url), supported = !!(docConfig(docOpen.id, docOpen.name, docOpen.country) || REQUEST_DOCS[docOpen.id]); const myState = viewerTraveler && t.travelerStates && t.travelerStates[viewerTraveler.id] && t.travelerStates[viewerTraveler.id].docs; const myDone = viewerTraveler ? (myState && myState[docOpen.id] !== undefined ? !!myState[docOpen.id] : !!docChecks[docOpen.id]) : false; return <Overlay onClose={() => setDocOpen(null)}><SheetHead title={docOpen.name} onClose={() => setDocOpen(null)} /><div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}><Badge label={DOC_TYPE_LABEL[info.type] || "документ"} color={T.cyan} /><Badge label={docOpen.country || t.country} color={T.subd} /><TimeBadge st={docStatus(docOpen, t.df)} /></div>{info.desc && <div style={{ fontSize: 13, color: T.text, lineHeight: 1.45, marginBottom: 12 }}>{info.desc}</div>}{(info.req || []).length > 0 && <><div style={{ fontSize: 12.5, fontWeight: 800, color: T.text, marginBottom: 6 }}>Что потребуется</div>{(info.req || []).map((rq) => <div key={rq} style={{ display: "flex", gap: 8, padding: "5px 0" }}><span style={{ width: 5, height: 5, borderRadius: 99, background: T.violet, marginTop: 6 }} /><span style={{ fontSize: 12.5, color: T.sub }}>{rq}</span></div>)}</>}<div onClick={() => { if (supported) { setDocWizard(docOpen); setDocOpen(null); } else setToast("Мастер для этого документа появится позже"); }} className="press" style={{ marginTop: 12, textAlign: "center", background: supported ? GRAD.cta : T.card2, border: supported ? "none" : `1px solid ${T.line}`, borderRadius: 14, padding: 13, color: supported ? "#fff" : T.subd, fontSize: 13.5, fontWeight: 800, cursor: supported ? "pointer" : "default" }}>Заполнить с помощником {!supported && "· скоро"}</div>{links.length > 0 && <div style={{ marginTop: 12 }}>{links.map((l) => <div key={l.label} onClick={() => window.open(l.url, "_blank")} style={{ display: "flex", padding: "9px 0", borderTop: `1px solid ${T.line}`, cursor: "pointer" }}><span style={{ fontSize: 12.5, color: T.violet, flex: 1 }}>{l.label}</span><Icon d={I.chevR} size={14} color={T.subd} /></div>)}</div>}{viewerTraveler && <div onClick={() => setTravelerDoc(viewerTraveler, docOpen, !myDone)} className="press" style={{ marginTop: 10, textAlign: "center", border: `1px solid ${myDone ? T.green : T.violet}55`, borderRadius: 12, padding: 10, color: myDone ? T.green : T.violet, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>{myDone ? "✓ Мой документ готов" : "Отметить мой документ готовым"}</div>}{isCreator && <div onClick={() => toggleDoc(docOpen.id)} className="press" style={{ marginTop: 7, textAlign: "center", border: `1px solid ${docChecks[docOpen.id] ? T.green : T.line}`, borderRadius: 12, padding: 10, color: docChecks[docOpen.id] ? T.green : T.text, fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>{docChecks[docOpen.id] ? "✓ В общем плане готово" : "Отметить готовым в общем плане"}</div>}</Overlay>; })()}
-    {docWizard && <DocWizard doc={docWizard} onClose={() => setDocWizard(null)} setToast={setToast} savedId={null} onSaved={() => {}} />}
+    {docWizard && <DocWizard doc={docWizard} fullScreen tripContext={t} onClose={() => setDocWizard(null)} setToast={setToast} savedId={null} onSaved={() => {}} />}
+    {confirmDanger && <ConfirmSheet title={confirmDanger.title} text={confirmDanger.text} danger confirmLabel={confirmDanger.label || "Подтвердить"} onClose={() => setConfirmDanger(null)} onConfirm={() => { const c=confirmDanger; setConfirmDanger(null); c && c.action && c.action(); }} />}
     {chatOpen && <Overlay onClose={() => setChatOpen(false)}><SheetHead title="Ask TripWise" onClose={() => setChatOpen(false)} /><div style={{ maxHeight: "46vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>{messages.map((m, i) => <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%", background: m.role === "user" ? T.violet + "35" : T.card, border: `1px solid ${m.role === "user" ? T.violet + "55" : T.line}`, borderRadius: 13, padding: "9px 11px", fontSize: 12.2, color: T.text, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{m.text}</div>)}{chatBusy && <div style={{ fontSize: 11.5, color: T.subd }}>TripWise думает…</div>}</div><div style={{ display: "flex", gap: 7 }}><input value={chatText} onChange={(e) => setChatText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && askAI()} placeholder="Спроси про эту поездку…" style={{ flex: 1, background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 11px", color: T.text, outline: "none" }} /><div onClick={() => askAI()} className="press" style={{ width: 42, borderRadius: 12, background: GRAD.cta, display: "grid", placeItems: "center", cursor: "pointer" }}><Icon d={I.arrow} size={16} color="#fff" /></div></div></Overlay>}
   </div>;
 }
@@ -2464,15 +2538,15 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 /* Ручное создание поездки: направление + даты, без билетов */
 function NewTripSheet({ onClose, onCreate }) {
   const [q, setQ] = useState(""); const [dest, setDest] = useState(null);
-  const [df, setDf] = useState(""); const [dt, setDt] = useState(""); const [adults, setAdults] = useState(1);
+  const [df, setDf] = useState(""); const [dt, setDt] = useState(""); const [dateErr,setDateErr]=useState(""); const [adults, setAdults] = useState(1);
   const [kidsAges, setKidsAges] = useState([]);
   const list = q.trim().length >= 2 && !dest ? AIRPORTS.filter((a) => a.city.toLowerCase().startsWith(q.trim().toLowerCase())).slice(0, 6) : [];
-  const ok = dest && df;
+  const ok = dest && df && (!dt || dt > df);
   const inputSt = { width: "100%", background: T.card, border: `1px solid ${T.line}`, borderRadius: 12, padding: "11px 12px", color: T.text, fontSize: 14, outline: "none", boxSizing: "border-box", colorScheme: "dark" };
   const create = () => {
-    if (!ok) return;
+    if (!ok) { if(df&&dt&&dt<=df)setDateErr("Дата возвращения должна быть позже даты начала"); return; }
     const dep = new Date(df);
-    onCreate({ id: "t" + Date.now(), title: `${dest.city} · ${MONTHS_S[dep.getMonth()]}`, dcName: dest.city, dc: dest.code, country: dest.country, oc: "", ocName: "", df, dt: dt || "", adults, children: kidsAges, route: null, checks: { tickets: false, lodgeMain: false, lodgeStop: false, docs: {}, services: {} }, servicesAdded: [], custom: [], docsExtra: [], lodgingOff: false, blocksOn: { tickets: true, lodging: true, docs: true }, createdAt: Date.now() });
+    onCreate({ id: "t" + Date.now(), title: `${dest.city} · ${MONTHS_S[dep.getMonth()]}`, dcName: dest.city, dc: dest.code, country: dest.country, oc: "", ocName: "", df, dt: dt || "", adults, children: kidsAges, route: null, checks: { tickets: false, lodgeMain: false, lodgeStop: false, docs: {}, services: {} }, servicesAdded: [], custom: [], docsExtra: [], lodgingOff: false, travelerTarget: adults + kidsAges.length, blocksOn: { tickets: true, lodging: true, docs: true }, createdAt: Date.now() });
   };
   return <Overlay onClose={onClose}>
     <SheetHead title="Новая поездка" onClose={onClose} />
@@ -2486,9 +2560,10 @@ function NewTripSheet({ onClose, onCreate }) {
       <div style={{ height: 6 }} />
     </>}
     <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-      <div style={{ flex: 1 }}><div style={{ fontSize: 11.5, color: T.subd, marginBottom: 6 }}>Туда</div><input type="date" value={df} onChange={(e) => setDf(e.target.value)} style={inputSt} /></div>
-      <div style={{ flex: 1 }}><div style={{ fontSize: 11.5, color: T.subd, marginBottom: 6 }}>Обратно</div><input type="date" value={dt} onChange={(e) => setDt(e.target.value)} style={inputSt} /></div>
+      <div style={{ flex: 1 }}><div style={{ fontSize: 11.5, color: T.subd, marginBottom: 6 }}>Туда</div><input type="date" value={df} onChange={(e) => {const v=e.target.value;setDf(v);setDateErr("");if(v&&dt&&dt<=v)setDt(addIsoDays(v,1));}} style={inputSt} /></div>
+      <div style={{ flex: 1 }}><div style={{ fontSize: 11.5, color: T.subd, marginBottom: 6 }}>Обратно</div><input type="date" min={df?addIsoDays(df,1):undefined} value={dt} onChange={(e) => {const v=e.target.value;if(df&&v&&v<=df){setDateErr("Дата возвращения должна быть позже даты начала");setDt(addIsoDays(df,1));}else{setDateErr("");setDt(v);}}} style={{...inputSt,borderColor:dateErr?"#ff6db066":T.line}} /></div>
     </div>
+    {dateErr&&<div style={{fontSize:10.8,color:"#ff7ba9",marginTop:-7,marginBottom:9}}>{dateErr}</div>}
     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
       <span style={{ fontSize: 13, color: T.text, flex: 1 }}>Путешественники</span>
       <div onClick={() => setAdults(Math.max(1, adults - 1))} className="press" style={{ width: 30, height: 30, borderRadius: 9, border: `1px solid ${T.line}`, display: "grid", placeItems: "center", color: T.text, cursor: "pointer" }}>−</div>
@@ -2520,7 +2595,7 @@ function RoutesScreen({ trips, onOpenTrip, onNewTrip, onPickDest, onSearch, save
   </div>);
   return <div style={{ animation: "fadeUp .18s ease-out", paddingBottom: 8 }}>
     <Header />
-    <PageHero title="Путешествия" sub="Управляйте всеми поездками в одном месте" emoji="🧳" />
+    <ScreenHero eyebrow="Путешествия" title="Все поездки — в одном месте" sub="Готовьте маршрут, документы, бюджет и решения группы без разрозненных чатов и заметок." image={HOME_ASSETS.fullTrip} />
     <div style={{ padding: "0 20px 0" }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
         <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, color: T.text, fontSize: 15, flex: 1 }}>Мои путешествия</div>
@@ -2530,7 +2605,7 @@ function RoutesScreen({ trips, onOpenTrip, onNewTrip, onPickDest, onSearch, save
         <div style={{ background: T.card, border: `1px dashed ${T.line}`, borderRadius: 18, padding: "22px 16px", textAlign: "center", marginBottom: 12 }}>
           <div style={{ fontSize: 26, marginBottom: 8 }}>🧳</div>
           <div style={{ fontSize: 14.5, fontWeight: 700, color: T.text, fontFamily: "Sora,sans-serif" }}>Пока нет поездок</div>
-          <div style={{ fontSize: 12, color: T.subd, marginTop: 4, marginBottom: 14 }}>Найдите билеты и нажмите «Взять в поездку» — TripWise поможет подготовить всё остальное</div>
+          <div style={{ fontSize: 12, color: T.subd, marginTop: 4, marginBottom: 14 }}>Найдите маршрут или создайте поездку вручную — дальше TripWise соберёт подготовку в одном месте</div>
           <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
             <div onClick={onSearch} className="press" style={{ background: GRAD.cta, borderRadius: 12, padding: "9px 14px", color: "#fff", fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>Найти билеты</div>
             <div onClick={onNewTrip} className="press" style={{ background: T.card2, border: `1px solid ${T.line}`, borderRadius: 12, padding: "9px 14px", color: T.text, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Создать вручную</div>
@@ -2666,17 +2741,17 @@ function resolveDestination(query) {
 const SERVICES = [
   { id: "yandex", name: "Яндекс Путешествия", desc: "Отели по всему миру", grad: GRAD.ocean, url: "https://travel.yandex.ru",
     promos: [
-      { header: "Скидка на первое бронирование отеля", code: "TRIPWISE20", discountRub: 5000, endDate: "2026-12-31", stayFrom: "2026-06-01", stayTo: "2026-12-31", country: "", city: "", url: "https://travel.yandex.ru/hotels/" },
-      { header: "Промокод на отели Чувашии", code: "CHUVASHIA10", discountRub: 1500, endDate: "2026-09-30", stayFrom: "2026-07-01", stayTo: "2026-09-30", country: "Россия", city: "Чебоксары", url: "https://travel.yandex.ru/hotels/cheboksary/" },
+      { header: "Скидка на первое бронирование отеля", code: "TRIPWISE20", discountRub: 5000, minSpendRub: 50000, endDate: "2026-12-31", stayFrom: "2026-06-01", stayTo: "2026-12-31", country: "", city: "", url: "https://travel.yandex.ru/hotels/" },
+      { header: "Промокод на отели Чувашии", code: "CHUVASHIA10", discountRub: 1500, minSpendRub: 10000, endDate: "2026-09-30", stayFrom: "2026-07-01", stayTo: "2026-09-30", country: "Россия", city: "Чебоксары", url: "https://travel.yandex.ru/hotels/cheboksary/" },
     ] },
   { id: "ostrovok", name: "Островок", desc: "Кэшбэк на бронирования", grad: GRAD.sunset, url: "https://ostrovok.ru",
     promos: [
-      { header: "Скидка на отели в Азии", code: "OSTROVOK15", discountRub: 3000, endDate: "2026-11-15", stayFrom: "2026-08-01", stayTo: "2026-11-30", country: "", city: "" },
+      { header: "Скидка на отели в Азии", code: "OSTROVOK15", discountRub: 3000, minSpendRub: 20000, endDate: "2026-11-15", stayFrom: "2026-08-01", stayTo: "2026-11-30", country: "", city: "" },
     ] },
   { id: "tripcom", name: "Trip.com", desc: "Отели и авиабилеты по миру", grad: GRAD.city, url: "https://trip.com",
     promos: [
-      { header: "Скидка на первое бронирование отеля", code: "TRIPCOM8", discountRub: 4000, endDate: "2026-12-31", stayFrom: "2026-06-01", stayTo: "2026-12-31", country: "", city: "", url: "https://trip.com/hotels/" },
-      { header: "Кэшбэк на отели в Азии", code: "ASIA2026", discountRub: 3500, endDate: "2026-11-30", stayFrom: "2026-07-01", stayTo: "2026-11-30", country: "", city: "", url: "https://trip.com/hotels/" },
+      { header: "Скидка на первое бронирование отеля", code: "TRIPCOM8", discountRub: 4000, minSpendRub: 50000, endDate: "2026-12-31", stayFrom: "2026-06-01", stayTo: "2026-12-31", country: "", city: "", url: "https://trip.com/hotels/" },
+      { header: "Кэшбэк на отели в Азии", code: "ASIA2026", discountRub: 3500, minSpendRub: 3500, endDate: "2026-11-30", stayFrom: "2026-07-01", stayTo: "2026-11-30", country: "", city: "", url: "https://trip.com/hotels/" },
     ] },
 ];
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -2794,7 +2869,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
     <Header />
     <div style={{ padding: "8px 20px 0" }}>
       {mode === "home" && <>
-        <div style={{ margin: "0 -20px 4px" }}><PageHero title="Документы" sub="Соберём комплект под поездку или поможем с одним документом" emoji="📄" /></div>
+        <div style={{ margin: "0 -20px 4px" }}><ScreenHero eyebrow="Документы" title="Всё для въезда — без хаоса" sub="Соберите комплект под поездку или заполните конкретный документ с помощником." image={HOME_ASSETS.docs || HOME_ASSETS.fullTrip} /></div>
         {/* Сценарий 1: подбор комплекта */}
         <div style={{ background: T.card, border: `1.5px solid ${T.violet}55`, borderRadius: 18, padding: 14, marginBottom: 12 }}>
           <div style={{ display: "flex", gap: 11, alignItems: "center" }}>
@@ -2815,7 +2890,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
         {/* Мои документы — снизу, как «последние поиски» */}
         {(() => {
           const mine = store.get("mydocs", []).slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-          if (!mine.length) return null;
+          if (!mine.length) return <div style={{marginTop:18}}><EmptyState compact icon="📄" title="Черновиков пока нет" sub="Начните с комплекта для поездки или откройте конкретный документ выше." /></div>;
           return <div style={{ marginTop: 18 }}>
             <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 15, color: T.text, flex: 1 }}>Мои документы</div>
@@ -2976,7 +3051,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
         <div style={{ fontSize: 10.5, color: T.subd, marginTop: 8, textAlign: "center" }}>Сроки ориентировочные — проверяйте официальные источники</div>
       </>}
     </div>
-    {wiz && <DocWizard doc={wiz} savedId={resumeId} onSaved={() => forceRefresh((n) => n + 1)} onClose={() => { setWiz(null); setResumeId(null); forceRefresh((n) => n + 1); }} setToast={setToast} />}
+    {wiz && <DocWizard doc={wiz} fullScreen savedId={resumeId} onSaved={() => forceRefresh((n) => n + 1)} onClose={() => { setWiz(null); setResumeId(null); forceRefresh((n) => n + 1); }} setToast={setToast} />}
     {/* Поиск документа: нижний лист — вместе с подсказками сидит над клавиатурой */}
     {searchOpen && <Overlay onClose={() => { setSearchOpen(false); setQ(""); }}>
       <SheetHead title="Поиск документа" onClose={() => { setSearchOpen(false); setQ(""); }} />
@@ -3023,104 +3098,55 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
   </div>;
 }
 const ddmm = (s) => { if (!s) return ""; const p = String(s).split("-"); return p.length === 3 ? `${p[2]}/${p[1]}` : s; };
-function Hotels({ setToast, preOpen, onPreDone }) {
-  const [svc, setSvc] = useState(null);
-  const [goUrl, setGoUrl] = useState(null); // ссылка нижней кнопки, подменяется при копировании
-  // авто-открытие сервиса по клику на промо-чипс из карточки маршрута
-  useEffect(() => {
-    if (preOpen) {
-      const s = SERVICES.find((x) => x.id === preOpen);
-      if (s) { setSvc(s); setGoUrl(null); }
-      onPreDone && onPreDone();
-    }
-  }, [preOpen]);
-  const today = new Date().toISOString().slice(0, 10);
-  const [pq, setPq] = useState(""); // направление (обязательно)
-  const [pFrom, setPFrom] = useState(""); // дата заезда (опц.)
-  const [pTo, setPTo] = useState("");     // дата выезда (опц.)
-  const copy = async (p) => { try { await navigator.clipboard.writeText(p.code); setGoUrl(p.url || null); setToast("Промокод скопирован"); } catch (e) { setToast("Не удалось скопировать"); } };
-  const activePromos = (s) => (s.promos || []).filter(p => p.endDate >= today).sort((a, b) => b.discountRub - a.discountRub);
-  // подбор под направление + опциональные даты; ввод (отель/город/зона/страна) резолвим в base
-  const matchedPromos = (() => {
-    const q = pq.trim().toLowerCase();
-    if (!q) return [];
-    const resolved = resolveDestination(pq); // {country, city} | null
-    const out = [];
-    for (const s of SERVICES) for (const p of activePromos(s)) {
-      const hay = `${p.country || ""} ${p.city || ""} ${p.header || ""} ${s.name}`.toLowerCase();
-      const universal = !p.country && !p.city;
-      let geoOk = hay.includes(q) || universal;
-      if (resolved) {
-        const cOk = !p.country || (resolved.country && p.country === resolved.country);
-        const ctOk = !p.city || (resolved.city && p.city === resolved.city);
-        if (cOk && ctOk) geoOk = true; // промокод покрывает распознанное направление
-      }
-      if (!geoOk) continue;
-      if (pFrom && p.stayTo && pFrom > p.stayTo) continue;
-      if (pTo && p.stayFrom && pTo < p.stayFrom) continue;
-      out.push({ ...p, _svc: s });
-    }
-    return out.sort((a, b) => (b.discountRub || 0) - (a.discountRub || 0)).slice(0, 8);
-  })();
-  const resolvedHint = pq.trim() ? resolveDestination(pq) : null;
-  const dInput = { flex: 1, background: T.card2, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 11px", color: T.text, fontSize: 13, outline: "none", boxSizing: "border-box", colorScheme: "dark" };
-  return <div style={{ animation: "fadeUp .18s ease-out" }}>
-    <PageHero title="Промокоды на отели" sub="Найдём лучшую скидку на бронирование жилья" emoji="🏷️" grad="linear-gradient(135deg,#141438,#3a2a7e,#5e4ad0)" bullets={["Предложения всех популярных сервисов", "Максимальная скидка по вашей поездке"]} />
-    <div style={{ padding: "0 20px 0" }}>
-      {/* Режим 1: подбор под поездку — направление + опциональные даты */}
-      <div style={{ background: T.card, border: `1.5px solid ${T.violet}55`, borderRadius: 18, padding: 14, marginBottom: 16 }}>
-        <div style={{ fontSize: 14.5, fontWeight: 800, color: T.text, fontFamily: "Sora,sans-serif", marginBottom: 3 }}>Подобрать под поездку</div>
-        <div style={{ fontSize: 11.5, color: T.subd, marginBottom: 10 }}>Укажите направление — даты по желанию</div>
-        <input value={pq} onChange={(e) => setPq(e.target.value)} placeholder="Страна или город: Бали, Турция, Сочи…" style={{ width: "100%", background: T.card2, border: `1px solid ${T.line}`, borderRadius: 12, padding: "11px 12px", color: T.text, fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 9 }} />
-        <div style={{ display: "flex", gap: 9 }}>
-          <div style={{ flex: 1 }}><div style={{ fontSize: 10.5, color: T.subd, marginBottom: 4 }}>Заезд · необязательно</div><input type="date" value={pFrom} onChange={(e) => setPFrom(e.target.value)} style={dInput} /></div>
-          <div style={{ flex: 1 }}><div style={{ fontSize: 10.5, color: T.subd, marginBottom: 4 }}>Выезд · необязательно</div><input type="date" value={pTo} onChange={(e) => setPTo(e.target.value)} style={dInput} /></div>
-        </div>
-        {resolvedHint && <div style={{ marginTop: 9, fontSize: 11.5, color: T.green, display: "flex", alignItems: "center", gap: 5 }}><span>📍</span>Направление: {resolvedHint.city ? `${resolvedHint.city}, ${resolvedHint.country}` : resolvedHint.country}</div>}
-        {pq.trim() && <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 9 }}>
-          {matchedPromos.length ? matchedPromos.map((p, i) => (
-            <div key={p.code + i} style={{ background: T.card2, border: `1px solid ${T.line}`, borderRadius: 13, padding: "11px 12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <span style={{ fontSize: 12.5, color: T.text, fontWeight: 700, flex: 1 }}>{p.header}</span>
-                <Badge label={`−${(p.discountRub || 0).toLocaleString("ru")}₽`} color={T.green} />
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px dashed ${T.violet}`, borderRadius: 10, padding: "10px 12px" }}>
-                <span style={{ flex: 1, fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 15, color: T.violet, letterSpacing: 1 }}>{p.code}</span>
-                <span style={{ fontSize: 10.5, color: T.subd }}>{p._svc.name}</span>
-                <div onClick={() => { trackGoal("hotel_partner_click", { partner: p._svc.id, country: p.country || "", city: p.city || "" }); copy(p); }} className="press" style={{ cursor: "pointer", padding: 6, borderRadius: 8, background: T.violet + "22" }}><Icon d={I.copy} size={16} color={T.violet} /></div>
-              </div>
-            </div>
-          )) : <div style={{ fontSize: 12.5, color: T.subd, textAlign: "center", padding: "10px 0" }}>Под «{pq}» пока нет промокодов. Загляните в каталог ниже.</div>}
-        </div>}
+function Hotels({ setToast, preOpen, onPreDone, trip=null, onBack, onAddStay }) {
+  const [svc,setSvc]=useState(null),[goUrl,setGoUrl]=useState(null),[bookingOpen,setBookingOpen]=useState(false);
+  const today=new Date().toISOString().slice(0,10), scoped=!!(trip&&trip.id);
+  const travelers=scoped?activeTravelers(trip):[];
+  const [pq,setPq]=useState(()=>scoped?(trip.dcName||trip.country||""):"");
+  const [pFrom,setPFrom]=useState(()=>scoped?(trip.df||""):"");
+  const [pTo,setPTo]=useState(()=>scoped?(trip.dt||""):"");
+  const [guests,setGuests]=useState(()=>scoped?Math.max(1,travelers.length):(2));
+  const [searched,setSearched]=useState(()=>scoped),[dateErr,setDateErr]=useState("");
+  const [stay,setStay]=useState(()=>({name:"",startDate:scoped?(trip.df||""):"",endDate:scoped?(trip.dt||""):"",priceAmount:"",currency:(trip&&trip.baseCurrency)||"EUR",pricingMode:"total"}));
+  useEffect(()=>{if(preOpen){const x=SERVICES.find(s=>s.id===preOpen);if(x){setSvc(x);setGoUrl(null);}onPreDone&&onPreDone();}},[preOpen]);
+  useEffect(()=>{if(scoped){setPq(trip.dcName||trip.country||"");setPFrom(trip.df||"");setPTo(trip.dt||"");setGuests(Math.max(1,activeTravelers(trip).length));}},[trip&&trip.id]);
+  const activePromos=(s)=>(s.promos||[]).filter(p=>!p.endDate||p.endDate>=today).sort((a,b)=>(b.discountRub||0)-(a.discountRub||0));
+  const changeFrom=(v)=>{setPFrom(v);setDateErr("");if(v&&pTo&&pTo<=v)setPTo(addIsoDays(v,1));};
+  const changeTo=(v)=>{if(pFrom&&v&&v<=pFrom){setDateErr("Выезд должен быть позже заезда");return;}setDateErr("");setPTo(v);};
+  const validDates=!pFrom||!pTo||pTo>pFrom;
+  const matchedPromos=(()=>{const q=pq.trim().toLowerCase();if(!q)return[];const resolved=resolveDestination(pq),out=[];for(const s of SERVICES)for(const p of activePromos(s)){const hay=`${p.country||""} ${p.city||""} ${p.header||""} ${s.name}`.toLowerCase(),universal=!p.country&&!p.city;let geoOk=hay.includes(q)||universal;if(resolved){const cOk=!p.country||(resolved.country&&p.country===resolved.country),ctOk=!p.city||(resolved.city&&p.city===resolved.city);if(cOk&&ctOk)geoOk=true;}if(!geoOk)continue;if(pFrom&&p.stayTo&&pFrom>p.stayTo)continue;if(pTo&&p.stayFrom&&pTo<p.stayFrom)continue;out.push({...p,_svc:s});}return out.sort((a,b)=>(b.discountRub||0)-(a.discountRub||0)).slice(0,8);})();
+  const copy=async(p)=>{try{await navigator.clipboard.writeText(p.code);setGoUrl(p.url||null);setToast("Промокод скопирован");}catch(e){setToast("Не удалось скопировать");}};
+  const openProvider=(s,url)=>{trackGoal("hotel_partner_click",{partner:s.id,country:(resolveDestination(pq)||{}).country||"",city:(resolveDestination(pq)||{}).city||""});try{window.open(url||s.url,"_blank");}catch(e){}setToast(`Открываем ${s.name}…`);};
+  const search=()=>{if(!pq.trim()){setToast("Укажите город или страну");return;}if(!validDates){setDateErr("Выезд должен быть позже заезда");return;}setSearched(true);};
+  const addStay=()=>{if(!stay.name.trim()){setToast("Укажите отель или жильё");return;}if(stay.startDate&&stay.endDate&&stay.endDate<=stay.startDate){setToast("Выезд должен быть позже заезда");return;}const item={id:"s"+Date.now(),name:stay.name.trim(),done:true,status:"confirmed",startDate:stay.startDate||pFrom||"",endDate:stay.endDate||pTo||"",priceAmount:Number(stay.priceAmount)||null,currency:stay.currency||"EUR",pricingMode:stay.pricingMode||"total",splitTravelerIds:travelers.map(x=>x.id),payments:[],createdAt:new Date().toISOString()};onAddStay&&onAddStay(item);setBookingOpen(false);setToast(scoped?`Жильё добавлено в «${trip.title}»`:"Жильё сохранено");};
+  const dInput={width:"100%",background:T.card,border:`1px solid ${T.line}`,borderRadius:12,padding:"10px 11px",color:T.text,outline:"none",colorScheme:"dark"};
+  const hasTelegramBack=typeof window!=="undefined"&&window.Telegram&&window.Telegram.WebApp&&window.Telegram.WebApp.BackButton;
+  return <div style={{animation:"fadeUp .18s ease-out",paddingBottom:18}}>
+    {!scoped&&<Header/>}
+    {scoped&&!hasTelegramBack&&<div style={{padding:"10px 16px 0"}}><div onClick={onBack} className="press" style={{display:"inline-flex",alignItems:"center",gap:7,color:T.sub,fontSize:12,fontWeight:800,cursor:"pointer"}}><Icon d={I.back} size={15} color={T.sub}/>Назад в {trip.title}</div></div>}
+    <ScreenHero eyebrow={scoped?`Для поездки · ${trip.title}`:"Жильё"} title={scoped?"Подобрать жильё":"Жильё без лишних вкладок"} sub={scoped?"Даты и состав поездки уже подставлены. Выберите сервис или добавьте готовую бронь.":"Сначала параметры поездки, затем подходящие скидки и сервисы бронирования."} image={HOME_ASSETS.hotels}/>
+    <div style={{padding:"0 16px"}}>
+      <div style={{background:T.card,border:`1px solid ${T.line2}`,borderRadius:18,padding:14,marginBottom:12}}>
+        <div style={{fontFamily:"Sora,sans-serif",fontSize:14,fontWeight:800,color:T.text,marginBottom:9}}>Параметры проживания</div>
+        <input value={pq} onChange={(e)=>{setPq(e.target.value);setSearched(false);}} placeholder="Город, страна или район" style={{...dInput,marginBottom:9}}/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><div style={{fontSize:10.5,color:T.subd,marginBottom:4}}>Заезд</div><input type="date" value={pFrom} onChange={(e)=>changeFrom(e.target.value)} style={dInput}/></div><div><div style={{fontSize:10.5,color:T.subd,marginBottom:4}}>Выезд</div><input type="date" min={pFrom?addIsoDays(pFrom,1):today} value={pTo} onChange={(e)=>changeTo(e.target.value)} style={{...dInput,borderColor:dateErr?"#ff6db066":T.line}}/></div></div>
+        {dateErr&&<div style={{fontSize:10.8,color:"#ff7ba9",marginTop:5}}>{dateErr}</div>}
+        <div style={{display:"flex",alignItems:"center",gap:10,marginTop:10}}><div style={{flex:1}}><div style={{fontSize:10.5,color:T.subd}}>Гостей</div><div style={{fontSize:13,color:T.text,fontWeight:800,marginTop:2}}>{guests} {plural(guests,"человек","человека","человек")}</div></div><div style={{display:"flex",gap:5}}><button onClick={()=>setGuests(Math.max(1,guests-1))} style={{width:32,height:32,borderRadius:10,border:`1px solid ${T.line}`,background:T.card2,color:T.text,fontSize:18}}>−</button><button onClick={()=>setGuests(Math.min(30,guests+1))} style={{width:32,height:32,borderRadius:10,border:`1px solid ${T.line}`,background:T.card2,color:T.text,fontSize:18}}>＋</button></div></div>
+        <div onClick={search} className="press" style={{marginTop:12,textAlign:"center",background:GRAD.cta,borderRadius:13,padding:12,color:"#fff",fontSize:13,fontWeight:900,cursor:"pointer"}}>Показать предложения</div>
       </div>
-      {/* Режим 2: каталог агрегаторов — горизонтальная карусель */}
-      <div style={{ fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 15, color: T.text, marginBottom: 12 }}>Каталог сервисов</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 9 }}>
-        {SERVICES.map((s, i) => { const n = activePromos(s).length; return (
-          <div key={s.id} onClick={() => { setSvc(s); setGoUrl(null); }} className="press card-in" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 15, overflow: "hidden", cursor: "pointer", animationDelay: `${i * 70}ms` }}>
-            <Porthole grad={s.grad} h={64} style={{ borderRadius: 0 }} />
-            <div style={{ padding: "9px 8px 11px" }}><div style={{ fontFamily: "Sora,sans-serif", fontWeight: 700, color: T.text, fontSize: 12.5, lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div><div style={{ marginTop: 6 }}><Badge label={n ? `${n} промо` : "скоро"} color={n ? T.green : T.subd} /></div></div>
-          </div>); })}
-      </div>
+      {searched&&<>
+        <div style={{display:"flex",alignItems:"baseline",margin:"17px 3px 9px"}}><div style={{fontFamily:"Sora,sans-serif",fontWeight:800,fontSize:15,color:T.text,flex:1}}>Лучшие предложения</div><span style={{fontSize:10.5,color:T.subd}}>{matchedPromos.length?`${matchedPromos.length} промо`:"без промо"}</span></div>
+        {matchedPromos.length?<div style={{display:"flex",flexDirection:"column",gap:9}}>{matchedPromos.map((p,i)=><div key={p.code+i} style={{background:`linear-gradient(135deg,${T.card2},${T.card})`,border:`1px solid ${T.line}`,borderRadius:16,padding:12}}><div style={{display:"flex",alignItems:"flex-start",gap:10}}><ServiceLogo id={p._svc.id} name={p._svc.name}/><div style={{flex:1,minWidth:0}}><div style={{fontFamily:"Sora,sans-serif",fontSize:14,fontWeight:800,color:T.text}}>{promoHeadline(p)}</div><div style={{fontSize:10.8,color:T.subd,marginTop:3}}>{p._svc.name} · {p.header}</div>{p.endDate&&<div style={{fontSize:10,color:T.subd,marginTop:4}}>Бронирование до {ddmm(p.endDate)}{p.stayTo?` · проживание до ${ddmm(p.stayTo)}`:""}</div>}</div></div><div style={{display:"flex",alignItems:"center",gap:8,marginTop:10,background:"rgba(255,255,255,.035)",border:`1px dashed ${T.line2}`,borderRadius:11,padding:"8px 10px"}}><span style={{fontFamily:"Sora,sans-serif",fontSize:13,fontWeight:900,color:T.cyan,letterSpacing:.7,flex:1}}>{p.code}</span><span onClick={()=>copy(p)} className="press" style={{fontSize:11,fontWeight:800,color:T.cyan,cursor:"pointer"}}>Скопировать</span><span onClick={()=>openProvider(p._svc,p.url)} className="press" style={{fontSize:11,fontWeight:800,color:T.text,cursor:"pointer"}}>Открыть ↗</span></div></div>)}</div>:<EmptyState compact icon="🏷️" title="Промокодов под эти даты пока нет" sub="Это не блокирует поиск: откройте любой сервис ниже и сравните варианты."/>}
+      </>}
+      <div style={{fontFamily:"Sora,sans-serif",fontSize:13,fontWeight:800,color:T.subd,margin:"18px 3px 9px"}}>Где искать</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>{SERVICES.map(s=>{const n=activePromos(s).length;return <div key={s.id} onClick={()=>{setSvc(s);setGoUrl(null);}} className="press" style={{background:T.card,border:`1px solid ${T.line}`,borderRadius:16,padding:12,cursor:"pointer",minHeight:96}}><div style={{display:"flex",alignItems:"center",gap:8}}><ServiceLogo id={s.id} name={s.name}/><div style={{fontFamily:"Sora,sans-serif",fontSize:12.5,fontWeight:800,color:T.text,lineHeight:1.15}}>{s.name}</div></div><div style={{fontSize:10.5,color:T.subd,lineHeight:1.35,marginTop:9}}>{s.desc}</div><div style={{fontSize:10.5,color:n?T.cyan:T.subd,fontWeight:800,marginTop:7}}>{n?`${n} активных промо`:"Открыть сервис"}</div></div>})}</div>
+      {scoped&&<div onClick={()=>{setStay(x=>({...x,startDate:pFrom||x.startDate,endDate:pTo||x.endDate}));setBookingOpen(true);}} className="press" style={{marginTop:12,background:`linear-gradient(135deg,${T.card2},${T.card})`,border:`1px solid ${T.line2}`,borderRadius:16,padding:13,cursor:"pointer",display:"flex",alignItems:"center",gap:10}}><div style={{fontSize:20}}>✓</div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:800,color:T.text}}>Уже забронировали?</div><div style={{fontSize:10.8,color:T.subd,marginTop:2}}>Добавьте жильё и цену прямо в {trip.title}</div></div><Icon d={I.chevR} size={15} color={T.subd}/></div>}
     </div>
-    {svc && <Overlay onClose={() => setSvc(null)}>
-      <SheetHead title={svc.name} onClose={() => setSvc(null)} />
-      <div style={{ display: "flex", flexDirection: "column", gap: 16, maxHeight: 380, overflowY: "auto" }}>
-        {activePromos(svc).length ? activePromos(svc).map((p) => (
-          <div key={p.code}>
-            <div style={{ fontSize: 13, color: T.text, fontWeight: 600, marginBottom: 8 }}>{p.header}</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: T.card, border: `1px dashed ${T.violet}`, borderRadius: 12, padding: "14px 16px" }}>
-              <span style={{ flex: 1, fontFamily: "Sora,sans-serif", fontWeight: 800, fontSize: 18, color: T.violet, letterSpacing: 1 }}>{p.code}</span>
-              <div onClick={() => copy(p)} className="press" style={{ cursor: "pointer", padding: 6, borderRadius: 8, background: T.violet + "22" }}><Icon d={I.copy} size={18} color={T.violet} /></div>
-            </div>
-            <div style={{ fontSize: 11, color: T.subd, marginTop: 4 }}>Действует до {p.endDate}{(p.stayFrom && p.stayTo) ? ` · на проживания с ${ddmm(p.stayFrom)} по ${ddmm(p.stayTo)}` : ""}</div>
-          </div>
-        )) : <div style={{ color: T.subd, fontSize: 13, textAlign: "center", padding: 12 }}>Активных промокодов пока нет</div>}
-      </div>
-      <div style={{ marginTop: 16 }}><Btn onClick={() => { trackGoal("hotel_partner_click", { partner: (svc && svc.id) || "", country: "", city: "" }); try { window.open(goUrl || svc.url, "_blank"); } catch (e) { } setToast(`Открываем ${svc.name}…`); }}>Перейти в {svc.name}</Btn></div>
-    </Overlay>}
+    {svc&&<Overlay onClose={()=>setSvc(null)}><SheetHead title={svc.name} onClose={()=>setSvc(null)}/><div style={{display:"flex",flexDirection:"column",gap:11,maxHeight:"52vh",overflowY:"auto"}}>{activePromos(svc).length?activePromos(svc).map(p=><div key={p.code} style={{background:T.card,border:`1px solid ${T.line}`,borderRadius:14,padding:11}}><div style={{fontFamily:"Sora,sans-serif",fontSize:14,fontWeight:800,color:T.text}}>{promoHeadline(p)}</div><div style={{fontSize:10.8,color:T.subd,marginTop:3}}>{p.header}</div><div style={{display:"flex",alignItems:"center",gap:8,marginTop:9}}><span style={{flex:1,color:T.cyan,fontFamily:"Sora,sans-serif",fontWeight:900}}>{p.code}</span><span onClick={()=>copy(p)} className="press" style={{fontSize:11,color:T.cyan,fontWeight:800,cursor:"pointer"}}>Скопировать</span></div></div>):<EmptyState compact title="Промокодов сейчас нет" sub="Можно перейти в сервис без промокода."/>}</div><div style={{marginTop:13}}><Btn onClick={()=>openProvider(svc,goUrl||svc.url)}>Перейти в {svc.name}</Btn></div></Overlay>}
+    {bookingOpen&&<Overlay onClose={()=>setBookingOpen(false)}><SheetHead title="Добавить жильё" onClose={()=>setBookingOpen(false)}/><input value={stay.name} onChange={(e)=>setStay(x=>({...x,name:e.target.value}))} placeholder="Отель / апартаменты" style={{...dInput,marginBottom:8}}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><input type="date" value={stay.startDate} onChange={(e)=>setStay(x=>({...x,startDate:e.target.value,endDate:x.endDate&&x.endDate<=e.target.value?addIsoDays(e.target.value,1):x.endDate}))} style={dInput}/><input type="date" min={stay.startDate?addIsoDays(stay.startDate,1):today} value={stay.endDate} onChange={(e)=>setStay(x=>({...x,endDate:e.target.value}))} style={dInput}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 90px",gap:8,marginTop:8}}><input inputMode="decimal" value={stay.priceAmount} onChange={(e)=>setStay(x=>({...x,priceAmount:e.target.value.replace(",",".")}))} placeholder="Цена" style={dInput}/><select value={stay.currency} onChange={(e)=>setStay(x=>({...x,currency:e.target.value}))} style={dInput}>{COST_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></div><div style={{display:"flex",gap:7,marginTop:8}}>{[["total","За всех"],["per_person","За человека"]].map(([v,l])=><div key={v} onClick={()=>setStay(x=>({...x,pricingMode:v}))} className="press" style={{flex:1,textAlign:"center",border:`1px solid ${stay.pricingMode===v?T.cyan:T.line}`,background:stay.pricingMode===v?T.cyan+"16":T.card,borderRadius:10,padding:9,color:stay.pricingMode===v?T.cyan:T.subd,fontSize:11,fontWeight:800,cursor:"pointer"}}>{l}</div>)}</div><div style={{fontSize:10.5,color:T.subd,marginTop:9}}>По умолчанию расход разделится на всех текущих путешественников. Плательщика можно уточнить в бюджете поездки.</div><div onClick={addStay} className="press" style={{marginTop:12,textAlign:"center",background:GRAD.cta,borderRadius:13,padding:12,color:"#fff",fontSize:13,fontWeight:900,cursor:"pointer"}}>Добавить в {trip&&trip.title||"поездку"}</div></Overlay>}
   </div>;
 }
+
 
 /* ================================ APP ================================== */
 export default function App() {
@@ -3167,14 +3193,21 @@ export default function App() {
   }, []);
   const [hotelsPre, setHotelsPre] = useState(null);    // авто-открытие сервиса промокодов в «Отелях»
   const [docsPre, setDocsPre] = useState(null);        // авто-открытие карточки документа в «Документах»
+  const [flow, setFlow] = useState(null);             // {kind, tripId, section}: дочерний flow, запущенный из конкретной поездки
   const [editName, setEditName] = useState(false);
   const [name, setName] = useState(() => store.get("name", "TripWise tester"));
   useEffect(() => { store.set("name", name); }, [name]);
+  const [profile, setProfile] = useState(() => store.get("profile", {}));
+  useEffect(() => { store.set("profile", profile || {}); }, [profile]);
+  useEffect(() => { let dead=false; (async()=>{ const r=await sharedApi("profile-get",{},12000); if(!dead&&r.ok&&r.profile){ setProfile((cur)=>({...(cur||{}),...r.profile})); store.set("profile",{...(profile||{}),...r.profile}); } })(); return()=>{dead=true;}; }, []);
+  const saveProfile = async (v) => { const next={...(v||{})}; setProfile(next); store.set("profile",next); const r=await sharedApi("profile-save",{profile:next},12000); if(r.ok&&r.profile){setProfile(r.profile);store.set("profile",r.profile);} return r; };
   const [inset, setInset] = useState({ top: 0, bottomStr: "env(safe-area-inset-bottom)", logoTop: null });
   const safeTop = inset.top;
   const [toast, setToastRaw] = useState(null);
   const toastTimer = useRef(null);
   const setToast = (m) => { setToastRaw(m); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToastRaw(null), 2200); };
+  const [actionToast, setActionToast] = useState(null);
+  const actionToastTimer = useRef(null), deleteTimers = useRef({});
 
   // Telegram Mini App layout. Высоту держим на CSS (100dvh) — НЕ в JS, иначе меню "застревает" после клавиатуры.
   useEffect(() => {
@@ -3335,17 +3368,39 @@ export default function App() {
     }
     return next;
   }));
-  const openTripScreen = (id) => { setTripSection(null); setTripOpen(id); setTab("routes"); setStack(["trip"]); };
-  // «Взять в поездку»: сперва подтверждение (пользователь осознаёт создание карточки поездки)
+  const scheduleTripDelete = (id) => {
+    const gone=trips.find((x)=>x.id===id); if(!gone)return;
+    setTrips((p)=>p.filter((x)=>x.id!==id)); setStack([]); setTripOpen(null); setTab("routes"); setFlow(null);
+    clearTimeout(deleteTimers.current[id]);
+    deleteTimers.current[id]=setTimeout(()=>{ deleteTripOnServer(id); delete deleteTimers.current[id]; },5000);
+    clearTimeout(actionToastTimer.current);
+    setActionToast({ text:"Поездка удалена", action:"Отменить", onAction:()=>{ clearTimeout(deleteTimers.current[id]); delete deleteTimers.current[id]; setTrips((p)=>p.some((x)=>x.id===id)?p:[gone,...p]); setActionToast(null); setToast("Удаление отменено"); } });
+    actionToastTimer.current=setTimeout(()=>setActionToast(null),4800);
+  };
+  const showUndoable = (text, undo) => { clearTimeout(actionToastTimer.current); setActionToast({text,action:"Отменить",onAction:()=>{try{undo&&undo();}finally{setActionToast(null);setToast("Изменение отменено");}}}); actionToastTimer.current=setTimeout(()=>setActionToast(null),4800); };
+  const openTripScreen = (id) => { setFlow(null); setTripSection(null); setTripOpen(id); setTab("routes"); setStack(["trip"]); };
+  const returnTripFlow = (section) => {
+    const id = flow && flow.tripId;
+    if (!id) return;
+    setTripSection(section || flow.section || "overview"); setTripOpen(id); setFlow(null); setTab("routes"); setStack(["trip"]);
+  };
+  const routeForTrip = (r) => ({ ...r, rid:r.id || r.rid || "", total:r.total, codes:tripCodes(r), stopover:r.stopover?{...r.stopover}:null });
+  const applyRouteToTrip = (r, tripId) => {
+    const id=tripId || (flow&&flow.tripId); if(!id)return false;
+    updateTrip(id,(x)=>({ ...x, route:routeForTrip(r), oc:(lastSearchRef.current&&lastSearchRef.current.oc)||x.oc, dc:(lastSearchRef.current&&lastSearchRef.current.dc)||x.dc, df:(lastSearchRef.current&&lastSearchRef.current.df)||x.df, dt:(lastSearchRef.current&&lastSearchRef.current.dt)||x.dt, blocksOn:{...tripBlocks(x),tickets:true}, checks:{...(x.checks||{}),tickets:false} }));
+    setTripSection("tickets"); setTripOpen(id); setFlow(null); setTab("routes"); setStack(["trip"]); setToast("Билеты добавлены в поездку"); return true;
+  };
+  // Глобальный поиск создаёт поездку; поиск, запущенный из Trip, меняет только этот Trip.
   const askTakeTrip = (r) => {
+    if (flow && flow.kind === "tickets" && flow.tripId) { applyRouteToTrip(r, flow.tripId); return; }
     const ls = lastSearchRef.current || {};
-    const dup = trips.find((t) => t.route && t.route.rid === r.id && t.df === (ls.df || ""));
+    const dup = trips.find((t) => t.route && (t.route.rid === r.id || t.route.id === r.id) && t.df === (ls.df || ""));
     if (dup) { openTripScreen(dup.id); return; }
     setConfirmTrip(r);
   };
   const takeTrip = (r) => {
     const ls = lastSearchRef.current || {};
-    const dup = trips.find((t) => t.route && t.route.rid === r.id && t.df === (ls.df || ""));
+    const dup = trips.find((t) => t.route && (t.route.rid === r.id || t.route.id === r.id) && t.df === (ls.df || ""));
     if (dup) { openTripScreen(dup.id); return; }
     const dep = ls.df ? new Date(ls.df) : null;
     const t = {
@@ -3353,8 +3408,8 @@ export default function App() {
       title: `${query.destName || ls.dc || "Поездка"}${dep ? " · " + MONTHS_S[dep.getMonth()] : ""}`,
       dcName: query.destName || "", dc: ls.dc || "", country: query.destCountry || "",
       oc: ls.oc || "", ocName: query.origin || "", df: ls.df || "", dt: ls.dt || "", adults: ls.a || 1,
-      route: { rid: r.id, total: r.total, codes: tripCodes(r), stopover: r.stopover ? { city: r.stopover.city, nights: r.stopover.nights } : null },
-      blocksOn: { tickets: true, lodging: false, docs: false },  // из билетов показываем только билеты; жильё/документы добавляются в Обзоре
+      route: routeForTrip(r),
+      blocksOn: { tickets: true, lodging: false, docs: false },
       checks: { tickets: false, lodgeMain: false, lodgeStop: false, docs: {}, services: {} },
       servicesAdded: [], custom: [], docsExtra: [], lodgingOff: false, children: ls.ch || [], createdAt: Date.now(),
     };
@@ -3362,28 +3417,37 @@ export default function App() {
   };
   const findTicketsForTrip = (t) => {
     const o = AIRPORTS.find((a) => a.code === t.oc) || null, ds = AIRPORTS.find((a) => a.code === t.dc) || null;
-    const f = { origin: o, dest: ds, round: !!t.dt, dep: t.df ? new Date(t.df) : null, ret: t.dt ? new Date(t.dt) : null, adults: t.adults || 1 };
-    setForm(f);
+    const f = { origin: o, dest: ds, round: !!t.dt, dep: t.df ? new Date(t.df) : null, ret: t.dt ? new Date(t.dt) : null, adults: t.adults || 1, children:t.children||[] };
+    setFlow({ kind:"tickets", tripId:t.id, section:"tickets" }); setForm(f);
     if (o && ds && t.df) runSearch(f); else setSheet(true);
   };
-  const openSheetWithDest = (id) => { const a = byDest(id); setForm((f) => ({ ...f, dest: a })); setSheet(true); };
+  const openHotelsForTrip = (t) => { setHotelsPre(null); setFlow({kind:"hotels",tripId:t.id,section:"lodging"}); setTab("hotels"); setStack([]); };
+  const openSheetWithDest = (id) => { setFlow(null); const a = byDest(id); setForm((f) => ({ ...f, dest: a })); setSheet(true); };
 
   // системная кнопка «Назад» Telegram: показывается вместо «Закрыть», когда есть куда вернуться
   useEffect(() => {
     const tg = (typeof window !== "undefined") && window.Telegram && window.Telegram.WebApp;
     if (!tg || !tg.BackButton) return;
-    const canBack = stack.length > 0 || sheet || traveler || editName || svcOpen || newTrip || confirmTrip;
+    const canBack = stack.length > 0 || sheet || traveler || editName || svcOpen || newTrip || confirmTrip || !!(flow && flow.tripId);
     let fired = false; // защита от двойного срабатывания (две подписки)
     const onBack = () => {
       if (fired) return; fired = true; setTimeout(() => { fired = false; }, 300);
+      if (typeof window!=="undefined" && window.__tripwiseModalBack) { const close=window.__tripwiseModalBack; try { close(); } catch(e){} return; }
       if (confirmTrip) return setConfirmTrip(null);
-      // ушли смотреть промокоды/документы из карточки маршрута — «Назад» возвращает к маршруту
-      if (stack.length > 0 && tab !== "routes") { setTab("routes"); return; }
       if (newTrip) return setNewTrip(false);
       if (svcOpen) return setSvcOpen(false);
       if (editName) return setEditName(false);
       if (traveler) return setTraveler(false);
       if (sheet) return setSheet(false);
+      // Trip-scoped flow не ломает стек приложения: один Back всегда возвращает в исходную поездку.
+      if (flow && flow.tripId) {
+        const closing = stack[stack.length - 1];
+        if (tab === "routes" && closing === "detail") { setStack(["results"]); return; }
+        if (tab === "routes" && closing === "results") { returnTripFlow(flow.section || "tickets"); return; }
+        returnTripFlow(flow.section || "overview"); return;
+      }
+      // Глобальный переход из карточки маршрута в Отели/Документы по-прежнему возвращает к маршруту.
+      if (stack.length > 0 && tab !== "routes") { setTab("routes"); return; }
       const closing = stack[stack.length - 1];
       if (closing === "results" && stack.length === 1) { setStack([]); setTab("home"); setSheet(true); return; }
       setStack((p) => p.slice(0, -1));
@@ -3397,7 +3461,7 @@ export default function App() {
     return () => {
       try { if (tg.BackButton.offClick) tg.BackButton.offClick(onBack); } catch (e) { }
     };
-  }, [stack, sheet, traveler, editName, svcOpen, newTrip, confirmTrip]);
+  }, [stack, sheet, traveler, editName, svcOpen, newTrip, confirmTrip, flow, tab]);
   const isLiked = (r) => !!saved.find(x => x.id === ("liked-" + r.id));
   const likeRoute = (r) => { try { trackGoal("route_saved"); } catch(e){}
     const id = "liked-" + r.id;
@@ -3422,18 +3486,19 @@ export default function App() {
   };
   const openSaved = (s) => { setSelected(s.route); setQuery({ ...s.query, datesLabel: s.dates }); setTab("routes"); setStack(["results", "detail"]); };
 
+  const scopedTrip = flow && flow.tripId ? trips.find((x)=>x.id===flow.tripId) : null;
   let main = null;
   if (tab === "routes") {
     const curTrip = trips.find((t) => t.id === tripOpen);
-    if (top === "trip" && curTrip) main = <SharedTripScreen t={curTrip} initialBlk={tripSection} onBack={() => setStack([])} onUpdate={updateTrip} onReplaceTrip={replaceSharedTrip} bottomStr={inset.bottomStr} onLeaveTrip={(id) => { setTrips((p) => p.filter((x) => x.id !== id)); setStack([]); }} onDelete={(id) => { setTrips((p) => p.filter((x) => x.id !== id)); deleteTripOnServer(id); setStack([]); setToast("Поездка удалена"); }} onFindTickets={findTicketsForTrip} goHotels={() => { setHotelsPre(null); setTab("hotels"); }} goDocs={(docId) => { setDocsPre(typeof docId === "string" ? docId : null); setTab("docs"); }} setToast={setToast} />;
+    if (top === "trip" && curTrip) main = <SharedTripScreen t={curTrip} initialBlk={tripSection} onBack={() => setStack([])} onUpdate={updateTrip} onReplaceTrip={replaceSharedTrip} onUndoable={showUndoable} bottomStr={inset.bottomStr} onLeaveTrip={(id) => { setTrips((p) => p.filter((x) => x.id !== id)); setStack([]); }} onDelete={(id) => scheduleTripDelete(id)} onFindTickets={findTicketsForTrip} goHotels={() => openHotelsForTrip(curTrip)} goDocs={(docId) => { setDocsPre(typeof docId === "string" ? docId : null); setFlow({kind:"docs",tripId:curTrip.id,section:"docs"}); setTab("docs"); setStack([]); }} setToast={setToast} />;
     else if (top === "trip") main = <RoutesScreen trips={trips} onOpenTrip={openTripScreen} onNewTrip={() => setNewTrip(true)} onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved((p) => p.filter((x) => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => { const f = { ...s.form, dep: s.form.dep ? new Date(s.form.dep) : null, ret: s.form.ret ? new Date(s.form.ret) : null }; setForm(f); runSearch(f); }} />;
-    else if (top === "detail") main = <Detail r={selected} query={query} onBack={() => setStack(["results"])} onEdit={() => { setTab("home"); setSheet(true); }} liked={isLiked(selected)} onLike={likeRoute} onShare={shareRoute} goHotels={(svc) => { setHotelsPre(svc || null); setTab("hotels"); }} onTakeTrip={askTakeTrip} inTrip={!!(selected && trips.some((t) => t.route && t.route.rid === selected.id && t.df === ((lastSearchRef.current || {}).df || "")))} />;
-    else if (top === "results") { main = <Results query={query} routes={routes} loading={loading} error={searchError} onRetry={() => runSearch()} onEdit={() => { setTab("home"); setSheet(true); }} onBack={() => setStack([])} onOpen={(r) => { setSelected(r); setStack(["results", "detail"]); }} isLiked={isLiked} onLike={likeRoute} />; }
+    else if (top === "detail") main = <Detail r={selected} query={query} onBack={() => setStack(["results"])} onEdit={() => { if(!(flow&&flow.tripId)) setTab("home"); setSheet(true); }} liked={isLiked(selected)} onLike={likeRoute} onShare={shareRoute} goHotels={(svc) => { setHotelsPre(svc || null); if(flow&&flow.tripId)setFlow({...flow,kind:"hotels",section:"lodging"}); else setFlow(null); setTab("hotels"); setStack([]); }} onTakeTrip={askTakeTrip} takeLabel={flow&&flow.kind==="tickets"&&scopedTrip?`Добавить в ${scopedTrip.title}`:null} inTrip={!!(selected && trips.some((t) => t.route && (t.route.rid === selected.id || t.route.id === selected.id) && t.df === ((lastSearchRef.current || {}).df || "")))} />;
+    else if (top === "results") { main = <Results query={query} routes={routes} loading={loading} error={searchError} onRetry={() => runSearch()} onEdit={() => { if(!(flow&&flow.tripId)) setTab("home"); setSheet(true); }} onBack={() => flow&&flow.tripId ? returnTripFlow(flow.section||"tickets") : setStack([])} onOpen={(r) => { setSelected(r); setStack(["results", "detail"]); }} isLiked={isLiked} onLike={likeRoute} />; }
     else main = <RoutesScreen trips={trips} onOpenTrip={openTripScreen} onNewTrip={() => setNewTrip(true)} onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved(p => p.filter(x => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => { const f = { ...s.form, dep: s.form.dep ? new Date(s.form.dep) : null, ret: s.form.ret ? new Date(s.form.ret) : null }; setForm(f); runSearch(f); }} />;
-  } else if (tab === "home") main = <Home onSearch={() => setSheet(true)} onPickDest={openSheetWithDest} goTab={setTab} openServices={() => (trackGoal("services_opened"), setSvcOpen(true))} />;
-  else if (tab === "hotels") main = <Hotels setToast={setToast} preOpen={hotelsPre} onPreDone={() => setHotelsPre(null)} />;
+  } else if (tab === "home") main = <Home onSearch={() => { setFlow(null); setSheet(true); }} onPickDest={openSheetWithDest} goTab={(k)=>{setFlow(null);setTab(k);}} openServices={() => (trackGoal("services_opened"), setSvcOpen(true))} />;
+  else if (tab === "hotels") main = <Hotels setToast={setToast} preOpen={hotelsPre} onPreDone={() => setHotelsPre(null)} trip={flow&&flow.kind==="hotels"?scopedTrip:null} onBack={()=>returnTripFlow("lodging")} onAddStay={(item)=>{if(!scopedTrip)return;updateTrip(scopedTrip.id,(x)=>({...x,stays:[...(x.stays||[]),item],blocksOn:{...tripBlocks(x),lodging:true}}));setTimeout(()=>returnTripFlow("lodging"),80);}} />;
   else if (tab === "docs") main = <Docs trips={trips} preOpenDoc={docsPre} onPreDone={() => setDocsPre(null)} onOpenTrip={openTripScreen} onAddDocToTrip={(tripId, ids) => { updateTrip(tripId, (x) => { const cur = x.docsExtra || []; const base = (DOC_MATRIX[x.country] || DOC_BASE).map((dd) => dd.id); const add = (ids || []).filter((id) => !cur.includes(id) && !base.includes(id)); return { ...x, docsExtra: [...cur, ...add], blocksOn: { ...tripBlocks(x), docs: true } }; }); openTripScreen(tripId); }} onCreateTrip={(t) => { setTrips((p) => [t, ...p]); syncTripToServer(t).then((r)=>r&&r.trip&&replaceSharedTrip(r.trip)); setToast("Поездка создана"); openTripScreen(t.id); }} setToast={setToast} />;
-  else if (tab === "profile") main = <Profile name={name} onTraveler={() => setTraveler(true)} onEditName={() => setEditName(true)} setToast={setToast} notifyPrefs={notifyPrefs} onNotifyChange={changeNotifyPrefs} />;
+  else if (tab === "profile") main = <Profile name={name} onTraveler={() => setTraveler(true)} onEditName={() => setEditName(true)} onOpenDocs={() => { setFlow(null); setTab("docs"); setStack([]); }} setToast={setToast} notifyPrefs={notifyPrefs} onNotifyChange={changeNotifyPrefs} profile={profile} onProfileSave={saveProfile} trips={trips} />;
 
   return <div style={{ minHeight: "100vh", background: T.bg, display: "flex", justifyContent: "center" }}>
     <style>{`
@@ -3457,10 +3522,10 @@ export default function App() {
         .home-compact-title{font-size:27px!important}
       }
     `}</style>
-    <div className="app-root" style={{ width: "100%", maxWidth: 420, paddingTop: safeTop, background: tab === "home" ? `radial-gradient(105% 54% at 78% 0%, #0d1830 0%, ${HOME_T.bg} 48%, ${HOME_T.bgDeep} 100%)` : `radial-gradient(120% 60% at 80% 0%, #1a1340 0%, ${T.bg} 55%)`, color: tab === "home" ? HOME_T.text : T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div className="app-root" style={{ width: "100%", maxWidth: 420, paddingTop: safeTop, background: `radial-gradient(105% 54% at 78% 0%, #0d1830 0%, ${HOME_T.bg} 48%, ${HOME_T.bgDeep} 100%)`, color: tab === "home" ? HOME_T.text : T.text, fontFamily: "Manrope,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", top: inset.logoTop != null ? inset.logoTop + "px" : "calc(env(safe-area-inset-top, 0px) + 14px)", zIndex: 30, pointerEvents: "none" }}><Logo home={tab === "home"} /></div>
-      <div style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", background: "transparent", paddingTop: 10, paddingBottom: 108 }}>{main}</div>
-      {!kb && top !== "trip" && <BottomNav tab={tab} setTab={(k) => { if (k === tab && (k === "routes" || k === "profile" || k === "hotels" || k === "docs")) setStack([]); if (k === "routes" && tab === "routes") setStack([]); setTab(k); }} bottomStr={inset.bottomStr} />}
+      <div style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", background: "transparent", paddingTop: 10, paddingBottom: top === "trip" ? 150 : ((flow&&flow.tripId)?28:108) }}>{main}</div>
+      {!kb && top !== "trip" && !(flow&&flow.tripId) && <BottomNav tab={tab} setTab={(k) => { setFlow(null); if (k === tab && (k === "routes" || k === "profile" || k === "hotels" || k === "docs")) setStack([]); if (k === "routes" && tab === "routes") setStack([]); setTab(k); }} bottomStr={inset.bottomStr} />}
       {sheet && <SearchSheet form={form} setForm={setForm} onClose={() => setSheet(false)} onSubmit={() => runSearch()} setToast={setToast} />}
       {traveler && <Traveler safeTop={safeTop} bottomStr={inset.bottomStr} onBack={() => setTraveler(false)} />}
       {confirmTrip && <Overlay onClose={() => setConfirmTrip(null)}>
@@ -3478,6 +3543,7 @@ export default function App() {
       {newTrip && <NewTripSheet onClose={() => setNewTrip(false)} onCreate={(t) => { setTrips((p) => [t, ...p]); syncTripToServer(t).then((r)=>r&&r.trip&&replaceSharedTrip(r.trip)); setNewTrip(false); setToast("Поездка создана"); openTripScreen(t.id); }} />}
       {svcOpen && <Overlay onClose={() => setSvcOpen(false)}><SheetHead title="Сервисы для поездки" onClose={() => setSvcOpen(false)} /><ServiceGrid setToast={setToast} /></Overlay>}
       {editName && <NameEdit name={name} onClose={() => setEditName(false)} onSave={(n) => { setName(n); setEditName(false); setToast("Имя сохранено"); }} />}
+      <ActionToast data={actionToast} />
       <Toast msg={toast} />
     </div>
   </div>;
