@@ -416,6 +416,7 @@ function budgetSummary(t) {
 //#endregion
 //#region TripWiseAI-v7-release/frontend/src/App.jsx
 const API_BASE = import.meta.env.VITE_API_BASE || "https://functions.yandexcloud.net/d4e3hpvr0lrijksc8i1r";
+const APP_VERSION = "7.0.0-rc.2";
 const YM_ID = Number(import.meta.env.VITE_METRIKA_ID) || 0;
 const YM_TAB_PATH = {
 	home: "/home",
@@ -2033,13 +2034,15 @@ async function sharedApi(action, payload = {}, timeoutMs = 3e4) {
 		if (timer) clearTimeout(timer);
 	}
 }
-function aiErrorText(error, fallback = "Помощник сейчас недоступен.") {
+function aiErrorText(error, fallback = "Помощник сейчас недоступен.", meta = {}) {
 	const key = String(error || "").toLowerCase();
+	const diagnostic = String(meta.code || "").trim().replace(/[^a-z0-9_.-]/gi, "").slice(0, 32);
+	const suffix = diagnostic ? ` Код: ${diagnostic}.` : "";
 	if (key === "timeout") return "ИИ не ответил вовремя. Попробуйте ещё раз через несколько секунд.";
 	if (key.includes("not configured") || key.includes("not set") || key.includes("missing")) return "ИИ ещё не подключён на сервере. Нужны настройки GigaChat-прокси.";
 	if (key.includes("proxy unauthorized") || key.includes("unauthorized")) return "ИИ-прокси отклонил ключ. Проверьте, что GIGACHAT_PROXY_KEY совпадает с PROXY_SHARED_SECRET.";
 	if (key.includes("rate limit") || key.includes("too many")) return "Лимит запросов к ИИ исчерпан. Попробуйте позже.";
-	if (key.includes("provider") || key.includes("unavailable")) return "Сервис GigaChat временно недоступен. Попробуйте ещё раз позже.";
+	if (key.includes("provider") || key.includes("unavailable")) return `Сервис GigaChat временно недоступен. Попробуйте ещё раз позже.${suffix}`;
 	return error ? `${fallback} (${String(error).slice(0, 120)})` : fallback;
 }
 function stripServerFields(trip) {
@@ -2898,6 +2901,15 @@ const promoHeadline = (p) => {
 	if (disc && min) return `−${disc.toLocaleString("ru-RU")} ₽ от ${min.toLocaleString("ru-RU")} ₽`;
 	if (disc) return `−${disc.toLocaleString("ru-RU")} ₽`;
 	return p && p.header || "Промокод";
+};
+const isReferralUrl = (url) => {
+	if (!url) return false;
+	try {
+		const u = new URL(url);
+		return /(?:ref|aff|affiliate|partner|utm_|clickid|subid)/i.test(`${u.pathname}${u.search}`);
+	} catch {
+		return false;
+	}
 };
 function AirportPicker({ title, onPick, onClose }) {
 	const [q, setQ] = useState("");
@@ -4785,7 +4797,7 @@ function Profile({ name, onTraveler, onEditName, onOpenDocs, setToast, notifyPre
 	}}>Версия</span><span style={{
 		fontSize: 11.5,
 		color: T.subd
-	}}>5.0 MVP</span></div>
+	}}>{APP_VERSION}</span></div>
       </div>
     </div>
     {profileOpen && <ProfileDataEditor profile={actualProfile} onClose={() => setProfileOpen(false)} onSave={(v) => {
@@ -8009,7 +8021,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			}, 35e3);
 			setAiMessages((m) => [...m, {
 				role: "assistant",
-				text: d?.answer || aiErrorText(d?.error, "Не удалось получить ответ.")
+				text: d?.answer || aiErrorText(d?.error, "Не удалось получить ответ.", d)
 			}]);
 		} catch (e) {
 			setAiMessages((m) => [...m, {
@@ -8822,7 +8834,10 @@ const TimeBadge = ({ st }) => st.label ? <span style={{
 function TripCard({ t, onOpen }) {
 	const p = tripProgress(t), phase = tripPhase(t), act = nextAction(t), archived = ["completed", "cancelled"].includes(phase.key);
 	const color = phase.key === "in_trip" ? T.green : phase.key === "waiting" ? T.cyan : T.violet;
-	return <button type="button" onClick={onOpen} className="press" style={{
+	const destination = [t.dcName, t.country].filter(Boolean).join(", ");
+	const autoTitle = t.dcName && t.df ? `${t.dcName} · ${MONTHS_S[new Date(t.df).getMonth()]}` : "";
+	const customTitle = t.title && t.title !== autoTitle;
+	return <button type="button" aria-label={`Открыть поездку ${t.title || destination || "без названия"}`} onClick={onOpen} className="press" style={{
 		width: "100%",
 		textAlign: "left",
 		background: T.card,
@@ -8831,7 +8846,8 @@ function TripCard({ t, onOpen }) {
 		padding: 16,
 		marginBottom: 11,
 		cursor: "pointer",
-		color: T.text
+		color: T.text,
+		overflow: "hidden"
 	}}>
     <div style={{
 		display: "flex",
@@ -8851,11 +8867,11 @@ function TripCard({ t, onOpen }) {
 		fontSize: 17,
 		fontWeight: 800,
 		marginTop: 10
-	}}>{t.title || "Новая поездка"}</div><div style={{
+	}}>{customTitle ? t.title || "Новая поездка" : destination || t.title || "Новая поездка"}</div><div style={{
 		fontSize: 12,
 		color: T.subd,
 		marginTop: 4
-	}}>{[t.dcName, t.country].filter(Boolean).join(", ")} · {activeTravelers(t).length} чел.</div>
+	}}>{[customTitle ? destination : "", `${activeTravelers(t).length} чел.`].filter(Boolean).join(" · ")}</div>
     {!archived && <><div style={{
 		display: "flex",
 		alignItems: "center",
@@ -8882,7 +8898,14 @@ function TripCard({ t, onOpen }) {
 		padding: 10,
 		marginTop: 11,
 		fontWeight: 700
-	}}>{phase.key === "in_trip" ? "Открыть план путешествия" : act.title} →</div></>}
+	}}><span style={{
+		display: "block",
+		fontSize: 9.5,
+		letterSpacing: .4,
+		textTransform: "uppercase",
+		opacity: .72,
+		marginBottom: 3
+	}}>Следующий шаг</span>{phase.key === "in_trip" ? "Открыть план путешествия" : act.title} →</div></>}
   </button>;
 }
 function formatSchedule(x) {
@@ -9941,7 +9964,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 				tripId: t.id,
 				question: q
 			}, 35e3);
-			const text = r.ok ? r.answer || "Не нашёл ответа в данных поездки." : aiErrorText(r.error, "TripWise AI сейчас недоступен.");
+			const text = r.ok ? r.answer || "Не нашёл ответа в данных поездки." : aiErrorText(r.error, "TripWise AI сейчас недоступен.", r);
 			setMessages((m) => [...m, {
 				role: "assistant",
 				text
@@ -9971,7 +9994,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		}, 35e3);
 		setImportBusy(false);
 		if (r.ok && r.booking) setImportResult(r.booking);
-		else setToast(aiErrorText(r.error, "Не удалось распознать бронирование"));
+		else setToast(aiErrorText(r.error, "Не удалось распознать бронирование", r));
 	};
 	const importFile = async (e) => {
 		const f = e.target.files && e.target.files[0];
@@ -13980,14 +14003,78 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
     </Overlay>}
   </div>;
 }
+function MiniSwitch({ on, onChange, label }) {
+	return <button type="button" role="switch" aria-label={label} aria-checked={on} onClick={onChange} style={{
+		width: 42,
+		height: 24,
+		padding: 2,
+		border: 0,
+		borderRadius: 999,
+		background: on ? T.violet : T.line2,
+		cursor: "pointer",
+		flexShrink: 0,
+		transition: "background .16s"
+	}}><span style={{
+		display: "block",
+		width: 20,
+		height: 20,
+		borderRadius: 999,
+		background: "#fff",
+		transform: on ? "translateX(18px)" : "translateX(0)",
+		transition: "transform .16s",
+		boxShadow: "0 1px 4px rgba(0,0,0,.3)"
+	}} /></button>;
+}
 function NewTripSheet({ onClose, onCreate, profile = {} }) {
 	const [q, setQ] = useState(""), [dest, setDest] = useState(null), [df, setDf] = useState(""), [dt, setDt] = useState(""), [adults, setAdults] = useState(1), [kidsAges, setKidsAges] = useState([]);
+	const [blocks, setBlocks] = useState({
+		tickets: true,
+		lodging: true,
+		transport: true,
+		activities: true,
+		docs: true,
+		prep: true
+	});
+	const blockOptions = [
+		[
+			"tickets",
+			"Билеты",
+			"найти и подтвердить маршрут"
+		],
+		[
+			"lodging",
+			"Жильё",
+			"отель и ночёвки"
+		],
+		[
+			"transport",
+			"Транспорт",
+			"трансферы, поезд, авто"
+		],
+		[
+			"activities",
+			"Активности",
+			"места и планы на месте"
+		],
+		[
+			"docs",
+			"Документы",
+			"визы и требования въезда"
+		],
+		[
+			"prep",
+			"Сборы",
+			"чек-лист перед поездкой"
+		]
+	];
 	const qq = q.trim(), airportMatches = qq.length >= 2 && !dest ? AIRPORTS.filter((a) => a.city.toLowerCase().startsWith(qq.toLowerCase())).slice(0, 5) : [], knownCityMatches = qq.length >= 2 && !dest ? DEST_BASE.flatMap((d) => (d.cities || []).map((c) => ({
 		city: c.city,
 		country: d.country,
 		flag: "📍",
 		code: ""
 	}))).filter((a) => a.city.toLowerCase().startsWith(qq.toLowerCase()) && !airportMatches.some((x) => x.city === a.city && x.country === a.country)).slice(0, 4) : [], list = [...airportMatches, ...knownCityMatches], canFreeform = qq.length >= 2 && !dest && profile.homeCountry && !list.some((a) => a.city.toLowerCase() === qq.toLowerCase()), ok = dest && df && dt && dt >= df;
+	const allBlocks = blockOptions.every(([key]) => blocks[key]);
+	const setAllBlocks = (value) => setBlocks(Object.fromEntries(blockOptions.map(([key]) => [key, value])));
 	const inputSt = {
 		width: "100%",
 		background: T.card,
@@ -14030,16 +14117,9 @@ function NewTripSheet({ onClose, onCreate, profile = {} }) {
 			servicesAdded: [],
 			custom: [],
 			docsExtra: [],
-			lodgingOff: false,
+			lodgingOff: !blocks.lodging,
 			travelerTarget: adults + kidsAges.length,
-			blocksOn: {
-				tickets: true,
-				lodging: true,
-				transport: true,
-				activities: true,
-				docs: true,
-				prep: true
-			},
+			blocksOn: { ...blocks },
 			baseCurrency: profile.defaultCurrency || "EUR",
 			createdAt: Date.now()
 		});
@@ -14122,6 +14202,58 @@ function NewTripSheet({ onClose, onCreate, profile = {} }) {
 		padding: "10px 12px",
 		marginBottom: 14
 	}}><KidsPicker ages={kidsAges} onChange={setKidsAges} /></div>
+  <div style={{
+		background: T.card,
+		border: `1px solid ${T.line2}`,
+		borderRadius: 16,
+		padding: 13,
+		marginBottom: 14
+	}}>
+    <div style={{
+		display: "flex",
+		alignItems: "center",
+		gap: 10
+	}}><div style={{ flex: 1 }}><div style={{
+		fontSize: 14,
+		fontWeight: 800,
+		color: T.text
+	}}>Вся поездка под ключ</div><div style={{
+		fontSize: 10.8,
+		color: T.subd,
+		marginTop: 3
+	}}>Сразу добавим все основные блоки подготовки</div></div><MiniSwitch label="Вся поездка под ключ" on={allBlocks} onChange={() => setAllBlocks(!allBlocks)} /></div>
+    <div style={{
+		fontSize: 11,
+		color: T.subd,
+		lineHeight: 1.4,
+		margin: "11px 0 8px",
+		paddingTop: 10,
+		borderTop: `1px solid ${T.line}`
+	}}>Не нужны отдельные пункты? Выключите их до создания поездки.</div>
+    <div style={{
+		display: "grid",
+		gap: 7
+	}}>{blockOptions.map(([key, title, sub]) => <div key={key} style={{
+		display: "flex",
+		alignItems: "center",
+		gap: 9,
+		padding: "7px 0"
+	}}><div style={{
+		flex: 1,
+		minWidth: 0
+	}}><div style={{
+		fontSize: 12.5,
+		color: T.text,
+		fontWeight: 700
+	}}>{title}</div><div style={{
+		fontSize: 10.3,
+		color: T.subd,
+		marginTop: 2
+	}}>{sub}</div></div><MiniSwitch label={title} on={blocks[key]} onChange={() => setBlocks((x) => ({
+		...x,
+		[key]: !x[key]
+	}))} /></div>)}</div>
+  </div>
   {profile.homeCity && <div style={{
 		fontSize: 10.8,
 		color: T.subd,
@@ -14416,6 +14548,11 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
 		cursor: "pointer",
 		padding: 8
 	};
+	const openCatalog = () => {
+		setCatalog(true);
+		trackGoal("public_catalog_open");
+		reloadPublic?.();
+	};
 	return <div style={{ paddingBottom: 20 }}><Header /><div style={{ padding: "8px 18px 0" }}>
     <h1 style={{
 		fontSize: 27,
@@ -14427,6 +14564,43 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
 		fontSize: 12,
 		margin: "0 0 20px"
 	}}>Даты, люди и следующий шаг — всё рядом.</p>
+    <button type="button" aria-label="Открыть каталог поездок" onClick={openCatalog} style={{
+		width: "100%",
+		display: "flex",
+		alignItems: "center",
+		gap: 14,
+		textAlign: "left",
+		border: `1px solid ${T.violet}66`,
+		background: `linear-gradient(110deg,${T.violet}24,${T.cyan}0d)`,
+		borderRadius: 18,
+		padding: 17,
+		margin: "0 0 20px",
+		cursor: "pointer",
+		overflow: "hidden"
+	}}>
+      <span style={{
+		fontSize: 30,
+		flexShrink: 0
+	}}>🌍</span><span style={{
+		flex: 1,
+		minWidth: 0
+	}}><strong style={{
+		display: "block",
+		fontSize: 17,
+		color: T.text
+	}}>Все публичные поездки</strong><span style={{
+		display: "block",
+		fontSize: 12,
+		color: T.subd,
+		marginTop: 4
+	}}>{publicLoading ? "Обновляем каталог…" : publicCount ? `${publicCount} показано · открыть весь каталог` : "Найти поездку и попутчиков"}</span></span><span style={{
+		color: T.violet,
+		fontSize: 12,
+		fontWeight: 900,
+		whiteSpace: "nowrap",
+		flexShrink: 0
+	}}>Смотреть все&nbsp;→</span>
+    </button>
     <div style={{
 		display: "flex",
 		alignItems: "center",
@@ -14461,45 +14635,6 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
 		borderRadius: 12,
 		padding: "12px 20px"
 	}}>Создать поездку</button></div>}
-    <button type="button" aria-label="Открыть каталог поездок" onClick={() => {
-		setCatalog(true);
-		trackGoal("public_catalog_open");
-		reloadPublic?.();
-	}} style={{
-		width: "100%",
-		display: "flex",
-		alignItems: "center",
-		gap: 14,
-		textAlign: "left",
-		border: `1px solid ${T.violet}66`,
-		background: `linear-gradient(110deg,${T.violet}24,${T.cyan}0d)`,
-		borderRadius: 18,
-		padding: 17,
-		margin: "18px 0",
-		cursor: "pointer",
-		overflow: "hidden"
-	}}>
-      <span style={{
-		fontSize: 30,
-		flexShrink: 0
-	}}>🌍</span><span style={{
-		flex: 1,
-		minWidth: 0
-	}}><strong style={{
-		display: "block",
-		fontSize: 17,
-		color: T.text
-	}}>Поехать вместе</strong><span style={{
-		display: "block",
-		fontSize: 12,
-		color: T.subd,
-		marginTop: 4
-	}}>{publicLoading ? "Обновляем открытые поездки…" : publicCount ? `${publicCount} поезд${publicCount === 1 ? "ка" : "ок"} ждут попутчиков` : "Пока без опубликованных поездок — можно создать свою"}</span></span><span style={{
-		color: T.violet,
-		fontSize: 22,
-		flexShrink: 0
-	}}>→</span>
-    </button>
     <div style={{
 		display: "flex",
 		gap: 8,
@@ -14535,7 +14670,7 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
   {catalog && <FullScreenOverlay onClose={() => setCatalog(false)}><div style={{ padding: "0 18px 80px" }}><h2 style={{
 		fontSize: 25,
 		color: T.text
-	}}>Поехать вместе</h2><p style={{
+	}}>Все публичные поездки</h2><p style={{
 		fontSize: 12,
 		color: T.subd
 	}}>Сначала обсудите поездку, затем подтвердите участие.</p><input aria-label="Найти направление" placeholder="Направление или название" value={filter} onChange={(e) => setFilter(e.target.value)} style={{
@@ -14932,7 +15067,7 @@ const SERVICES = [
 		name: "Яндекс Путешествия",
 		desc: "Отели по всему миру",
 		grad: GRAD.ocean,
-		url: "https://travel.yandex.ru",
+		refUrl: "",
 		promos: [{
 			header: "Скидка на первое бронирование отеля",
 			code: "TRIPWISE20",
@@ -14942,9 +15077,7 @@ const SERVICES = [
 			stayFrom: "2026-06-01",
 			stayTo: "2026-12-31",
 			country: "",
-			city: "",
-			url: "https://travel.yandex.ru/hotels/",
-			verified: false
+			city: ""
 		}, {
 			header: "Промокод на отели Чувашии",
 			code: "CHUVASHIA10",
@@ -14954,9 +15087,7 @@ const SERVICES = [
 			stayFrom: "2026-07-01",
 			stayTo: "2026-09-30",
 			country: "Россия",
-			city: "Чебоксары",
-			url: "https://travel.yandex.ru/hotels/cheboksary/",
-			verified: false
+			city: "Чебоксары"
 		}]
 	},
 	{
@@ -14964,7 +15095,7 @@ const SERVICES = [
 		name: "Островок",
 		desc: "Кэшбэк на бронирования",
 		grad: GRAD.sunset,
-		url: "https://ostrovok.ru",
+		refUrl: "",
 		promos: [{
 			header: "Скидка на отели в Азии",
 			code: "OSTROVOK15",
@@ -14974,8 +15105,7 @@ const SERVICES = [
 			stayFrom: "2026-08-01",
 			stayTo: "2026-11-30",
 			country: "",
-			city: "",
-			verified: false
+			city: ""
 		}]
 	},
 	{
@@ -14983,7 +15113,7 @@ const SERVICES = [
 		name: "Trip.com",
 		desc: "Отели и авиабилеты по миру",
 		grad: GRAD.city,
-		url: "https://trip.com",
+		refUrl: "",
 		promos: [{
 			header: "Скидка на первое бронирование отеля",
 			code: "TRIPCOM8",
@@ -14993,9 +15123,7 @@ const SERVICES = [
 			stayFrom: "2026-06-01",
 			stayTo: "2026-12-31",
 			country: "",
-			city: "",
-			url: "https://trip.com/hotels/",
-			verified: false
+			city: ""
 		}, {
 			header: "Кэшбэк на отели в Азии",
 			code: "ASIA2026",
@@ -15005,9 +15133,7 @@ const SERVICES = [
 			stayFrom: "2026-07-01",
 			stayTo: "2026-11-30",
 			country: "",
-			city: "",
-			url: "https://trip.com/hotels/",
-			verified: false
+			city: ""
 		}]
 	}
 ];
@@ -15016,7 +15142,6 @@ function promosForTrip({ country, city, depISO }) {
 	const today = todayISO();
 	const out = [];
 	for (const s of SERVICES) for (const p of s.promos || []) {
-		if (p.verified !== true) continue;
 		if (p.endDate && p.endDate < today) continue;
 		if (p.country && country && p.country !== country) continue;
 		if (p.city && city && p.city !== city) continue;
@@ -15026,7 +15151,7 @@ function promosForTrip({ country, city, depISO }) {
 			...p,
 			service: s.name,
 			serviceId: s.id,
-			serviceUrl: s.url
+			serviceUrl: s.refUrl || null
 		});
 	}
 	return out.sort((a, b) => b.discountRub - a.discountRub);
@@ -15066,7 +15191,7 @@ const EXTRA_SERVICES = [
 		from: 200,
 		icon: "shield",
 		color: "#7c5cff",
-		url: ""
+		refUrl: ""
 	},
 	{
 		id: "lounge",
@@ -15075,7 +15200,7 @@ const EXTRA_SERVICES = [
 		from: 1500,
 		icon: "armchair",
 		color: "#48dcdc",
-		url: ""
+		refUrl: ""
 	},
 	{
 		id: "esim",
@@ -15084,7 +15209,7 @@ const EXTRA_SERVICES = [
 		from: 99,
 		icon: "sim",
 		color: "#f59640",
-		url: ""
+		refUrl: ""
 	},
 	{
 		id: "transfer",
@@ -15093,7 +15218,7 @@ const EXTRA_SERVICES = [
 		from: 700,
 		icon: "car",
 		color: "#39d98a",
-		url: ""
+		refUrl: ""
 	}
 ];
 function ServiceGrid({ setToast }) {
@@ -15103,12 +15228,12 @@ function ServiceGrid({ setToast }) {
 			partner: s.id,
 			country: ""
 		});
-		if (s.url) {
+		if (isReferralUrl(s.refUrl)) {
 			try {
-				window.open(s.url, "_blank");
+				window.open(s.refUrl, "_blank");
 			} catch (e) {}
 			setToast(`Открываем: ${s.title}…`);
-		} else setToast("Скоро подключим партнёра");
+		} else setToast("Реферальная ссылка партнёра ещё не настроена");
 	};
 	const byId = (id) => EXTRA_SERVICES.find((s) => s.id === id);
 	const small = [byId("insurance"), byId("esim")].filter(Boolean);
@@ -16475,7 +16600,7 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 			setGuests(Math.max(1, activeTravelers(trip).length));
 		}
 	}, [trip && trip.id]);
-	const activePromos = (s) => (s.promos || []).filter((p) => p.verified === true && (!p.endDate || p.endDate >= today)).sort((a, b) => (b.discountRub || 0) - (a.discountRub || 0));
+	const activePromos = (s) => (s.promos || []).filter((p) => !p.endDate || p.endDate >= today).sort((a, b) => (b.discountRub || 0) - (a.discountRub || 0));
 	const changeFrom = (v) => {
 		setPFrom(v);
 		setDateErr("");
@@ -16514,20 +16639,25 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 	const copy = async (p) => {
 		try {
 			await navigator.clipboard.writeText(p.code);
-			setGoUrl(p.url || null);
+			setGoUrl(isReferralUrl(p.refUrl) ? p.refUrl : null);
 			setToast("Промокод скопирован");
 		} catch (e) {
 			setToast("Не удалось скопировать");
 		}
 	};
 	const openProvider = (s, url) => {
+		const target = url || s.refUrl;
+		if (!isReferralUrl(target)) {
+			setToast(`Реферальная ссылка для ${s.name} ещё не настроена`);
+			return;
+		}
 		trackGoal("hotel_partner_click", {
 			partner: s.id,
 			country: (resolveDestination(pq) || {}).country || "",
 			city: (resolveDestination(pq) || {}).city || ""
 		});
 		try {
-			window.open(url || s.url, "_blank");
+			window.open(target, "_blank");
 		} catch (e) {}
 		setToast(`Открываем ${s.name}…`);
 	};
@@ -16736,30 +16866,30 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		fontWeight: 800,
 		color: T.cyan,
 		cursor: "pointer"
-	}}>Скопировать</span><span onClick={() => openProvider(p._svc, p.url)} className="press" style={{
+	}}>Скопировать</span>{isReferralUrl(p.refUrl) && <span onClick={() => openProvider(p._svc, p.refUrl)} className="press" style={{
 		fontSize: 11,
 		fontWeight: 800,
 		color: T.text,
 		cursor: "pointer"
-	}}>Открыть ↗</span></div></div>)}</div> : <EmptyState compact icon="🏷️" title="Промокодов под эти даты пока нет" sub="Это не блокирует поиск: откройте любой сервис ниже и сравните варианты." />}
+	}}>Открыть ↗</span>}</div></div>)}</div> : <EmptyState compact icon="🏷️" title="Промокодов под эти даты пока нет" sub="Добавьте действующий код перед релизом." />}
       </>}
       <div style={{
 		fontSize: 10.8,
 		color: T.subd,
 		lineHeight: 1.45,
 		margin: "12px 3px 0"
-	}}>TripWise пока не строит собственную выдачу отелей: здесь собраны сервисы и доступные промокоды под параметры поездки.</div><div style={{
+	}}>TripWise пока не строит собственную выдачу отелей: здесь собраны сервисы и промокоды, которые вы добавите перед релизом.</div><div style={{
 		fontSize: 10.5,
 		color: T.gold,
 		lineHeight: 1.4,
 		margin: "6px 3px 0"
-	}}>Промокоды показываем только после ручной проверки партнёром; пока доступны переходы на сайты сервисов.</div><div style={{
+	}}>Переход разрешён только по реферальной ссылке партнёра; обычные ссылки на сайты не открываем.</div><div style={{
 		fontFamily: "Sora,sans-serif",
 		fontSize: 13,
 		fontWeight: 800,
 		color: T.subd,
 		margin: "18px 3px 9px"
-	}}>Сравнить жильё</div>
+	}}>Сервисы бронирования</div>
       <div style={{
 		display: "grid",
 		gridTemplateColumns: "1fr 1fr",
@@ -16860,7 +16990,7 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		color: T.cyan,
 		fontWeight: 800,
 		cursor: "pointer"
-	}}>Скопировать</span></div></div>) : <EmptyState compact title="Промокодов сейчас нет" sub="Можно перейти в сервис без промокода." />}</div><div style={{ marginTop: 13 }}><Btn onClick={() => openProvider(svc, goUrl || svc.url)}>Перейти в {svc.name}</Btn></div></Overlay>}
+	}}>Скопировать</span></div></div>) : <EmptyState compact title="Промокодов сейчас нет" sub="Добавьте действующий код перед релизом." />}</div><div style={{ marginTop: 13 }}><Btn onClick={() => openProvider(svc, goUrl || svc.refUrl)}>Открыть по реферальной ссылке</Btn></div></Overlay>}
     {bookingOpen && <Overlay onClose={() => setBookingOpen(false)}><SheetHead title="Добавить жильё" onClose={() => setBookingOpen(false)} /><input value={stay.name} onChange={(e) => setStay((x) => ({
 		...x,
 		name: e.target.value
