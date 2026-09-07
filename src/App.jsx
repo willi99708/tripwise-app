@@ -416,7 +416,7 @@ function budgetSummary(t) {
 //#endregion
 //#region TripWiseAI-v7-release/frontend/src/App.jsx
 const API_BASE = import.meta.env.VITE_API_BASE || "https://functions.yandexcloud.net/d4e3hpvr0lrijksc8i1r";
-const APP_VERSION = "7.0.0-rc.2";
+const APP_VERSION = "7.0.0-rc.3";
 const YM_ID = Number(import.meta.env.VITE_METRIKA_ID) || 0;
 const YM_TAB_PATH = {
 	home: "/home",
@@ -526,13 +526,98 @@ const HOME_ASSETS = {
 		profile: "/graphics/nav/nav-profile.png"
 	}
 };
+const TRIP_COVER_ASSETS = {
+	bali: {
+		src: "/graphics/bali.png",
+		grad: GRAD.ocean,
+		emoji: "🌴",
+		key: "бали"
+	},
+	phuket: {
+		src: "/graphics/phuket.png",
+		grad: GRAD.sunset,
+		emoji: "🌊",
+		key: "пхукет"
+	},
+	tokyo: {
+		src: "/graphics/tokyo.png",
+		grad: GRAD.city,
+		emoji: "🗼",
+		key: "токио"
+	}
+};
+function tripCoverMeta(trip) {
+	const hay = [
+		trip && trip.dcName,
+		trip && trip.destination,
+		trip && trip.country,
+		trip && trip.title
+	].filter(Boolean).join(" ").toLowerCase();
+	const hit = Object.values(TRIP_COVER_ASSETS).find((x) => hay.includes(x.key));
+	return hit || {
+		src: null,
+		grad: gradFor(String(trip && (trip.dc || trip.country || trip.id) || "X")),
+		emoji: "✈️",
+		key: ""
+	};
+}
+function TripCover({ trip, height = 104 }) {
+	const meta = tripCoverMeta(trip);
+	const label = [trip && (trip.dcName || trip.destination), trip && trip.country].filter(Boolean).join(", ");
+	return <div className="trip-cover" style={{
+		position: "relative",
+		height,
+		borderRadius: 16,
+		overflow: "hidden",
+		background: meta.grad
+	}}>
+    {meta.src && <img src={meta.src} alt="" draggable={false} style={{
+		position: "absolute",
+		inset: 0,
+		width: "100%",
+		height: "100%",
+		objectFit: "cover"
+	}} onError={(e) => {
+		e.currentTarget.style.display = "none";
+	}} />}
+    <div style={{
+		position: "absolute",
+		inset: 0,
+		background: "linear-gradient(180deg,rgba(3,8,20,.04) 12%,rgba(3,8,20,.82) 100%)"
+	}} />
+    <div style={{
+		position: "absolute",
+		left: 12,
+		right: 12,
+		bottom: 10,
+		display: "flex",
+		alignItems: "end",
+		gap: 8,
+		color: "#fff"
+	}}>
+      <span style={{
+		fontSize: 20,
+		lineHeight: 1
+	}}>{meta.emoji}</span>
+      {label && <span style={{
+		fontSize: 12,
+		fontWeight: 800,
+		lineHeight: 1.2,
+		textShadow: "0 1px 4px rgba(0,0,0,.4)"
+	}}>{label}</span>}
+    </div>
+  </div>;
+}
 const GP = [
 	GRAD.ocean,
 	GRAD.city,
 	GRAD.sunset,
 	GRAD.night
 ];
-const gradFor = (code) => GP[((code || "X").charCodeAt(0) + (code || "X").charCodeAt(1 || 0)) % GP.length];
+const gradFor = (code) => {
+	const s = String(code || "X");
+	return GP[((s.charCodeAt(0) || 0) + (s.charCodeAt(1) || 0)) % GP.length];
+};
 const CUR = {
 	USM: "samui",
 	DPS: "bali",
@@ -2036,9 +2121,11 @@ async function sharedApi(action, payload = {}, timeoutMs = 3e4) {
 }
 function aiErrorText(error, fallback = "Помощник сейчас недоступен.", meta = {}) {
 	const key = String(error || "").toLowerCase();
+	const diagnosticKey = String(meta.code || meta.detail || "").toLowerCase();
 	const diagnostic = String(meta.code || "").trim().replace(/[^a-z0-9_.-]/gi, "").slice(0, 32);
 	const suffix = diagnostic ? ` Код: ${diagnostic}.` : "";
-	if (key === "timeout") return "ИИ не ответил вовремя. Попробуйте ещё раз через несколько секунд.";
+	if (key === "timeout" || key.includes("etimedout") || diagnosticKey.includes("etimedout") || diagnosticKey.includes("timeout")) return "ИИ не ответил вовремя. Попробуйте ещё раз через несколько секунд.";
+	if (key.includes("self_signed_cert_in_chain") || diagnosticKey.includes("self_signed_cert_in_chain")) return "Не удалось проверить сертификат GigaChat. Проверьте GIGACHAT_STRICT_TLS и цепочку CA на сервере.";
 	if (key.includes("not configured") || key.includes("not set") || key.includes("missing")) return "ИИ ещё не подключён на сервере. Нужны настройки GigaChat-прокси.";
 	if (key.includes("proxy unauthorized") || key.includes("unauthorized")) return "ИИ-прокси отклонил ключ. Проверьте, что GIGACHAT_PROXY_KEY совпадает с PROXY_SHARED_SECRET.";
 	if (key.includes("rate limit") || key.includes("too many")) return "Лимит запросов к ИИ исчерпан. Попробуйте позже.";
@@ -2218,7 +2305,8 @@ const I = {
 	bag: <><rect x="5" y="8" width="14" height="12" rx="2" /><path d="M9 8V6a3 3 0 016 0v2" /></>,
 	copy: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 012-2h10" /></>,
 	shield: <><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" /></>,
-	search: <><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></>
+	search: <><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></>,
+	filter: <><path d="M4 6h16M7 12h10M10 18h4" /></>
 };
 function Porthole({ grad = GRAD.sunset, image, h = 150, label, sub, codeRight, style }) {
 	return <div style={{
@@ -6410,8 +6498,9 @@ const SUPPORT_LABEL = {
 	}
 };
 const PURPOSE_LABEL = {
-	tourism: "Туризм",
-	private_visit: "Посещение друзей или родственников"
+	tourism: "Отпуск",
+	private_visit: "Посещение друзей или родственников",
+	none: "Не требуется указывать"
 };
 const REQUEST_DOCS = {
 	work_ref: {
@@ -8002,6 +8091,34 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 		setStepIdx(n);
 		persist(ans, "draft", n);
 	};
+	const WizardHead = ({ title, back = onClose }) => <div style={{
+		display: "flex",
+		alignItems: "center",
+		gap: 8,
+		marginBottom: 14
+	}}><div onClick={back} className="press" role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && back()} style={{
+		display: "inline-flex",
+		alignItems: "center",
+		gap: 4,
+		color: T.sub,
+		fontSize: 12,
+		fontWeight: 800,
+		cursor: "pointer",
+		padding: "4px 2px"
+	}}><Icon d={I.back} size={17} color={T.sub} />Назад</div><div style={{
+		flex: 1,
+		textAlign: "center",
+		fontFamily: "Sora,sans-serif",
+		fontWeight: 800,
+		fontSize: 16,
+		color: T.text,
+		overflow: "hidden",
+		textOverflow: "ellipsis",
+		whiteSpace: "nowrap"
+	}}>{title}</div><div onClick={onClose} className="press" role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && onClose()} style={{
+		cursor: "pointer",
+		padding: 4
+	}}><Icon d={I.close} size={18} color={T.sub} /></div></div>;
 	const askAi = async (q, field = focusF) => {
 		const question = String(q || aiQ || "").trim();
 		if (!question || aiBusy) return;
@@ -8273,7 +8390,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
   </>;
 	if (mode === "result") {
 		const ready = allVisible.filter((f) => ans[f.k]);
-		return <Wrap onClose={onClose}><SheetHead title="Документ готов" onClose={onClose} />
+		return <Wrap onClose={onClose}><WizardHead title="Документ готов" back={() => setMode("form")} />
       <div style={{
 			maxHeight: "62vh",
 			overflowY: "auto",
@@ -8370,7 +8487,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
     </Wrap>;
 	}
 	if (mode === "review") {
-		return <Wrap onClose={onClose}><SheetHead title="Проверка документа" onClose={onClose} />
+		return <Wrap onClose={onClose}><WizardHead title="Проверка документа" back={() => setMode("form")} />
       <div style={{
 			maxHeight: "62vh",
 			overflowY: "auto",
@@ -8452,7 +8569,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 	}
 	const last = stepIdx >= steps.length - 1;
 	return <Wrap onClose={onClose}>
-    <SheetHead title={cfg.title} onClose={onClose} />
+    <WizardHead title={cfg.title} back={() => stepIdx === 0 ? onClose() : goStep(stepIdx - 1)} />
     <div style={{ marginBottom: 12 }}>
       <div style={{
 		display: "flex",
@@ -8843,19 +8960,24 @@ function TripCard({ t, onOpen }) {
 		background: T.card,
 		border: `1px solid ${T.line}`,
 		borderRadius: 18,
-		padding: 16,
+		padding: 8,
 		marginBottom: 11,
 		cursor: "pointer",
 		color: T.text,
 		overflow: "hidden"
 	}}>
-    <div style={{
+    <TripCover trip={t} height={104} />
+    <div style={{ padding: "10px 7px 6px" }}>
+      <div style={{
 		display: "flex",
 		alignItems: "center",
 		justifyContent: "space-between",
 		gap: 8,
 		flexWrap: "wrap"
-	}}><strong style={{ fontSize: 20 }}>{t.df ? fmtShort(new Date(t.df)) : "Даты не выбраны"}{t.dt ? ` — ${fmtShort(new Date(t.dt))}` : ""}</strong><span style={{
+	}}><strong style={{
+		fontSize: 16,
+		lineHeight: 1.2
+	}}>{t.df ? fmtShort(new Date(t.df)) : "Даты не выбраны"}{t.dt ? ` — ${fmtShort(new Date(t.dt))}` : ""}</strong><span style={{
 		fontSize: 10,
 		fontWeight: 800,
 		color,
@@ -8863,20 +8985,20 @@ function TripCard({ t, onOpen }) {
 		borderRadius: 99,
 		padding: "5px 9px"
 	}}>{phase.label}</span></div>
-    <div style={{
-		fontSize: 17,
+      <div style={{
+		fontSize: 15.5,
 		fontWeight: 800,
-		marginTop: 10
+		marginTop: 8
 	}}>{customTitle ? t.title || "Новая поездка" : destination || t.title || "Новая поездка"}</div><div style={{
-		fontSize: 12,
+		fontSize: 11.5,
 		color: T.subd,
 		marginTop: 4
 	}}>{[customTitle ? destination : "", `${activeTravelers(t).length} чел.`].filter(Boolean).join(" · ")}</div>
-    {!archived && <><div style={{
+      {!archived && <><div style={{
 		display: "flex",
 		alignItems: "center",
 		gap: 10,
-		marginTop: 14
+		marginTop: 12
 	}}><div style={{
 		flex: 1,
 		height: 5,
@@ -8888,15 +9010,15 @@ function TripCard({ t, onOpen }) {
 		background: GRAD.cta,
 		borderRadius: 4
 	}} /></div><span style={{
-		fontSize: 11,
+		fontSize: 10.5,
 		color: T.subd
 	}}>{p.pct}% готово</span></div><div style={{
-		fontSize: 12,
+		fontSize: 11.5,
 		color: act.tone || T.violet,
 		background: (act.tone || T.violet) + "12",
 		borderRadius: 10,
 		padding: 10,
-		marginTop: 11,
+		marginTop: 10,
 		fontWeight: 700
 	}}><span style={{
 		display: "block",
@@ -8906,6 +9028,7 @@ function TripCard({ t, onOpen }) {
 		opacity: .72,
 		marginBottom: 3
 	}}>Следующий шаг</span>{phase.key === "in_trip" ? "Открыть план путешествия" : act.title} →</div></>}
+    </div>
   </button>;
 }
 function formatSchedule(x) {
@@ -10861,7 +10984,6 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			marginTop: 8
 		}}>Документы и подготовка показываются сводкой, а не отдельными событиями.</div></div>;
 	};
-	const hasTelegramBack = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.BackButton;
 	const travelerMember = (tr) => members.find((m) => String(m.id) === String(tr.memberId || "")) || null;
 	return <div style={{
 		padding: "12px 14px",
@@ -10883,7 +11005,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		inset: 0,
 		background: "linear-gradient(transparent,rgba(5,5,20,.80))"
 	}} />
-      {!hasTelegramBack && <div onClick={onBack} className="press" style={{
+      <div onClick={onBack} className="press" role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && onBack()} style={{
 		position: "absolute",
 		top: 11,
 		left: 11,
@@ -10896,7 +11018,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		placeItems: "center",
 		cursor: "pointer",
 		zIndex: 3
-	}}><Icon d={I.back} size={15} color="#fff" /></div>}
+	}}><Icon d={I.back} size={15} color="#fff" /></div>
       <div style={{
 		position: "absolute",
 		top: 10,
@@ -11083,7 +11205,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		gap: 8
 	}}><div style={{
 		fontFamily: "Sora,sans-serif",
-		fontSize: 30,
+		fontSize: 25,
 		fontWeight: 800,
 		color: T.text,
 		lineHeight: 1
@@ -14294,48 +14416,198 @@ function publicBudgetLabel(x) {
 	if (a || b) return `≈ ${money(a || b, c)}`;
 	return "Бюджет уточняется";
 }
-function PublicTripCard({ trip, onClick }) {
+function PublicTripCard({ trip, onClick, liked, onLike }) {
 	return <button type="button" className="press" onClick={onClick} style={{
 		display: "block",
 		width: "100%",
 		textAlign: "left",
-		padding: 16,
+		padding: 8,
 		borderRadius: 18,
 		border: `1px solid ${T.line}`,
 		background: T.card,
 		color: T.text,
 		cursor: "pointer"
 	}}>
-    <div style={{
-		fontWeight: 900,
+    <div style={{ position: "relative" }}><TripCover trip={trip} height={112} /><span role="button" tabIndex={0} aria-label={liked ? "Убрать лайк" : "Поставить лайк"} onClick={(e) => {
+		e.stopPropagation();
+		onLike && onLike();
+	}} onKeyDown={(e) => {
+		if (e.key === "Enter" || e.key === " ") {
+			e.preventDefault();
+			e.stopPropagation();
+			onLike && onLike();
+		}
+	}} className="press" style={{
+		position: "absolute",
+		right: 10,
+		top: 10,
+		width: 34,
+		height: 34,
+		borderRadius: 999,
+		display: "grid",
+		placeItems: "center",
+		background: "rgba(3,8,20,.68)",
+		border: "1px solid rgba(255,255,255,.28)",
+		color: liked ? "#ff7bb4" : "#fff",
 		fontSize: 18,
+		cursor: "pointer"
+	}}>{liked ? "♥" : "♡"}</span></div>
+    <div style={{ padding: "9px 7px 5px" }}><div style={{
+		fontWeight: 800,
+		fontSize: 15,
 		color: T.violet
 	}}>{trip.df ? ddmm(trip.df) : "Даты уточняются"}{trip.dt ? ` — ${ddmm(trip.dt)}` : ""}</div>
     <div style={{
-		fontSize: 18,
+		fontSize: 16,
 		fontWeight: 900,
-		marginTop: 7
+		marginTop: 5
 	}}>{trip.title}</div>
     <div style={{
-		fontSize: 12,
+		fontSize: 11.5,
 		color: T.subd,
 		marginTop: 4
 	}}>{trip.routeLabel || trip.destination}</div>
     <div style={{
-		fontSize: 20,
+		fontSize: 18,
 		fontWeight: 900,
-		marginTop: 13
+		marginTop: 11
 	}}>{publicBudgetLabel(trip)} <span style={{
-		fontSize: 11,
+		fontSize: 10.5,
 		color: T.subd,
 		fontWeight: 500
 	}}>на человека</span></div>
     <div style={{
 		fontSize: 11,
 		color: T.sub,
-		marginTop: 7
-	}}>{trip.freeSeats} свободных мест · {PUB_COST_LABEL[trip.publication?.costMode] || "Условия обсуждаются"}</div>
+		marginTop: 6
+	}}>{trip.freeSeats} свободных мест · {PUB_COST_LABEL[trip.publication?.costMode] || "Условия обсуждаются"}</div></div>
   </button>;
+}
+const PUBLIC_FILTER_DEFAULTS = {
+	likedOnly: false,
+	country: "",
+	ageMin: "",
+	ageMax: "",
+	gender: "any",
+	budgetMin: "",
+	budgetMax: "",
+	costMode: "any",
+	sort: "recommended"
+};
+function publicTripScore(t, liked) {
+	const p = t && t.publication || {}, budget = Number(p.budgetMin) || Number(p.budgetMax) || 0, seats = Number(t && t.freeSeats) || 0, hasDates = t && t.df ? 1 : 0, description = p.description ? 1 : 0;
+	return (liked ? 1e5 : 0) + hasDates * 1e3 + description * 70 + seats * 18 + (budget ? Math.max(0, 5e4 - budget / 100) : 0);
+}
+function PublicFilters({ filters, setFilters, countries, onClose, onReset }) {
+	const set = (k, v) => setFilters((x) => ({
+		...x,
+		[k]: v
+	}));
+	const chip = (k, v, label) => <span onClick={() => set(k, v)} className="press" style={{
+		fontSize: 11.5,
+		fontWeight: 800,
+		color: filters[k] === v ? T.violet : T.sub,
+		border: `1px solid ${filters[k] === v ? T.violet : T.line}`,
+		background: filters[k] === v ? T.violet + "18" : T.card,
+		borderRadius: 999,
+		padding: "7px 10px",
+		cursor: "pointer"
+	}}>{label}</span>;
+	const inp = {
+		width: "100%",
+		boxSizing: "border-box",
+		background: T.card,
+		border: `1px solid ${T.line}`,
+		borderRadius: 10,
+		padding: "10px 11px",
+		color: T.text,
+		fontSize: 14,
+		outline: "none"
+	};
+	return <Overlay zIndex={90} onClose={onClose}><SheetHead title="Фильтры поездок" onClose={onClose} />
+    <label style={{
+		display: "flex",
+		alignItems: "center",
+		gap: 9,
+		padding: "9px 0",
+		fontSize: 13,
+		color: T.text,
+		fontWeight: 800
+	}}><input type="checkbox" checked={filters.likedOnly} onChange={(e) => set("likedOnly", e.target.checked)} /> Только лайкнутые</label>
+    <div style={{
+		fontSize: 11.5,
+		color: T.subd,
+		fontWeight: 800,
+		margin: "11px 0 6px"
+	}}>Страна</div><select value={filters.country} onChange={(e) => set("country", e.target.value)} style={inp}><option value="">Все страны</option>{countries.map((c) => <option key={c} value={c}>{c}</option>)}</select>
+    <div style={{
+		fontSize: 11.5,
+		color: T.subd,
+		fontWeight: 800,
+		margin: "12px 0 6px"
+	}}>Возраст попутчиков</div><div style={{
+		display: "grid",
+		gridTemplateColumns: "1fr 1fr",
+		gap: 8
+	}}><input inputMode="numeric" placeholder="от" value={filters.ageMin} onChange={(e) => set("ageMin", e.target.value.replace(/\D/g, ""))} style={inp} /><input inputMode="numeric" placeholder="до" value={filters.ageMax} onChange={(e) => set("ageMax", e.target.value.replace(/\D/g, ""))} style={inp} /></div>
+    <div style={{
+		fontSize: 11.5,
+		color: T.subd,
+		fontWeight: 800,
+		margin: "12px 0 6px"
+	}}>Пол</div><div style={{
+		display: "flex",
+		gap: 7,
+		flexWrap: "wrap"
+	}}>{chip("gender", "any", "Любой")}{chip("gender", "female", "Женщины")}{chip("gender", "male", "Мужчины")}</div>
+    <div style={{
+		fontSize: 11.5,
+		color: T.subd,
+		fontWeight: 800,
+		margin: "12px 0 6px"
+	}}>Стоимость на человека</div><div style={{
+		display: "grid",
+		gridTemplateColumns: "1fr 1fr",
+		gap: 8
+	}}><input inputMode="decimal" placeholder="от" value={filters.budgetMin} onChange={(e) => set("budgetMin", e.target.value.replace(/[^\d.,]/g, "").replace(",", "."))} style={inp} /><input inputMode="decimal" placeholder="до" value={filters.budgetMax} onChange={(e) => set("budgetMax", e.target.value.replace(/[^\d.,]/g, "").replace(",", "."))} style={inp} /></div>
+    <div style={{
+		fontSize: 11.5,
+		color: T.subd,
+		fontWeight: 800,
+		margin: "12px 0 6px"
+	}}>Кто оплачивает</div><div style={{
+		display: "flex",
+		gap: 7,
+		flexWrap: "wrap"
+	}}>{chip("costMode", "any", "Любой")}{chip("costMode", "self", "Каждый за себя")}{chip("costMode", "split", "Делим вместе")}{chip("costMode", "covered", "Часть покрыта")}{chip("costMode", "discuss", "Обсуждается")}</div>
+    <div style={{
+		fontSize: 11.5,
+		color: T.subd,
+		fontWeight: 800,
+		margin: "12px 0 6px"
+	}}>Сортировка</div><select value={filters.sort} onChange={(e) => set("sort", e.target.value)} style={inp}><option value="recommended">Рекомендованные</option><option value="date">Ближайшая дата</option><option value="price">Сначала дешевле</option><option value="seats">Больше свободных мест</option></select>
+    <div style={{
+		display: "flex",
+		gap: 8,
+		marginTop: 16
+	}}><button type="button" onClick={onReset} style={{
+		flex: 1,
+		padding: 11,
+		borderRadius: 12,
+		border: `1px solid ${T.line}`,
+		background: T.card,
+		color: T.sub,
+		fontWeight: 800
+	}}>Сбросить</button><button type="button" onClick={onClose} style={{
+		flex: 1.3,
+		padding: 11,
+		borderRadius: 12,
+		border: 0,
+		background: GRAD.cta,
+		color: "#fff",
+		fontWeight: 800
+	}}>Показать поездки</button></div>
+  </Overlay>;
 }
 function PublicTripPreview({ trip, onClose, onOpenOwn, profile, setToast }) {
 	const [detail, setDetail] = useState(trip), [myReq, setMyReq] = useState(null), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [failed, setFailed] = useState(false), [apply, setApply] = useState(false);
@@ -14421,28 +14693,36 @@ function PublicTripPreview({ trip, onClose, onOpenOwn, profile, setToast }) {
 		cursor: "pointer"
 	};
 	return <FullScreenOverlay onClose={onClose}><div style={{ padding: "4px 18px 100px" }}>
-    <div style={{
-		background: gradFor(detail.country || detail.id),
-		borderRadius: 22,
-		padding: "24px 18px",
+    <div onClick={onClose} className="press" style={{
+		display: "inline-flex",
+		alignItems: "center",
+		gap: 5,
+		color: T.sub,
+		fontSize: 12,
+		fontWeight: 800,
+		cursor: "pointer",
+		padding: "3px 0 10px"
+	}}><Icon d={I.back} size={15} color={T.sub} />Все публичные поездки</div>
+    <div style={{ position: "relative" }}><TripCover trip={detail} height={158} /><div style={{
+		position: "absolute",
+		left: 15,
+		right: 15,
+		bottom: 14,
 		color: "#fff"
-	}}>
-      <div style={{
-		fontSize: 22,
+	}}><div style={{
+		fontSize: 16,
 		fontWeight: 900
-	}}>{detail.df ? ddmm(detail.df) : "Даты уточняются"}{detail.dt ? ` — ${ddmm(detail.dt)}` : ""}</div>
-      <h2 style={{
-		fontSize: 25,
-		margin: "12px 0 6px"
-	}}>{detail.title}</h2><div style={{ fontSize: 13 }}>{detail.routeLabel || detail.destination}</div>
-    </div>
+	}}>{detail.df ? ddmm(detail.df) : "Даты уточняются"}{detail.dt ? ` — ${ddmm(detail.dt)}` : ""}</div><h2 style={{
+		fontSize: 20,
+		margin: "7px 0 4px"
+	}}>{detail.title}</h2><div style={{ fontSize: 12 }}>{detail.routeLabel || detail.destination}</div></div></div>
     <div style={{
 		fontWeight: 900,
-		fontSize: 25,
+		fontSize: 21,
 		color: T.text,
-		margin: "20px 0 5px"
+		margin: "17px 0 5px"
 	}}>{publicBudgetLabel(detail)} <span style={{
-		fontSize: 12,
+		fontSize: 11.5,
 		fontWeight: 500,
 		color: T.subd
 	}}>на человека</span></div>
@@ -14530,14 +14810,24 @@ function PublicTripPreview({ trip, onClose, onOpenOwn, profile, setToast }) {
   </div></FullScreenOverlay>;
 }
 function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicMore, loadMorePublic, profile, setToast, onOpenTrip, onNewTrip, onSearch, saved, onUnlike, onOpenSaved, recent, onClearRecent, onRunRecent }) {
-	const [catalog, setCatalog] = useState(false), [pubOpen, setPubOpen] = useState(null), [archive, setArchive] = useState(false), [history, setHistory] = useState(false), [filter, setFilter] = useState("");
+	const [catalog, setCatalog] = useState(false), [pubOpen, setPubOpen] = useState(null), [archive, setArchive] = useState(false), [history, setHistory] = useState(false), [filterOpen, setFilterOpen] = useState(false), [publicFilters, setPublicFilters] = useState(PUBLIC_FILTER_DEFAULTS), [likedPublic, setLikedPublic] = useState(() => {
+		const x = store.get("public_likes", []);
+		return Array.isArray(x) ? x : [];
+	});
 	const active = trips.filter((t) => !["completed", "cancelled"].includes(tripPhase(t).key)).sort((a, b) => (a.df || "9999").localeCompare(b.df || "9999"));
 	const past = trips.filter((t) => ["completed", "cancelled"].includes(tripPhase(t).key));
-	const pub = (publicTrips || []).filter((t) => [
-		t.title,
-		t.destination,
-		t.routeLabel
-	].join(" ").toLowerCase().includes(filter.toLowerCase()));
+	const countries = [...new Set((publicTrips || []).map((t) => String(t.country || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru"));
+	const pub = (publicTrips || []).filter((t) => {
+		const p = t.publication || {}, country = String(t.country || "");
+		const minAge = Number(p.ageMin) || 18, maxAge = Number(p.ageMax) || 90, reqMin = Number(publicFilters.ageMin) || 0, reqMax = Number(publicFilters.ageMax) || 90;
+		const low = Number(p.budgetMin) || 0, high = Number(p.budgetMax) || low || Infinity, bMin = Number(String(publicFilters.budgetMin || "").replace(",", ".")) || 0, bMax = Number(String(publicFilters.budgetMax || "").replace(",", ".")) || Infinity;
+		return (!publicFilters.likedOnly || likedPublic.includes(t.id)) && (!publicFilters.country || country === publicFilters.country) && (!reqMin || maxAge >= reqMin) && (!publicFilters.ageMax || minAge <= reqMax) && (!publicFilters.gender || publicFilters.gender === "any" || p.preferredGender === publicFilters.gender || p.preferredGender === "any") && high >= bMin && low <= bMax && (!publicFilters.costMode || publicFilters.costMode === "any" || p.costMode === publicFilters.costMode);
+	}).sort((a, b) => {
+		if (publicFilters.sort === "date") return String(a.df || "9999").localeCompare(String(b.df || "9999"));
+		if (publicFilters.sort === "price") return (Number(a.publication?.budgetMin) || Number.MAX_SAFE_INTEGER) - (Number(b.publication?.budgetMin) || Number.MAX_SAFE_INTEGER);
+		if (publicFilters.sort === "seats") return (Number(b.freeSeats) || 0) - (Number(a.freeSeats) || 0);
+		return publicTripScore(b, likedPublic.includes(b.id)) - publicTripScore(a, likedPublic.includes(a.id));
+	});
 	const publicCount = (publicTrips || []).length;
 	const link = {
 		background: "none",
@@ -14553,9 +14843,26 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
 		trackGoal("public_catalog_open");
 		reloadPublic?.();
 	};
+	const toggleLike = (id) => setLikedPublic((prev) => {
+		const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+		store.set("public_likes", next);
+		setToast(prev.includes(id) ? "Лайк убран" : "Поездка сохранена в понравившиеся");
+		return next;
+	});
+	const resetFilters = () => setPublicFilters(PUBLIC_FILTER_DEFAULTS);
+	const activeFilterCount = [
+		publicFilters.likedOnly,
+		publicFilters.country,
+		publicFilters.ageMin,
+		publicFilters.ageMax,
+		publicFilters.gender !== "any",
+		publicFilters.budgetMin,
+		publicFilters.budgetMax,
+		publicFilters.costMode !== "any"
+	].filter(Boolean).length;
 	return <div style={{ paddingBottom: 20 }}><Header /><div style={{ padding: "8px 18px 0" }}>
     <h1 style={{
-		fontSize: 27,
+		fontSize: 24,
 		fontWeight: 900,
 		color: T.text,
 		margin: "4px 0 8px"
@@ -14667,27 +14974,47 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
 		display: "block"
 	}} onClick={() => onRunRecent(x)}>{x.name} · {x.dates}</button>)}</div>}
   </div>
-  {catalog && <FullScreenOverlay onClose={() => setCatalog(false)}><div style={{ padding: "0 18px 80px" }}><h2 style={{
-		fontSize: 25,
-		color: T.text
-	}}>Все публичные поездки</h2><p style={{
-		fontSize: 12,
-		color: T.subd
-	}}>Сначала обсудите поездку, затем подтвердите участие.</p><input aria-label="Найти направление" placeholder="Направление или название" value={filter} onChange={(e) => setFilter(e.target.value)} style={{
-		width: "100%",
-		boxSizing: "border-box",
-		fontSize: 16,
-		padding: 13,
-		borderRadius: 12,
-		border: `1px solid ${T.line}`,
-		background: T.card,
+  {catalog && <FullScreenOverlay onClose={() => setCatalog(false)}><div style={{ padding: "0 18px 80px" }}><div style={{
+		display: "flex",
+		alignItems: "center",
+		gap: 10
+	}}><h2 style={{
+		fontSize: 22,
 		color: T.text,
-		marginBottom: 16
-	}} />
+		margin: 0,
+		flex: 1
+	}}>Все публичные поездки</h2><button type="button" aria-label="Открыть фильтры публичных поездок" onClick={() => setFilterOpen(true)} className="press" style={{
+		width: 40,
+		height: 40,
+		borderRadius: 12,
+		border: `1px solid ${activeFilterCount ? T.violet : T.line}`,
+		background: activeFilterCount ? T.violet + "18" : T.card,
+		display: "grid",
+		placeItems: "center",
+		cursor: "pointer",
+		position: "relative"
+	}}><Icon d={I.filter} size={18} color={activeFilterCount ? T.violet : T.sub} />{activeFilterCount > 0 && <span style={{
+		position: "absolute",
+		right: -4,
+		top: -5,
+		minWidth: 17,
+		height: 17,
+		borderRadius: 99,
+		background: T.violet,
+		color: "#fff",
+		fontSize: 9,
+		fontWeight: 900,
+		display: "grid",
+		placeItems: "center"
+	}}>{activeFilterCount}</span>}</button></div><p style={{
+		fontSize: 12,
+		color: T.subd,
+		margin: "7px 0 14px"
+	}}>Сначала обсудите поездку, затем подтвердите участие.</p>
     <div style={{
 		display: "grid",
 		gap: 12
-	}}>{pub.map((x) => <PublicTripCard key={x.id} trip={x} onClick={() => setPubOpen(x)} />)}</div>
+	}}>{pub.map((x) => <PublicTripCard key={x.id} trip={x} liked={likedPublic.includes(x.id)} onLike={() => toggleLike(x.id)} onClick={() => setPubOpen(x)} />)}</div>
     {publicLoading ? <p style={{ color: T.subd }}>Загружаем поездки…</p> : !pub.length ? <div style={{
 		padding: 20,
 		color: T.subd,
@@ -14696,6 +15023,7 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
 	}}>Подходящих поездок пока нет. Можно опубликовать свою из настроек поездки.<button style={link} onClick={reloadPublic}>Обновить</button></div> : null}
     {publicMore != null && <button disabled={publicLoading} style={link} onClick={loadMorePublic}>Показать ещё</button>}
   </div></FullScreenOverlay>}
+  {filterOpen && <PublicFilters filters={publicFilters} setFilters={setPublicFilters} countries={countries} onClose={() => setFilterOpen(false)} onReset={resetFilters} />} 
   {pubOpen && <PublicTripPreview trip={pubOpen} profile={profile} setToast={setToast} onClose={() => setPubOpen(null)} onOpenOwn={(id) => {
 		setPubOpen(null);
 		setCatalog(false);
@@ -15403,6 +15731,9 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 	];
 	const cCfg = country ? countryCfg(country) : null;
 	const cVisa = country ? visaInfoFor(country) : null;
+	useEffect(() => {
+		if (country) setPurpose(cCfg && cCfg.entryMode === "none" ? "none" : cCfg && cCfg.defaultPurpose || "tourism");
+	}, [country]);
 	const linkedTrip = country ? (trips || []).find((t) => t.country === country) : null;
 	const found = q.trim().length >= 2 ? ALL_DOCS.filter((x) => (x.name + " " + x.country + " " + (x.kw || "")).toLowerCase().includes(q.trim().toLowerCase())).slice(0, 6) : [];
 	const popular = [
@@ -15722,7 +16053,6 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		gap: 10,
 		marginBottom: 12
 	}}>
-          <div onClick={() => setMode("home")} className="press" style={{ cursor: "pointer" }}><Icon d={I.back} size={20} color={T.text} /></div>
           <div style={{
 		fontFamily: "Sora,sans-serif",
 		fontWeight: 800,
@@ -15811,6 +16141,35 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		borderBottom: `1px solid ${T.line}`
 	}}>{c}</div>)}
         </div>}
+        {country && <div style={{ marginBottom: 16 }}><div style={{
+		fontSize: 12.5,
+		fontWeight: 700,
+		color: T.subd,
+		marginBottom: 7
+	}}>Цель поездки</div><div style={{
+		display: "flex",
+		gap: 7,
+		flexWrap: "wrap"
+	}}>
+          {[
+		"tourism",
+		...(cCfg && cCfg.purposes || []).includes("private_visit") ? ["private_visit"] : [],
+		"none"
+	].map((p) => <div key={p} onClick={() => setPurpose(p)} className="press" style={{
+		background: purpose === p ? T.violet + "22" : T.card,
+		border: `1px solid ${purpose === p ? T.violet : T.line}`,
+		borderRadius: 999,
+		padding: "8px 12px",
+		cursor: "pointer",
+		fontSize: 12,
+		fontWeight: 700,
+		color: purpose === p ? T.violet : T.text
+	}}>{PURPOSE_LABEL[p]}</div>)}
+        </div><div style={{
+		fontSize: 10.5,
+		color: T.subd,
+		marginTop: 6
+	}}>{purpose === "none" ? "Для этой поездки отдельная цель в визовом сценарии не нужна." : "По умолчанию выбрано: отпуск."}</div></div>}
         <div style={{
 		fontSize: 12.5,
 		fontWeight: 700,
@@ -15873,17 +16232,32 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		...inputSt,
 		marginBottom: 16
 	}} />
-        <div onClick={() => country && setMode("kit")} className="press" style={{
+        <div style={{
+		display: "flex",
+		gap: 8
+	}}><div onClick={() => setMode("home")} className="press" style={{
+		flex: 1,
+		textAlign: "center",
+		background: T.card,
+		border: `1px solid ${T.line}`,
+		borderRadius: 14,
+		padding: 13,
+		color: T.sub,
+		fontSize: 13.5,
+		fontWeight: 800,
+		cursor: "pointer"
+	}}>Назад</div><div onClick={() => country && setMode("kit")} className="press" style={{
+		flex: 1.35,
 		textAlign: "center",
 		background: country ? GRAD.cta : T.card,
 		border: country ? "none" : `1px solid ${T.line}`,
 		borderRadius: 14,
 		padding: 13,
 		color: country ? "#fff" : T.subd,
-		fontSize: 14.5,
+		fontSize: 14,
 		fontWeight: 800,
 		cursor: country ? "pointer" : "default"
-	}}>Собрать комплект</div>
+	}}>Собрать комплект</div></div>
       </>}
       {mode === "kit" && country && <>
         <div style={{
@@ -15940,7 +16314,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 			marginBottom: 10,
 			lineHeight: 1.45
 		}}>💡 {cCfg.note}</div>}
-            {(cCfg.purposes || []).length > 1 && <div style={{ marginBottom: 12 }}>
+            <div style={{ marginBottom: 12 }}>
               <div style={{
 			fontSize: 12,
 			fontWeight: 700,
@@ -15952,7 +16326,11 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 			gap: 7,
 			flexWrap: "wrap"
 		}}>
-                {cCfg.purposes.map((p) => <div key={p} onClick={() => setPurpose(p)} className="press" style={{
+                {[
+			"tourism",
+			...(cCfg.purposes || []).includes("private_visit") ? ["private_visit"] : [],
+			"none"
+		].map((p) => <div key={p} onClick={() => setPurpose(p)} className="press" style={{
 			background: purpose === p ? T.violet + "22" : T.card,
 			border: `1px solid ${purpose === p ? T.violet : T.line}`,
 			borderRadius: 999,
@@ -15963,7 +16341,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 			color: purpose === p ? T.violet : T.text
 		}}>{PURPOSE_LABEL[p]}</div>)}
               </div>
-            </div>}
+            </div>
             <div style={{
 			fontFamily: "Sora,sans-serif",
 			fontWeight: 800,
@@ -16566,7 +16944,7 @@ const ddmm = (s) => {
 	return p.length === 3 ? `${p[2]}/${p[1]}` : s;
 };
 function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }) {
-	const [svc, setSvc] = useState(null), [goUrl, setGoUrl] = useState(null), [bookingOpen, setBookingOpen] = useState(false);
+	const [svc, setSvc] = useState(null), [goUrl, setGoUrl] = useState(null), [bookingOpen, setBookingOpen] = useState(false), [promoOpen, setPromoOpen] = useState(false);
 	const today = new Date().toISOString().slice(0, 10), scoped = !!(trip && trip.id);
 	const travelers = scoped ? activeTravelers(trip) : [];
 	const [pq, setPq] = useState(() => scoped ? trip.dcName || trip.country || "" : "");
@@ -16671,6 +17049,7 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 			return;
 		}
 		setSearched(true);
+		setPromoOpen(true);
 	};
 	const addStay = () => {
 		if (!stay.name.trim()) {
@@ -16709,13 +17088,12 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		outline: "none",
 		colorScheme: "dark"
 	};
-	const hasTelegramBack = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.BackButton;
 	return <div style={{
 		animation: "fadeUp .18s ease-out",
 		paddingBottom: 18
 	}}>
     {!scoped && <Header />}
-    {scoped && !hasTelegramBack && <div style={{ padding: "10px 16px 0" }}><div onClick={onBack} className="press" style={{
+    {scoped && <div style={{ padding: "10px 16px 0" }}><div onClick={onBack} className="press" style={{
 		display: "inline-flex",
 		alignItems: "center",
 		gap: 7,
@@ -16801,89 +17179,26 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		cursor: "pointer"
 	}}>Показать скидки и сервисы</div>
       </div>
-      {searched && <>
-        <div style={{
-		display: "flex",
-		alignItems: "baseline",
-		margin: "17px 3px 9px"
-	}}><div style={{
-		fontFamily: "Sora,sans-serif",
-		fontWeight: 800,
-		fontSize: 15,
-		color: T.text,
-		flex: 1
-	}}>Скидки под ваши даты</div><span style={{
-		fontSize: 10.5,
-		color: T.subd
-	}}>{matchedPromos.length ? `${matchedPromos.length} промо` : "без промо"}</span></div>
-        {matchedPromos.length ? <div style={{
-		display: "flex",
-		flexDirection: "column",
-		gap: 9
-	}}>{matchedPromos.map((p, i) => <div key={p.code + i} style={{
-		background: `linear-gradient(135deg,${T.card2},${T.card})`,
-		border: `1px solid ${T.line}`,
-		borderRadius: 16,
-		padding: 12
-	}}><div style={{
-		display: "flex",
-		alignItems: "flex-start",
-		gap: 10
-	}}><ServiceLogo id={p._svc.id} name={p._svc.name} /><div style={{
-		flex: 1,
-		minWidth: 0
-	}}><div style={{
-		fontFamily: "Sora,sans-serif",
-		fontSize: 14,
-		fontWeight: 800,
-		color: T.text
-	}}>{promoHeadline(p)}</div><div style={{
-		fontSize: 10.8,
-		color: T.subd,
-		marginTop: 3
-	}}>{p._svc.name} · {p.header}</div>{p.endDate && <div style={{
-		fontSize: 10,
-		color: T.subd,
-		marginTop: 4
-	}}>Бронирование до {ddmm(p.endDate)}{p.stayTo ? ` · проживание до ${ddmm(p.stayTo)}` : ""}</div>}</div></div><div style={{
+      {searched && <div onClick={() => setPromoOpen(true)} className="press" style={{
 		display: "flex",
 		alignItems: "center",
-		gap: 8,
-		marginTop: 10,
-		background: "rgba(255,255,255,.035)",
-		border: `1px dashed ${T.line2}`,
-		borderRadius: 11,
-		padding: "8px 10px"
-	}}><span style={{
-		fontFamily: "Sora,sans-serif",
-		fontSize: 13,
-		fontWeight: 900,
-		color: T.cyan,
-		letterSpacing: .7,
-		flex: 1
-	}}>{p.code}</span><span onClick={() => copy(p)} className="press" style={{
-		fontSize: 11,
-		fontWeight: 800,
-		color: T.cyan,
+		gap: 9,
+		background: T.card,
+		border: `1px solid ${T.violet}55`,
+		borderRadius: 14,
+		padding: 11,
+		marginBottom: 12,
 		cursor: "pointer"
-	}}>Скопировать</span>{isReferralUrl(p.refUrl) && <span onClick={() => openProvider(p._svc, p.refUrl)} className="press" style={{
-		fontSize: 11,
+	}}><span style={{ fontSize: 18 }}>🏷️</span><div style={{ flex: 1 }}><div style={{
+		fontSize: 12.5,
 		fontWeight: 800,
-		color: T.text,
-		cursor: "pointer"
-	}}>Открыть ↗</span>}</div></div>)}</div> : <EmptyState compact icon="🏷️" title="Промокодов под эти даты пока нет" sub="Добавьте действующий код перед релизом." />}
-      </>}
-      <div style={{
+		color: T.text
+	}}>Результаты подбора скидок</div><div style={{
 		fontSize: 10.8,
 		color: T.subd,
-		lineHeight: 1.45,
-		margin: "12px 3px 0"
-	}}>TripWise пока не строит собственную выдачу отелей: здесь собраны сервисы и промокоды, которые вы добавите перед релизом.</div><div style={{
-		fontSize: 10.5,
-		color: T.gold,
-		lineHeight: 1.4,
-		margin: "6px 3px 0"
-	}}>Переход разрешён только по реферальной ссылке партнёра; обычные ссылки на сайты не открываем.</div><div style={{
+		marginTop: 2
+	}}>{matchedPromos.length ? `${matchedPromos.length} промо найдено` : `Промокодов под эти даты пока нет`}</div></div><Icon d={I.chevR} size={15} color={T.subd} /></div>}
+      <div style={{
 		fontFamily: "Sora,sans-serif",
 		fontSize: 13,
 		fontWeight: 800,
@@ -16955,6 +17270,68 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		marginTop: 2
 	}}>Добавьте жильё и цену прямо в {trip.title}</div></div><Icon d={I.chevR} size={15} color={T.subd} /></div>}
     </div>
+    {promoOpen && <Overlay onClose={() => setPromoOpen(false)}><SheetHead title="Скидки под ваши даты" onClose={() => setPromoOpen(false)} /><div style={{
+		fontSize: 11,
+		color: T.subd,
+		marginBottom: 11
+	}}>{pq}{pFrom ? ` · ${ddmm(pFrom)}` : ""}{pTo ? ` — ${ddmm(pTo)}` : ""}</div><div style={{
+		display: "flex",
+		flexDirection: "column",
+		gap: 9,
+		maxHeight: "62vh",
+		overflowY: "auto"
+	}}>{matchedPromos.length ? matchedPromos.map((p, i) => <div key={p.code + i} style={{
+		background: `linear-gradient(135deg,${T.card2},${T.card})`,
+		border: `1px solid ${T.line}`,
+		borderRadius: 16,
+		padding: 12
+	}}><div style={{
+		display: "flex",
+		alignItems: "flex-start",
+		gap: 10
+	}}><ServiceLogo id={p._svc.id} name={p._svc.name} /><div style={{
+		flex: 1,
+		minWidth: 0
+	}}><div style={{
+		fontFamily: "Sora,sans-serif",
+		fontSize: 14,
+		fontWeight: 800,
+		color: T.text
+	}}>{promoHeadline(p)}</div><div style={{
+		fontSize: 10.8,
+		color: T.subd,
+		marginTop: 3
+	}}>{p._svc.name} · {p.header}</div>{p.endDate && <div style={{
+		fontSize: 10,
+		color: T.subd,
+		marginTop: 4
+	}}>Бронирование до {ddmm(p.endDate)}{p.stayTo ? ` · проживание до ${ddmm(p.stayTo)}` : ""}</div>}</div></div><div style={{
+		display: "flex",
+		alignItems: "center",
+		gap: 8,
+		marginTop: 10,
+		background: "rgba(255,255,255,.035)",
+		border: `1px dashed ${T.line2}`,
+		borderRadius: 11,
+		padding: "8px 10px"
+	}}><span style={{
+		fontFamily: "Sora,sans-serif",
+		fontSize: 13,
+		fontWeight: 900,
+		color: T.cyan,
+		letterSpacing: .7,
+		flex: 1
+	}}>{p.code}</span><span onClick={() => copy(p)} className="press" style={{
+		fontSize: 11,
+		fontWeight: 800,
+		color: T.cyan,
+		cursor: "pointer"
+	}}>Скопировать</span>{isReferralUrl(p.refUrl) && <span onClick={() => openProvider(p._svc, p.refUrl)} className="press" style={{
+		fontSize: 11,
+		fontWeight: 800,
+		color: T.text,
+		cursor: "pointer"
+	}}>Открыть ↗</span>}</div></div>) : <EmptyState compact icon="🏷️" title="Промокодов под эти даты пока нет" sub="Добавьте действующий код перед релизом." />}</div></Overlay>}
     {svc && <Overlay onClose={() => setSvc(null)}><SheetHead title={svc.name} onClose={() => setSvc(null)} /><div style={{
 		display: "flex",
 		flexDirection: "column",
@@ -17886,6 +18263,13 @@ function App() {
 		});
 		actionToastTimer.current = setTimeout(() => setActionToast(null), 4800);
 	};
+	const closeTripScreen = () => {
+		setTripOpen(null);
+		setTripSection(null);
+		setFlow(null);
+		setStack([]);
+		setTab("routes");
+	};
 	const openTripScreen = (id) => {
 		setFlow(null);
 		setTripSection(null);
@@ -18115,6 +18499,10 @@ function App() {
 				return;
 			}
 			const closing = stack[stack.length - 1];
+			if (closing === "trip") {
+				closeTripScreen();
+				return;
+			}
 			if (closing === "results" && stack.length === 1) {
 				setStack([]);
 				setTab("home");
@@ -18222,10 +18610,10 @@ function App() {
 	let main = null;
 	if (tab === "routes") {
 		const curTrip = trips.find((t) => t.id === tripOpen);
-		if (top === "trip" && curTrip) main = <SharedTripScreen t={curTrip} initialBlk={tripSection} onBack={() => setStack([])} onUpdate={updateTrip} onReplaceTrip={replaceSharedTrip} onUndoable={showUndoable} syncState={syncStates[curTrip.id] || "saved"} onRetrySync={() => retryTrip(curTrip.id)} bottomStr={inset.bottomStr} onLeaveTrip={(id) => {
+		if (top === "trip" && curTrip) main = <SharedTripScreen t={curTrip} initialBlk={tripSection} onBack={closeTripScreen} onUpdate={updateTrip} onReplaceTrip={replaceSharedTrip} onUndoable={showUndoable} syncState={syncStates[curTrip.id] || "saved"} onRetrySync={() => retryTrip(curTrip.id)} bottomStr={inset.bottomStr} onLeaveTrip={(id) => {
 			dirtyClear(id);
 			setTrips((p) => p.filter((x) => x.id !== id));
-			setStack([]);
+			closeTripScreen();
 		}} onDelete={(id) => scheduleTripDelete(id)} onFindTickets={findTicketsForTrip} goHotels={() => openHotelsForTrip(curTrip)} goDocs={(docId) => {
 			setDocsPre(typeof docId === "string" ? docId : null);
 			setFlow({
