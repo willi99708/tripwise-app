@@ -2033,6 +2033,15 @@ async function sharedApi(action, payload = {}, timeoutMs = 3e4) {
 		if (timer) clearTimeout(timer);
 	}
 }
+function aiErrorText(error, fallback = "Помощник сейчас недоступен.") {
+	const key = String(error || "").toLowerCase();
+	if (key === "timeout") return "ИИ не ответил вовремя. Попробуйте ещё раз через несколько секунд.";
+	if (key.includes("not configured") || key.includes("not set") || key.includes("missing")) return "ИИ ещё не подключён на сервере. Нужны настройки GigaChat-прокси.";
+	if (key.includes("proxy unauthorized") || key.includes("unauthorized")) return "ИИ-прокси отклонил ключ. Проверьте, что GIGACHAT_PROXY_KEY совпадает с PROXY_SHARED_SECRET.";
+	if (key.includes("rate limit") || key.includes("too many")) return "Лимит запросов к ИИ исчерпан. Попробуйте позже.";
+	if (key.includes("provider") || key.includes("unavailable")) return "Сервис GigaChat временно недоступен. Попробуйте ещё раз позже.";
+	return error ? `${fallback} (${String(error).slice(0, 120)})` : fallback;
+}
 function stripServerFields(trip) {
 	if (!trip) return trip;
 	const { members, askGroup, creatorId, shareCode, schemaVersion, revision, updatedAt, _viewer, activityLog, travelerStates, settlementPayments, ...core } = trip;
@@ -2622,9 +2631,12 @@ function Overlay({ children, onClose, zIndex = 60, centered = false }) {
 		paddingBottom: centered ? 18 : "calc(24px + env(safe-area-inset-bottom))",
 		width: "100%",
 		maxWidth: 420,
+		minWidth: 0,
 		maxHeight: centered ? "calc(100dvh - max(env(safe-area-inset-top),16px) - max(env(safe-area-inset-bottom),16px) - 24px)" : "calc(100dvh - max(env(safe-area-inset-top),12px) - 8px)",
 		overflowY: "auto",
+		overflowX: "hidden",
 		overscrollBehavior: "contain",
+		overscrollBehaviorX: "none",
 		margin: "0 auto",
 		animation: centered ? "fadeUp .22s ease" : "slideUp .28s cubic-bezier(.2,.8,.2,1)"
 	}}>
@@ -2685,11 +2697,14 @@ function FullScreenOverlay({ children, onClose }) {
 		position: "fixed",
 		inset: 0,
 		zIndex: 72,
-		background: `radial-gradient(110% 58% at 82% 0%,#0d1830 0%,${T.bg} 52%,#010610 100%)`,
+		width: "100%",
 		maxWidth: 420,
+		background: `radial-gradient(110% 58% at 82% 0%,#0d1830 0%,${T.bg} 52%,#010610 100%)`,
 		margin: "0 auto",
 		overflowY: "auto",
+		overflowX: "hidden",
 		overscrollBehavior: "contain",
+		overscrollBehaviorX: "none",
 		padding: "calc(env(safe-area-inset-top,0px) + 58px) 18px calc(28px + env(safe-area-inset-bottom,0px))",
 		animation: "slideIn .18s ease-out"
 	}}>
@@ -5190,6 +5205,15 @@ const KID_DOCS = [{
 	P: 3
 }];
 const CHECKED = "2026-07-28";
+const CHECK_STALE_DAYS = 30;
+const checkAgeDays = (date) => {
+	const t = Date.parse(String(date || ""));
+	return Number.isFinite(t) ? Math.floor((Date.now() - t) / 864e5) : null;
+};
+const checkIsStale = (date) => {
+	const age = checkAgeDays(date);
+	return age != null && age > CHECK_STALE_DAYS;
+};
 const visaRulesRemote = () => store.get("visa_rules", {}) || {};
 const visaInfoFor = (country) => visaRulesRemote()[country] || VISA_INFO[country] || null;
 const visaCountries = () => [...new Set([...Object.keys(VISA_INFO), ...Object.keys(visaRulesRemote())])];
@@ -6490,7 +6514,7 @@ const DOC_INFO = {
 		],
 		links: [{
 			label: "Официальный сайт eVisa",
-			url: ""
+			url: "https://evisa.imigrasi.go.id"
 		}]
 	},
 	ecd: {
@@ -6498,8 +6522,8 @@ const DOC_INFO = {
 		desc: "Электронная таможенная декларация Индонезии. Доступна не раньше чем за 3 дня до прилёта.",
 		req: ["Данные рейса", "Загранпаспорт"],
 		links: [{
-			label: "Сайт e-CD",
-			url: ""
+			label: "Сайт All Indonesia",
+			url: "https://allindonesia.beacukai.go.id"
 		}]
 	},
 	tdac: {
@@ -6512,12 +6536,12 @@ const DOC_INFO = {
 		],
 		links: [{
 			label: "Официальный сайт TDAC",
-			url: ""
+			url: "https://tdac.immigration.go.th"
 		}]
 	},
 	imuga: {
 		type: "online",
-		desc: "Декларация прибытия на Мальдивы. Заполняется онлайн в течение 96 часов до вылета.",
+		desc: "Декларация прибытия на Мальдивах. Заполняется онлайн в течение 96 часов до вылета.",
 		req: [
 			"Загранпаспорт",
 			"Данные рейса",
@@ -6525,7 +6549,7 @@ const DOC_INFO = {
 		],
 		links: [{
 			label: "Сайт Imuga",
-			url: ""
+			url: "https://imuga.immigration.gov.mv"
 		}]
 	},
 	jvisa: {
@@ -6540,11 +6564,8 @@ const DOC_INFO = {
 			"Выписка из банка"
 		],
 		links: [{
-			label: "Визовый центр",
-			url: ""
-		}, {
 			label: "Консульство Японии",
-			url: ""
+			url: "https://www.ru.emb-japan.go.jp"
 		}]
 	},
 	vjw: {
@@ -6553,7 +6574,7 @@ const DOC_INFO = {
 		req: ["Загранпаспорт", "Данные рейса"],
 		links: [{
 			label: "Visit Japan Web",
-			url: ""
+			url: "https://www.vjw.digital.go.jp"
 		}]
 	},
 	tz_visa: {
@@ -6566,7 +6587,7 @@ const DOC_INFO = {
 		],
 		links: [{
 			label: "Сайт eVisa Танзании",
-			url: ""
+			url: "https://visa.immigration.go.tz"
 		}]
 	},
 	vn_evisa: {
@@ -6575,7 +6596,7 @@ const DOC_INFO = {
 		req: ["Скан загранпаспорта", "Фото"],
 		links: [{
 			label: "Сайт eVisa Вьетнама",
-			url: ""
+			url: "https://evisa.gov.vn"
 		}]
 	},
 	eta: {
@@ -6584,7 +6605,7 @@ const DOC_INFO = {
 		req: ["Загранпаспорт", "Данные рейса"],
 		links: [{
 			label: "Сайт ETA",
-			url: ""
+			url: "https://eta.gov.lk"
 		}]
 	},
 	mu_form: {
@@ -6595,10 +6616,7 @@ const DOC_INFO = {
 			"Данные рейса",
 			"Отель"
 		],
-		links: [{
-			label: "Форма въезда",
-			url: ""
-		}]
+		links: []
 	},
 	sc_ta: {
 		type: "online",
@@ -6610,7 +6628,7 @@ const DOC_INFO = {
 		],
 		links: [{
 			label: "Сайт Travel Authorization",
-			url: ""
+			url: "https://seychelles.govtas.com"
 		}]
 	},
 	ph_etd: {
@@ -6619,7 +6637,7 @@ const DOC_INFO = {
 		req: ["Загранпаспорт", "Данные рейса"],
 		links: [{
 			label: "Сайт eTravel",
-			url: ""
+			url: "https://etravel.gov.ph"
 		}]
 	},
 	schengen: {
@@ -6634,11 +6652,8 @@ const DOC_INFO = {
 			"Справка с работы"
 		],
 		links: [{
-			label: "Визовый центр",
-			url: ""
-		}, {
-			label: "Требования консульства",
-			url: ""
+			label: "Правила виз ЕС",
+			url: "https://home-affairs.ec.europa.eu/policies/schengen-borders-and-visa/visa-policy_en"
 		}]
 	},
 	kid_birth: {
@@ -6673,7 +6688,7 @@ const DOC_INFO = {
 		],
 		links: [{
 			label: "Официальный сайт eVisa Индии",
-			url: ""
+			url: "https://indianvisaonline.gov.in"
 		}]
 	}
 };
@@ -7900,9 +7915,9 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
         </>}
         <div style={{
 			fontSize: 10.5,
-			color: T.subd,
+			color: checkIsStale(rq.checked) ? T.gold : T.subd,
 			marginTop: 12
-		}}>Требования проверены {rq.checked}. Перед подачей сверьтесь с сайтом консульства — правила меняются.</div>
+		}}>{checkIsStale(rq.checked) ? "Проверка устарела: " : "Требования проверены "}{rq.checked}. Перед подачей сверьтесь с сайтом консульства — правила меняются.</div>
       </div>
       <div onClick={() => {
 			persistRequest("ready");
@@ -7991,15 +8006,15 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 				doc: cfg.title,
 				country: cfg.country,
 				question: `${ctx} ${question}`
-			}, 22e3);
+			}, 35e3);
 			setAiMessages((m) => [...m, {
 				role: "assistant",
-				text: d && d.answer || "Не удалось получить ответ."
+				text: d?.answer || aiErrorText(d?.error, "Не удалось получить ответ.")
 			}]);
 		} catch (e) {
 			setAiMessages((m) => [...m, {
 				role: "assistant",
-				text: "Помощник сейчас недоступен."
+				text: aiErrorText(e?.message)
 			}]);
 		} finally {
 			setAiBusy(false);
@@ -9926,7 +9941,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 				tripId: t.id,
 				question: q
 			}, 35e3);
-			const text = r.ok ? r.answer || "Не нашёл ответа в данных поездки." : r.error === "timeout" ? "TripWise AI не ответил за 35 секунд. Попробуйте ещё раз." : `TripWise AI сейчас недоступен${r.error ? ` · ${r.error}` : ""}.`;
+			const text = r.ok ? r.answer || "Не нашёл ответа в данных поездки." : aiErrorText(r.error, "TripWise AI сейчас недоступен.");
 			setMessages((m) => [...m, {
 				role: "assistant",
 				text
@@ -9936,7 +9951,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		} catch (e) {
 			setMessages((m) => [...m, {
 				role: "assistant",
-				text: "TripWise AI сейчас недоступен."
+				text: aiErrorText(e?.message, "TripWise AI сейчас недоступен.")
 			}]);
 		} finally {
 			setChatBusy(false);
@@ -9953,10 +9968,10 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		const r = await sharedApi("booking-import", {
 			tripId: t.id,
 			text
-		});
+		}, 35e3);
 		setImportBusy(false);
 		if (r.ok && r.booking) setImportResult(r.booking);
-		else setToast("Не удалось распознать бронирование");
+		else setToast(aiErrorText(r.error, "Не удалось распознать бронирование"));
 	};
 	const importFile = async (e) => {
 		const f = e.target.files && e.target.files[0];
@@ -14391,6 +14406,7 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
 		t.destination,
 		t.routeLabel
 	].join(" ").toLowerCase().includes(filter.toLowerCase()));
+	const publicCount = (publicTrips || []).length;
 	const link = {
 		background: "none",
 		border: 0,
@@ -14445,7 +14461,7 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
 		borderRadius: 12,
 		padding: "12px 20px"
 	}}>Создать поездку</button></div>}
-    <button type="button" onClick={() => {
+    <button type="button" aria-label="Открыть каталог поездок" onClick={() => {
 		setCatalog(true);
 		trackGoal("public_catalog_open");
 		reloadPublic?.();
@@ -14460,9 +14476,16 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
 		borderRadius: 18,
 		padding: 17,
 		margin: "18px 0",
-		cursor: "pointer"
+		cursor: "pointer",
+		overflow: "hidden"
 	}}>
-      <span style={{ fontSize: 30 }}>🌍</span><span style={{ flex: 1 }}><strong style={{
+      <span style={{
+		fontSize: 30,
+		flexShrink: 0
+	}}>🌍</span><span style={{
+		flex: 1,
+		minWidth: 0
+	}}><strong style={{
 		display: "block",
 		fontSize: 17,
 		color: T.text
@@ -14471,9 +14494,10 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
 		fontSize: 12,
 		color: T.subd,
 		marginTop: 4
-	}}>Открытые поездки и новые попутчики</span></span><span style={{
+	}}>{publicLoading ? "Обновляем открытые поездки…" : publicCount ? `${publicCount} поезд${publicCount === 1 ? "ка" : "ок"} ждут попутчиков` : "Пока без опубликованных поездок — можно создать свою"}</span></span><span style={{
 		color: T.violet,
-		fontSize: 22
+		fontSize: 22,
+		flexShrink: 0
 	}}>→</span>
     </button>
     <div style={{
@@ -14919,7 +14943,8 @@ const SERVICES = [
 			stayTo: "2026-12-31",
 			country: "",
 			city: "",
-			url: "https://travel.yandex.ru/hotels/"
+			url: "https://travel.yandex.ru/hotels/",
+			verified: false
 		}, {
 			header: "Промокод на отели Чувашии",
 			code: "CHUVASHIA10",
@@ -14930,7 +14955,8 @@ const SERVICES = [
 			stayTo: "2026-09-30",
 			country: "Россия",
 			city: "Чебоксары",
-			url: "https://travel.yandex.ru/hotels/cheboksary/"
+			url: "https://travel.yandex.ru/hotels/cheboksary/",
+			verified: false
 		}]
 	},
 	{
@@ -14948,7 +14974,8 @@ const SERVICES = [
 			stayFrom: "2026-08-01",
 			stayTo: "2026-11-30",
 			country: "",
-			city: ""
+			city: "",
+			verified: false
 		}]
 	},
 	{
@@ -14967,7 +14994,8 @@ const SERVICES = [
 			stayTo: "2026-12-31",
 			country: "",
 			city: "",
-			url: "https://trip.com/hotels/"
+			url: "https://trip.com/hotels/",
+			verified: false
 		}, {
 			header: "Кэшбэк на отели в Азии",
 			code: "ASIA2026",
@@ -14978,7 +15006,8 @@ const SERVICES = [
 			stayTo: "2026-11-30",
 			country: "",
 			city: "",
-			url: "https://trip.com/hotels/"
+			url: "https://trip.com/hotels/",
+			verified: false
 		}]
 	}
 ];
@@ -14987,6 +15016,7 @@ function promosForTrip({ country, city, depISO }) {
 	const today = todayISO();
 	const out = [];
 	for (const s of SERVICES) for (const p of s.promos || []) {
+		if (p.verified !== true) continue;
 		if (p.endDate && p.endDate < today) continue;
 		if (p.country && country && p.country !== country) continue;
 		if (p.city && city && p.city !== city) continue;
@@ -16108,9 +16138,9 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
             </div>
             <div style={{
 			fontSize: 10,
-			color: T.subd,
+			color: checkIsStale(vi.checked) ? T.gold : T.subd,
 			marginTop: 9
-		}}>Сведения от {vi.checked} · актуальность перед поездкой проверьте в официальном источнике</div>
+		}}>{checkIsStale(vi.checked) ? "Проверка старше 30 дней" : `Сведения от ${vi.checked}`} · актуальность перед поездкой проверьте в официальном источнике</div>
           </div>;
 	})()}
         {kids && <>
@@ -16445,7 +16475,7 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 			setGuests(Math.max(1, activeTravelers(trip).length));
 		}
 	}, [trip && trip.id]);
-	const activePromos = (s) => (s.promos || []).filter((p) => !p.endDate || p.endDate >= today).sort((a, b) => (b.discountRub || 0) - (a.discountRub || 0));
+	const activePromos = (s) => (s.promos || []).filter((p) => p.verified === true && (!p.endDate || p.endDate >= today)).sort((a, b) => (b.discountRub || 0) - (a.discountRub || 0));
 	const changeFrom = (v) => {
 		setPFrom(v);
 		setDateErr("");
@@ -16719,6 +16749,11 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		lineHeight: 1.45,
 		margin: "12px 3px 0"
 	}}>TripWise пока не строит собственную выдачу отелей: здесь собраны сервисы и доступные промокоды под параметры поездки.</div><div style={{
+		fontSize: 10.5,
+		color: T.gold,
+		lineHeight: 1.4,
+		margin: "6px 3px 0"
+	}}>Промокоды показываем только после ручной проверки партнёром; пока доступны переходы на сайты сервисов.</div><div style={{
 		fontFamily: "Sora,sans-serif",
 		fontSize: 13,
 		fontWeight: 800,
@@ -16949,7 +16984,7 @@ function App() {
 		document.head.appendChild(script);
 		return () => script.remove();
 	}, []);
-	const [tab, setTab] = useState("routes");
+	const [tab, setTab] = useState("home");
 	const [stack, setStack] = useState([]);
 	const [sheet, setSheet] = useState(false);
 	const [traveler, setTraveler] = useState(false);
@@ -17312,9 +17347,8 @@ function App() {
 				if (raw === "open_trips") {
 					deepLinkDone.current = true;
 					setFlow(null);
-					setTab("routes");
+					setTab("home");
 					setStack([]);
-					setTimeout(() => loadPublicTrips(), 0);
 					try {
 						history.replaceState(null, "", location.pathname);
 					} catch (e) {}
@@ -18189,8 +18223,11 @@ function App() {
       ::-webkit-scrollbar{display:none}
       input::placeholder{color:${T.subd}}
       input,select,textarea{font-size:16px}
-      html,body{touch-action:pan-y;background:#0a0a18}
-      .app-root{height:100vh;height:100dvh}
+      html,body,#root{width:100%;max-width:100%;margin:0;overflow-x:hidden}
+      html,body{touch-action:pan-y;background:#0a0a18;overscroll-behavior-x:none}
+      img,svg,video,canvas{max-width:100%}
+      button,input,select,textarea{max-width:100%}
+      .app-root{height:100vh;height:100dvh;min-width:0;overflow-x:hidden}
       @media(max-width:370px){
         .home-compact-title{font-size:27px!important}
       }
@@ -18198,6 +18235,7 @@ function App() {
     <div className="app-root" style={{
 		width: "100%",
 		maxWidth: 420,
+		minWidth: 0,
 		paddingTop: safeTop,
 		background: `radial-gradient(105% 54% at 78% 0%, #0d1830 0%, ${HOME_T.bg} 48%, ${HOME_T.bgDeep} 100%)`,
 		color: tab === "home" ? HOME_T.text : T.text,
