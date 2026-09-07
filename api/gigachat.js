@@ -1,5 +1,5 @@
 import https from "node:https";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 
 export const maxDuration = 60;
 
@@ -23,7 +23,7 @@ function postJson(urlString, headers, body, timeoutMs) {
           "Accept-Encoding": "identity",
         },
         family: 4,
-        rejectUnauthorized: false,
+        rejectUnauthorized: true,
         timeout: timeoutMs,
       },
       (res) => {
@@ -96,7 +96,7 @@ export default async function handler(request, response) {
   const expectedSecret = process.env.PROXY_SHARED_SECRET;
   const receivedSecret = request.headers["x-proxy-key"];
 
-  if (!expectedSecret || receivedSecret !== expectedSecret) {
+  if (!expectedSecret || typeof receivedSecret!=="string" || Buffer.byteLength(receivedSecret)!==Buffer.byteLength(expectedSecret) || !timingSafeEqual(Buffer.from(receivedSecret),Buffer.from(expectedSecret))) {
     return response.status(401).json({ ok: false, error: "Unauthorized" });
   }
 
@@ -106,11 +106,14 @@ export default async function handler(request, response) {
         ? JSON.parse(request.body || "{}")
         : request.body || {};
 
+    if(!Array.isArray(input.messages)||input.messages.length>30||JSON.stringify(input).length>50000)return response.status(400).json({ok:false,error:"invalid request"});
     const token = await getAccessToken();
     const payload = JSON.stringify({
-      ...input,
+      messages:input.messages,
+      max_tokens:Math.min(2000,Math.max(1,Number(input.max_tokens)||1500)),
+      temperature:Math.min(1,Math.max(0,Number(input.temperature)||0.25)),
       model:
-        input.model || process.env.GIGACHAT_MODEL || "GigaChat-2-Pro",
+        process.env.GIGACHAT_MODEL || "GigaChat-2-Pro",
     });
 
     const giga = await postJson(
@@ -140,7 +143,7 @@ export default async function handler(request, response) {
 
     return response.status(502).json({
       ok: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: "AI provider unavailable",
       code: error?.code || error?.cause?.code || null,
     });
   }
