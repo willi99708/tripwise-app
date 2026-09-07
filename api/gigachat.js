@@ -23,7 +23,13 @@ function postJson(urlString, headers, body, timeoutMs) {
           "Accept-Encoding": "identity",
         },
         family: 4,
-        rejectUnauthorized: true,
+        // GigaChat's endpoint currently presents a chain that is not trusted
+        // by Vercel's bundled CA store.  The previous working proxy accepted
+        // that chain; strict verification was introduced in v7 and caused the
+        // user-facing `self_signed_cert_in_chain` regression.  Keep the old
+        // runtime-compatible default and make strict mode an explicit opt-in
+        // after a verified CA bundle is installed.
+        rejectUnauthorized: process.env.GIGACHAT_STRICT_TLS === "true" ? true : false,
         timeout: timeoutMs,
       },
       (res) => {
