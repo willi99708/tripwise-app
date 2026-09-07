@@ -8370,7 +8370,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 	}}>TripWise думает…</div>}</div><div style={{
 		display: "flex",
 		gap: 7
-	}}><input value={aiQ} onChange={(e) => setAiQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && askAi()} placeholder={focusF ? `Спроси про «${focusF.label.slice(0, 24)}»` : `Спроси про документ…`} style={{
+	}}><input autoFocus value={aiQ} onChange={(e) => setAiQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && askAi()} placeholder={focusF ? `Спроси про «${focusF.label.slice(0, 24)}»` : `Спроси про документ…`} style={{
 		flex: 1,
 		background: T.card,
 		border: `1px solid ${T.line}`,
@@ -10985,6 +10985,17 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		}}>Документы и подготовка показываются сводкой, а не отдельными событиями.</div></div>;
 	};
 	const travelerMember = (tr) => members.find((m) => String(m.id) === String(tr.memberId || "")) || null;
+	const runNextAction = () => {
+		if (act.act === "docs") return goDocs && goDocs();
+		if (act.act === "tickets") return onFindTickets && onFindTickets(t);
+		if (act.act === "hotels") return goHotels && goHotels();
+		if (act.act === "budget") return setBudgetOpen(true);
+		if (act.act === "group") return setMode("group");
+		setOpen((x) => ({
+			...x,
+			[act.block || "overview"]: true
+		}));
+	};
 	return <div style={{
 		padding: "12px 14px",
 		paddingBottom: 150,
@@ -11105,7 +11116,16 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		fontSize: 12,
 		color: "rgba(255,255,255,.84)",
 		marginTop: 3
-	}}>{[t.dcName, t.country].filter(Boolean).join(", ")}{t.df ? ` · ${fmtShort(new Date(t.df))}` : ""}{t.dt ? ` — ${fmtShort(new Date(t.dt))}` : ""}{today.active ? " · сейчас в поездке" : d != null ? ` · через ${d} дн.` : ""}</div><div onClick={() => setPeopleOpen(true)} style={{
+	}}>{[t.dcName, t.country].filter(Boolean).join(", ")}{t.df ? ` · ${fmtShort(new Date(t.df))}` : ""}{t.dt ? ` — ${fmtShort(new Date(t.dt))}` : ""}{today.active ? " · сейчас в поездке" : d != null ? ` · через ${d} дн.` : ""}</div><div style={{
+		display: "inline-flex",
+		marginTop: 6,
+		padding: "4px 8px",
+		borderRadius: 999,
+		background: "rgba(255,255,255,.14)",
+		color: "#fff",
+		fontSize: 10.5,
+		fontWeight: 800
+	}}>{today.active ? "В поездке" : t.status === "completed" ? "Завершена" : t.status === "waiting" ? "Ожидание" : "Подготовка"}</div><div onClick={() => setPeopleOpen(true)} style={{
 		fontSize: 10.7,
 		color: "rgba(255,255,255,.72)",
 		marginTop: 5,
@@ -11124,7 +11144,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		borderRadius: 13,
 		padding: 4,
 		margin: "12px 0"
-	}}>{[["trip", "Trip"], ["group", "Ask Group"]].map(([k, l]) => <div key={k} onClick={() => setMode(k)} className="press" style={{
+	}}>{[["trip", "План"], ["group", "Группа"]].map(([k, l]) => <div key={k} onClick={() => setMode(k)} className="press" style={{
 		flex: 1,
 		textAlign: "center",
 		padding: "9px 8px",
@@ -11137,7 +11157,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 	}}>{l}{k === "group" && (t.askGroup || []).filter((x) => x.status === "open").length > 0 ? ` · ${(t.askGroup || []).filter((x) => x.status === "open").length}` : ""}</div>)}</div>
 
     {mode === "trip" ? <>
-      {today.active && <div style={{
+      {false && today.active && <div style={{
 		background: "linear-gradient(135deg,rgba(48,215,184,.18),rgba(124,92,255,.12))",
 		border: `1px solid ${T.green}55`,
 		borderRadius: 18,
@@ -11234,6 +11254,47 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		color: T.sub,
 		marginTop: 10
 	}}>{p.pct === 100 ? "Поездка готова. Можно ехать." : act.title + " — " + act.sub}</div></div>
+      <div style={{
+		background: T.card,
+		border: `1px solid ${T.violet}66`,
+		borderRadius: 16,
+		padding: 13,
+		marginBottom: 10
+	}}><div style={{
+		fontSize: 10.5,
+		color: T.violet,
+		fontWeight: 900,
+		textTransform: "uppercase",
+		letterSpacing: .3
+	}}>Следующий шаг</div><div style={{
+		display: "flex",
+		alignItems: "center",
+		gap: 10,
+		marginTop: 5
+	}}><div style={{
+		flex: 1,
+		minWidth: 0
+	}}><div style={{
+		fontSize: 14,
+		fontWeight: 900,
+		color: T.text,
+		overflow: "hidden",
+		textOverflow: "ellipsis",
+		whiteSpace: "nowrap"
+	}}>{p.pct === 100 ? "Поездка готова" : act.title}</div><div style={{
+		fontSize: 10.8,
+		color: T.subd,
+		marginTop: 3
+	}}>{p.pct === 100 ? "Можно отправляться" : "Готовность поездки · " + p.pct + "% · " + act.sub}</div></div>{act.btn && <div onClick={runNextAction} className="press" style={{
+		flexShrink: 0,
+		background: GRAD.cta,
+		borderRadius: 10,
+		padding: "8px 10px",
+		color: "#fff",
+		fontSize: 10.5,
+		fontWeight: 900,
+		cursor: "pointer"
+	}}>{act.btn}</div>}</div></div>
 
       {(t.activityLog || []).length > 0 && <div onClick={openActivity} className="press" style={{
 		display: "flex",
@@ -11261,45 +11322,8 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		marginTop: 2
 	}}>{latestActivity && latestActivity.text}</div></div><Icon d={I.chevR} size={14} color={T.subd} /></div>}
 
-      <div onClick={() => setBudgetOpen(true)} className="press" style={{
-		background: T.card,
-		border: `1px solid ${T.line}`,
-		borderRadius: 16,
-		padding: 13,
-		marginBottom: 10,
-		cursor: "pointer"
-	}}><div style={{
-		display: "flex",
-		alignItems: "center",
-		gap: 8
-	}}><div style={{ fontSize: 18 }}>💸</div><div style={{
-		fontSize: 13.5,
-		fontWeight: 800,
-		color: T.text,
-		flex: 1
-	}}>Бюджет поездки</div>{budget.baseTotal != null && <b style={{
-		fontSize: 12,
-		color: T.text
-	}}>≈ {money(budget.baseTotal, budget.baseCurrency)}</b>}<Icon d={I.chevR} size={14} color={T.subd} /></div>{budget.groups.length ? <div style={{
-		marginTop: 8,
-		display: "flex",
-		flexDirection: "column",
-		gap: 5
-	}}>{budget.groups.slice(0, 3).map((g) => <div key={g.currency} style={{
-		display: "flex",
-		fontSize: 11.5
-	}}><span style={{
-		color: T.subd,
-		flex: 1
-	}}>{g.currency} · оплачено {Math.min(100, Math.round(g.paid / Math.max(1, g.total) * 100))}%</span><b style={{ color: T.text }}>{money(g.total, g.currency)}</b>{budget.me && <span style={{
-		color: T.subd,
-		marginLeft: 8
-	}}>· ваша доля {money(g.myShare, g.currency)}</span>}</div>)}</div> : <div style={{
-		fontSize: 11,
-		color: T.subd,
-		marginTop: 6
-	}}>Добавляйте цены — TripWise посчитает доли, плательщиков и взаиморасчёты.</div>}</div>
-      <TimelinePreview />
+      {false && <div onClick={() => setBudgetOpen(true)} />}
+      {false && <TimelinePreview />}
 
       <div style={{
 		background: T.card,
@@ -11524,6 +11548,31 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		flex: 1
 	}}>{it.name}</span>{it.item && <PriceBadge kind="custom" item={it.item} />}</div>) : <Empty>Сборов пока нет.</Empty>}</div>}</>}
       </div>
+      <TimelinePreview />
+      <div onClick={() => setBudgetOpen(true)} className="press" style={{
+		background: T.card,
+		border: `1px solid ${T.line}`,
+		borderRadius: 16,
+		padding: 13,
+		marginBottom: 10,
+		cursor: "pointer"
+	}}><div style={{
+		display: "flex",
+		alignItems: "center",
+		gap: 8
+	}}><div style={{ fontSize: 18 }}>💸</div><div style={{
+		fontSize: 13.5,
+		fontWeight: 800,
+		color: T.text,
+		flex: 1
+	}}>Бюджет поездки</div>{budget.baseTotal != null && <b style={{
+		fontSize: 12,
+		color: T.text
+	}}>≈ {money(budget.baseTotal, budget.baseCurrency)}</b>}<Icon d={I.chevR} size={14} color={T.subd} /></div><div style={{
+		fontSize: 11,
+		color: T.subd,
+		marginTop: 6
+	}}>{budget.baseTotal != null ? `Потрачено и распределено по ${budget.groups.length || 1} валюте(ам) · открыть детали` : "Добавьте цены — здесь появятся общий бюджет, остаток и доля каждого."}</div></div>
       <div style={{ marginTop: 10 }}><div onClick={() => setImportOpen(true)} className="press" style={{
 		textAlign: "center",
 		border: `1px solid ${T.violet}55`,
@@ -11703,7 +11752,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		fontSize: 13,
 		color: T.subd,
 		flex: 1
-	}}>Ask TripWise…</span><Icon d={I.arrow} size={15} color={T.violet} /></div></div>
+	}}>Спросить про поездку…</span><Icon d={I.arrow} size={15} color={T.violet} /></div></div>
 
     {peopleOpen && <Overlay onClose={() => setPeopleOpen(false)}><SheetHead title={`Путешественники · ${travelers.length}`} onClose={() => setPeopleOpen(false)} /><div style={{
 		fontSize: 11,
@@ -14693,16 +14742,6 @@ function PublicTripPreview({ trip, onClose, onOpenOwn, profile, setToast }) {
 		cursor: "pointer"
 	};
 	return <FullScreenOverlay onClose={onClose}><div style={{ padding: "4px 18px 100px" }}>
-    <div onClick={onClose} className="press" style={{
-		display: "inline-flex",
-		alignItems: "center",
-		gap: 5,
-		color: T.sub,
-		fontSize: 12,
-		fontWeight: 800,
-		cursor: "pointer",
-		padding: "3px 0 10px"
-	}}><Icon d={I.back} size={15} color={T.sub} />Все публичные поездки</div>
     <div style={{ position: "relative" }}><TripCover trip={detail} height={158} /><div style={{
 		position: "absolute",
 		left: 15,
@@ -18787,7 +18826,7 @@ function App() {
 		setToast("Данные восстановлены; черновики отправлены на синхронизацию");
 		return true;
 	}} />}</div>
-      {!kb && top !== "trip" && !(flow && flow.tripId) && <BottomNav tab={tab} setTab={(k) => {
+      {!kb && (top !== "trip" || tab !== "routes") && !(flow && flow.tripId && tab === "routes") && <BottomNav tab={tab} setTab={(k) => {
 		setFlow(null);
 		if (k === tab && (k === "routes" || k === "profile" || k === "hotels" || k === "docs")) setStack([]);
 		if (k === "routes" && tab === "routes") setStack([]);
