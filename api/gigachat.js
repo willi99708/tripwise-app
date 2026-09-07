@@ -75,7 +75,9 @@ async function getAccessToken() {
   );
 
   if (oauth.status < 200 || oauth.status >= 300) {
-    throw new Error(`GigaChat OAuth ${oauth.status}: ${oauth.text.slice(0, 300)}`);
+    const error = new Error(`GigaChat OAuth ${oauth.status}: ${oauth.text.slice(0, 300)}`);
+    error.status = oauth.status;
+    throw error;
   }
 
   const data = JSON.parse(oauth.text || "{}");
@@ -100,6 +102,7 @@ export default async function handler(request, response) {
     return response.status(401).json({ ok: false, error: "Unauthorized" });
   }
 
+  let stage = "oauth";
   try {
     const input =
       typeof request.body === "string"
@@ -107,7 +110,8 @@ export default async function handler(request, response) {
         : request.body || {};
 
     if(!Array.isArray(input.messages)||input.messages.length>30||JSON.stringify(input).length>50000)return response.status(400).json({ok:false,error:"invalid request"});
-    const token = await getAccessToken();
+    let token = await getAccessToken();
+    stage = "completion";
     const payload = JSON.stringify({
       messages:input.messages,
       max_tokens:Math.min(2000,Math.max(1,Number(input.max_tokens)||1500)),
@@ -116,7 +120,7 @@ export default async function handler(request, response) {
         process.env.GIGACHAT_MODEL || "GigaChat-2-Pro",
     });
 
-    const giga = await postJson(
+    let giga = await postJson(
       "https://gigachat.devices.sberbank.ru/api/v1/chat/completions",
       {
         "Content-Type": "application/json",
@@ -127,6 +131,26 @@ export default async function handler(request, response) {
       payload,
       50000
     );
+
+    // A cached access token can be revoked independently of its nominal TTL.
+    // Refresh once on 401 so a rotated Sber key does not leave the proxy
+    // returning the same error for the next 28 minutes.
+    if (giga.status === 401) {
+      cachedToken = null;
+      tokenExpiresAt = 0;
+      token = await getAccessToken();
+      giga = await postJson(
+        "https://gigachat.devices.sberbank.ru/api/v1/chat/completions",
+        {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          RqUID: randomUUID(),
+          Authorization: `Bearer ${token}`,
+        },
+        payload,
+        50000
+      );
+    }
 
     response.status(giga.status);
     response.setHeader("Content-Type", giga.contentType);
@@ -141,9 +165,11 @@ export default async function handler(request, response) {
       stack: error?.stack,
     });
 
-    return response.status(502).json({
+    const status = Number(error?.status);
+    return response.status(status >= 400 && status < 600 ? status : 502).json({
       ok: false,
       error: "AI provider unavailable",
+      stage,
       code: error?.code || error?.cause?.code || null,
     });
   }
