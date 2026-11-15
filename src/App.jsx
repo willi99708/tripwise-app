@@ -416,7 +416,7 @@ function budgetSummary(t) {
 //#endregion
 //#region TripWiseAI-v7-release/frontend/src/App.jsx
 const API_BASE = import.meta.env.VITE_API_BASE || "https://functions.yandexcloud.net/d4e3hpvr0lrijksc8i1r";
-const APP_VERSION = "7.0.0-rc.3";
+const APP_VERSION = "7.0.0-rc.6";
 const YM_ID = Number(import.meta.env.VITE_METRIKA_ID) || 0;
 const YM_TAB_PATH = {
 	home: "/home",
@@ -477,7 +477,7 @@ const T = {
 	line2: "rgba(141,171,228,.38)",
 	text: "#f7f8fc",
 	sub: "#9aa3b8",
-	subd: "#737e97",
+	subd: "#93a0b9",
 	violet: "#9364f5",
 	cyan: "#31c7f3",
 	green: "#39d98a",
@@ -503,7 +503,7 @@ const HOME_T = {
 	borderStrong: "rgba(141,171,228,.38)",
 	text: "#f7f8fc",
 	sub: "#9aa3b8",
-	subDim: "#737e97",
+	subDim: "#93a0b9",
 	violet: "#9364f5",
 	pink: "#d66cf1",
 	cyan: "#31c7f3",
@@ -2068,7 +2068,7 @@ async function apiSearch(req) {
 		});
 		const d = await r.json();
 		if (!r.ok || !d.ok) throw Object.assign(new Error(d.error || "Search unavailable"), { status: r.status });
-		return d.routes || [];
+		return { routes: Array.isArray(d.routes) ? d.routes : [], priceNotice: d.priceNotice || "" };
 	} finally {
 		clearTimeout(timer);
 	}
@@ -2193,12 +2193,12 @@ const LABELS = {
 		icon: "✦"
 	},
 	cheapest: {
-		t: "Самый дешёвый",
+		t: "Дешевле из найденных",
 		c: T.green,
 		icon: "₽"
 	},
 	fastest: {
-		t: "Самый быстрый",
+		t: "Быстрее из найденных",
 		c: T.cyan,
 		icon: "⚡"
 	},
@@ -2443,7 +2443,7 @@ function Badge({ label, color = T.violet, icon }) {
 		fontSize: 12,
 		fontWeight: 700,
 		whiteSpace: "nowrap"
-	}}>{icon && <span style={{ fontSize: 11 }}>{icon}</span>}{label}</span>;
+	}}>{icon && <span style={{ fontSize: 12 }}>{icon}</span>}{label}</span>;
 }
 function Btn({ children, onClick, grad = GRAD.cta, style }) {
 	return <button onClick={onClick} className="press" style={{
@@ -2562,7 +2562,7 @@ function Header({ onBack, title, subtitle, onEdit }) {
 		textOverflow: "ellipsis",
 		whiteSpace: "nowrap"
 	}}>{title}</div>{subtitle && <div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 2
 	}}>{subtitle}</div>}</div> : null}</div>
@@ -2666,7 +2666,7 @@ function BottomNav({ tab, setTab, bottomStr = "0px" }) {
 		}} fallback={<Icon d={fallbackIcon} size={24} color={active ? HOME_T.pink : HOME_T.subDim} />} />
         </div>
         <span style={{
-			fontSize: 11,
+			fontSize: 12,
 			lineHeight: 1.05,
 			fontWeight: active ? 700 : 500,
 			whiteSpace: "nowrap"
@@ -2694,8 +2694,49 @@ function Toast({ msg }) {
 		animation: "fadeUp .25s ease"
 	}}>{msg}</div>;
 }
-function Overlay({ children, onClose, zIndex = 60, centered = false }) {
-	return <div style={{
+let modalSequence = 0;
+const modalBackStack = [];
+function syncModalBack() {
+	if (typeof window === "undefined") return;
+	const top = [...modalBackStack].sort((a, b) => b.layer - a.layer || b.id - a.id)[0];
+	window.__tripwiseModalBack = top ? () => top.close.current?.() : null;
+	const bb = window.Telegram?.WebApp?.BackButton;
+	try {
+		if (top || window.__tripwiseAppCanBack) bb?.show();
+		else bb?.hide();
+	} catch {}
+}
+function useModalBack(onClose, layer) {
+	const close = useRef(onClose);
+	close.current = onClose;
+	const id = useRef(null);
+	if (id.current === null) id.current = ++modalSequence;
+	useEffect(() => {
+		const entry = {
+			id: id.current,
+			close,
+			layer
+		};
+		modalBackStack.push(entry);
+		syncModalBack();
+		const key = (e) => {
+			if (e.key === "Escape" && window.__tripwiseModalBack && [...modalBackStack].sort((a, b) => b.layer - a.layer || b.id - a.id)[0] === entry) {
+				e.stopImmediatePropagation();
+				window.__tripwiseModalBack();
+			}
+		};
+		document.addEventListener("keydown", key);
+		return () => {
+			const i = modalBackStack.indexOf(entry);
+			if (i >= 0) modalBackStack.splice(i, 1);
+			document.removeEventListener("keydown", key);
+			syncModalBack();
+		};
+	}, [layer]);
+}
+function Overlay({ children, onClose, zIndex = 90, centered = false }) {
+	useModalBack(onClose, zIndex);
+	return <div role="dialog" aria-modal="true" data-tripwise-modal style={{
 		position: "fixed",
 		inset: 0,
 		zIndex,
@@ -2752,39 +2793,20 @@ function SheetHead({ title, onClose }) {
 		fontWeight: 700,
 		fontSize: 17,
 		color: T.text
-	}}>{title}</span><div onClick={onClose} className="press" style={{ cursor: "pointer" }}><Icon d={I.close} size={20} color={T.sub} /></div></div>;
+	}}>{title}</span><button type="button" aria-label="Закрыть окно" onClick={onClose} className="press" style={{
+		padding: 0,
+		width: 44,
+		height: 44,
+		flexShrink: 0,
+		display: "grid",
+		placeItems: "center",
+		background: "transparent",
+		border: 0
+	}}><Icon d={I.close} size={20} color={T.sub} /></button></div>;
 }
 function FullScreenOverlay({ children, onClose }) {
-	const closeRef = useRef(onClose);
-	closeRef.current = onClose;
-	useEffect(() => {
-		if (typeof window === "undefined") return;
-		const prev = window.__tripwiseModalBack || null;
-		const localBack = () => {
-			try {
-				closeRef.current && closeRef.current();
-			} catch (e) {}
-		};
-		window.__tripwiseModalBack = localBack;
-		const tg = window.Telegram && window.Telegram.WebApp, bb = tg && tg.BackButton, wasVisible = !!(bb && bb.isVisible);
-		try {
-			if (bb) {
-				bb.show();
-				bb.onClick && bb.onClick(localBack);
-			}
-		} catch (e) {}
-		return () => {
-			if (window.__tripwiseModalBack === localBack) window.__tripwiseModalBack = prev;
-			try {
-				if (bb) {
-					bb.offClick && bb.offClick(localBack);
-					if (wasVisible) bb.show();
-					else bb.hide();
-				}
-			} catch (e) {}
-		};
-	}, []);
-	return <div style={{
+	useModalBack(onClose, 72);
+	return <div role="dialog" aria-modal="true" data-tripwise-modal style={{
 		position: "fixed",
 		inset: 0,
 		zIndex: 72,
@@ -2796,7 +2818,7 @@ function FullScreenOverlay({ children, onClose }) {
 		overflowX: "hidden",
 		overscrollBehavior: "contain",
 		overscrollBehaviorX: "none",
-		padding: "calc(env(safe-area-inset-top,0px) + 58px) 18px calc(28px + env(safe-area-inset-bottom,0px))",
+		padding: "calc(env(safe-area-inset-top,0px) + 16px) 16px calc(28px + env(safe-area-inset-bottom,0px))",
 		animation: "slideIn .18s ease-out"
 	}}>
     {children}
@@ -2824,7 +2846,7 @@ function ScreenHero({ title, sub, image, eyebrow, action, onAction }) {
 	}}>
       {eyebrow && <div style={{
 		color: HOME_T.cyan,
-		fontSize: 10.5,
+		fontSize: 12,
 		fontWeight: 800,
 		letterSpacing: .45,
 		textTransform: "uppercase",
@@ -2839,7 +2861,7 @@ function ScreenHero({ title, sub, image, eyebrow, action, onAction }) {
 	}}>{title}</div>
       {sub && <div style={{
 		color: HOME_T.sub,
-		fontSize: 11.7,
+		fontSize: 12,
 		lineHeight: 1.38,
 		marginTop: 7,
 		maxWidth: 230
@@ -2852,7 +2874,7 @@ function ScreenHero({ title, sub, image, eyebrow, action, onAction }) {
 		border: `1px solid ${HOME_T.borderStrong}`,
 		background: "rgba(255,255,255,.04)",
 		color: HOME_T.text,
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 800,
 		cursor: "pointer"
 	}}>{action}</div>}
@@ -2892,7 +2914,7 @@ function EmptyState({ icon = "✦", title, sub, action, onAction, compact = fals
 		color: T.text
 	}}>{title}</div>
     {sub && <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		lineHeight: 1.45,
 		color: T.subd,
 		margin: "6px auto 0",
@@ -2994,7 +3016,8 @@ const isReferralUrl = (url) => {
 	if (!url) return false;
 	try {
 		const u = new URL(url);
-		return /(?:ref|aff|affiliate|partner|utm_|clickid|subid)/i.test(`${u.pathname}${u.search}`);
+		if (u.protocol !== "https:" || u.username || u.password) return false;
+		return u.hostname === "tp.media" || [...u.searchParams].some(([k,v]) => /^(ref|refid|aff|affiliate|affiliate_id|partner|partner_id|marker|clickid|subid)$/i.test(k) && v.trim());
 	} catch {
 		return false;
 	}
@@ -3043,10 +3066,10 @@ function AirportPicker({ title, onPick, onClose }) {
 		color: T.text,
 		fontWeight: 600
 	}}>{a.city} {a.destId && <span style={{
-		fontSize: 10,
+		fontSize: 12,
 		color: T.violet
 	}}>✦ умный поиск</span>}</div><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd
 	}}>{a.country}</div></div>
         <span style={{
@@ -3142,7 +3165,7 @@ function Calendar({ initial, onClose, onApply }) {
 		marginBottom: 4
 	}}>{WD.map((w) => <div key={w} style={{
 		textAlign: "center",
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd,
 		padding: "4px 0"
 	}}>{w}</div>)}</div>
@@ -3229,7 +3252,7 @@ function DateRangePicker({ title = "Выберите даты", from = "", to = 
 		gap: 2
 	}}>{WD.map((w) => <div key={w} style={{
 		textAlign: "center",
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		padding: "4px 0"
 	}}>{w}</div>)}{cells.map((d, i) => {
@@ -3373,7 +3396,7 @@ function SearchSheet({ form, setForm, onClose, onSubmit, setToast }) {
 		placeItems: "center"
 	}}><Icon d={ic} size={17} color="#fff" /></div>
           <div style={{ flex: 1 }}><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd
 	}}>{label}</div><div style={{
 		fontSize: 15,
@@ -3381,7 +3404,7 @@ function SearchSheet({ form, setForm, onClose, onSubmit, setToast }) {
 		fontWeight: 600
 	}}>{val}</div></div>
           {tag && <span style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.sub
 	}}>{tag}</span>}
           {label === "Откуда" ? <div onClick={(e) => {
@@ -3510,7 +3533,7 @@ function Home({ onSearch, onPickDest, goTab, openServices }) {
 	}}>{name}</div>
       <div style={{
 		color: "rgba(255,255,255,.84)",
-		fontSize: 10.5,
+		fontSize: 12,
 		lineHeight: 1.2,
 		marginTop: 3,
 		whiteSpace: "nowrap",
@@ -3682,7 +3705,7 @@ function Home({ onSearch, onPickDest, goTab, openServices }) {
 	}}>Документы</div>
           <div style={{
 		color: HOME_T.subDim,
-		fontSize: 10.6,
+		fontSize: 12,
 		lineHeight: 1.23,
 		marginTop: 3,
 		paddingRight: 38
@@ -3732,7 +3755,7 @@ function Home({ onSearch, onPickDest, goTab, openServices }) {
 	}}>Отели</div>
             <div style={{
 		color: HOME_T.subDim,
-		fontSize: 10.4,
+		fontSize: 12,
 		lineHeight: 1.22,
 		marginTop: 4,
 		maxWidth: 72
@@ -3776,7 +3799,7 @@ function Home({ onSearch, onPickDest, goTab, openServices }) {
 	}}>Сервисы</div>
             <div style={{
 		color: HOME_T.subDim,
-		fontSize: 10.1,
+		fontSize: 12,
 		lineHeight: 1.2,
 		marginTop: 4,
 		maxWidth: 76
@@ -3842,7 +3865,7 @@ function Home({ onSearch, onPickDest, goTab, openServices }) {
 	}}>Подготовьте<br />поездку целиком</div>
           <div style={{
 		color: HOME_T.subDim,
-		fontSize: 10.5,
+		fontSize: 12,
 		lineHeight: 1.24,
 		marginTop: 5
 	}}>Документы, билеты и полезные сервисы</div>
@@ -3910,7 +3933,7 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
 			txt = durTxt ? `${durTxt} · ${trTxt}` : trTxt;
 		}
 		return <div style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			color: col,
 			marginTop: 1
 		}}>{txt}</div>;
@@ -3992,7 +4015,7 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
 		color: T.text,
 		fontWeight: 600
 	}}>{r.stopover ? `Stopover: ${r.stopover.city}` : r.roundTrip ? "Туда — обратно" : r.transfers ? "С пересадкой" : "Прямой перелёт"}</div><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd
 	}}>{r.stopover ? `${r.stopover.nights} ноч. в пути` : r.roundTrip ? "время по направлениям выше" : r.durationMin > 0 ? hm(r.durationMin) : "—"}</div></div>
       <div style={{
@@ -4023,8 +4046,8 @@ function Results({ query, routes, loading, error, onRetry, onBack, onEdit, onOpe
       <div style={{ width: 22 }} />
       <div style={{
 		position: "absolute",
-		left: 0,
-		right: 0,
+		left: 42,
+		right: 42,
 		textAlign: "center",
 		transform: "translateY(-4px)",
 		pointerEvents: "none"
@@ -4034,7 +4057,7 @@ function Results({ query, routes, loading, error, onRetry, onBack, onEdit, onOpe
 		color: T.text,
 		fontSize: 15
 	}}>{query.origin} → {query.destName}</div><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd
 	}}>{query.datesLabel}</div></div>
       <span onClick={onEdit} className="press" style={{
@@ -4053,12 +4076,12 @@ function Results({ query, routes, loading, error, onRetry, onBack, onEdit, onOpe
 		fontWeight: 800,
 		fontSize: 20,
 		color: T.text
-	}}>{loading ? "Ищем лучшие варианты…" : <>Нашли <span style={{ color: T.violet }}>{routes.length} {plural(routes.length, "хитрый способ", "хитрых способа", "хитрых способов")}</span> добраться</>}</div>
+	}}>{loading ? "Ищем лучшие варианты…" : <>Нашли <span style={{ color: T.violet }}>{routes.length} {plural(routes.length, "вариант", "варианта", "вариантов")}</span> добраться</>}</div>
       <div style={{
 		color: T.subd,
 		fontSize: 12.5,
 		marginTop: 4
-	}}>Показываем только лучшее — не сотни билетов.</div>
+	}}>{query.priceNotice || "Цена и наличие мест уточняются при переходе к продавцу."}</div>
     </div>
     <div style={{
 		padding: "16px 20px 8px",
@@ -4074,8 +4097,13 @@ function Results({ query, routes, loading, error, onRetry, onBack, onEdit, onOpe
     </div></>}
   </div>;
 }
-function Empty({ onEdit }) {
-	return <EmptyState icon="⌕" title="Подходящего маршрута пока нет" sub="Измените даты, аэропорты или количество пассажиров — текущий поиск останется сохранён." action="Изменить параметры" onAction={onEdit} />;
+function Empty({ onEdit, children }) {
+	return children ? <div style={{
+		padding: "12px 0",
+		fontSize: 13,
+		color: T.sub,
+		lineHeight: 1.5
+	}}>{children}</div> : <EmptyState icon="⌕" title="Подходящего маршрута пока нет" sub="Измените даты, аэропорты или количество пассажиров — текущий поиск останется сохранён." action="Изменить параметры" onAction={onEdit} />;
 }
 function ServiceLogo({ id, name }) {
 	return <div style={{
@@ -4126,7 +4154,7 @@ function AirlineLogo({ code }) {
 		placeItems: "center",
 		color: c,
 		fontWeight: 800,
-		fontSize: 11,
+		fontSize: 12,
 		fontFamily: "Sora,sans-serif",
 		overflow: "hidden"
 	}}>
@@ -4148,7 +4176,12 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 	const segs = r.segments || [];
 	const twoTicketNote = segs.length === 2 && (r.notes || []).some((n) => /раздельны|отдельных билета|два отдельных/i.test(n)) ? "Два отдельных билета" : null;
 	return <div style={{ animation: "slideIn .18s ease-out" }}>
-    <Header onBack={onBack} onEdit={onEdit} title={`${query.origin} → ${query.destName}`} subtitle={query.datesLabel} />
+    <Header onBack={onBack} onEdit={onEdit} title={`${query.origin} → ${query.destName}`} subtitle={query.datesLabel} /><div role="note" style={{
+		fontSize: 12,
+		color: T.sub,
+		lineHeight: 1.45,
+		margin: "8px 18px"
+	}}>{query.priceNotice || "Цена из прошлых поисков. Итоговая стоимость и наличие — у продавца."}</div>
     <div style={{ padding: "9px 20px 0" }}>
       <div style={{
 		position: "relative",
@@ -4186,7 +4219,8 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		const rel = promosForTrip({
 			country: query.destCountry,
 			city: query.destName,
-			depISO: query.depISO
+			depISO: query.depISO,
+			retISO: query.retISO
 		});
 		const bySvc = new Map();
 		for (const p of rel) {
@@ -4251,7 +4285,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		}}>
               <ServiceLogo id={p.serviceId} name={p.service} />
               <div><div style={{
-			fontSize: 11.5,
+			fontSize: 12,
 			fontWeight: 700,
 			color: T.text,
 			whiteSpace: "nowrap"
@@ -4292,12 +4326,12 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		[rub(r.total), "Билеты"],
 		[hm(r.durationOut || dur), "Туда"],
 		[hm(r.durationRet || 0), "Обратно"],
-		[`${query.adults || 1} пасс.`, "Эконом"],
+		[`${query.adults || 1} взр.${query.children?.length ? " + " + query.children.length + " дет." : ""}`, "Эконом"],
 		[r.transfers ? `${r.transfers}` : "0", "Пересадки"]
 	] : [
 		[rub(r.total), "Билеты"],
 		[hm(dur), "Туда"],
-		[`${query.adults || 1} пасс.`, "Эконом"],
+		[`${query.adults || 1} взр.${query.children?.length ? " + " + query.children.length + " дет." : ""}`, "Эконом"],
 		[r.transfers ? `${r.transfers}` : "0", "Пересадки"]
 	]).map(([a, b], i) => <div key={i} style={{ textAlign: "center" }}><div style={{
 		fontFamily: "Sora,sans-serif",
@@ -4333,7 +4367,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		color: T.text,
 		fontWeight: 600
 	}}>Добавить багаж на весь маршрут</div><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd
 	}}>В разработке — данные по багажу появятся позже</div></div>
       </div>
@@ -4352,7 +4386,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		fontSize: 16
 	}}>{segs.length > 0 ? "Маршрут по сегментам" : ""}</div>
         {twoTicketNote && <span style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.cyan,
 		fontWeight: 700
 	}}>{twoTicketNote}</span>}
@@ -4381,7 +4415,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		fontWeight: 700,
 		color: T.text
 	}}>{airlineName(s.airline) || "Авиакомпания"}</div><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd
 	}}>{s.flightNumber || (s.mode === "ferry" ? "Паром" : "номер рейса — в билете")}</div></div>
               {s.mode === "ferry" ? <Badge label="паром" color={T.cyan} /> : r.segments.length === 1 && (s.transfers || 0) === 0 ? <Badge label="Прямой рейс" color={T.green} /> : r.segments.length === 1 ? null : <Badge label={`Рейс ${i + 1}`} color={T.violet} />}
@@ -4397,13 +4431,13 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		color: T.text,
 		fontSize: 16
 	}}>{depOf(s)}</div><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd
 	}}>{s.fromCode}</div></div>
               <div style={{
 		flex: 1,
 		textAlign: "center",
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd
 	}}>{hm(s.durationMin || 0)}<div style={{
 		height: 1,
@@ -4416,7 +4450,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		color: T.text,
 		fontSize: 16
 	}}>{arrOf(s)}</div><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd
 	}}>{s.toCode}</div></div>
               {s.priceLive || s.priceEstimate ? <a onClick={() => trackGoal("flight_partner_click", {
@@ -4452,7 +4486,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		color: T.text
 	}}>{r.stopover.nights} {plural(r.stopover.nights, "ночь", "ночи", "ночей")} в {prep(r.stopover.city)}</span></div>
               <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 6
 	}}>Жильё подберём со скидкой — промокоды уже в карточке выше</div>
@@ -4533,7 +4567,7 @@ function NotifyToggle({ label, sub, icon, on, onToggle }) {
 		color: T.text,
 		fontWeight: 600
 	}}>{label}</div><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 1
 	}}>{sub}</div></div>
@@ -4605,13 +4639,13 @@ function ProfileDataEditor({ profile, onSave, onClose }) {
 		return n;
 	});
 	const row = (k, label, type = "text", ph = "") => <div style={{ marginBottom: 11 }}><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		fontWeight: 700
 	}}>{label}</div><input type={type} value={f[k] || ""} onChange={(e) => set(k, e.target.value)} placeholder={ph} style={st} /></div>;
 	return <FullScreenOverlay onClose={onClose}><SheetHead title="Данные путешественника" onClose={onClose} />
     <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		lineHeight: 1.5,
 		marginBottom: 14
@@ -4633,7 +4667,7 @@ function ProfileDataEditor({ profile, onSave, onClose }) {
 		gridTemplateColumns: "1fr 1fr",
 		gap: 9
 	}}>{row("dob", "Дата рождения", "date")}{<div style={{ marginBottom: 11 }}><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		fontWeight: 700
 	}}>Пол</div><select value={f.sex || ""} onChange={(e) => set("sex", e.target.value)} style={st}><option value="">Не указан</option><option value="M">Мужской</option><option value="F">Женский</option></select></div>}</div>
@@ -4674,7 +4708,7 @@ function ProfileDataEditor({ profile, onSave, onClose }) {
 		gridTemplateColumns: "1fr 110px",
 		gap: 9
 	}}>{row("homeAirport", "Домашний аэропорт", "text", "SVO")}{<div style={{ marginBottom: 11 }}><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		fontWeight: 700
 	}}>Валюта</div><select value={f.defaultCurrency || "EUR"} onChange={(e) => set("defaultCurrency", e.target.value)} style={st}>{[
@@ -4707,7 +4741,7 @@ function NotificationSettings({ prefs, onChange, onClose }) {
 	});
 	return <FullScreenOverlay onClose={onClose}><SheetHead title="Уведомления" onClose={onClose} />
     <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		lineHeight: 1.45,
 		marginBottom: 13
@@ -4780,14 +4814,14 @@ function Profile({ name, onTraveler, onEditName, onOpenDocs, setToast, notifyPre
 		fontWeight: 700,
 		color: T.text
 	}}>{title}</div>{sub && <div style={{
-		fontSize: 10.8,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 3,
 		whiteSpace: "nowrap",
 		overflow: "hidden",
 		textOverflow: "ellipsis"
 	}}>{sub}</div>}</div>{right && <span style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd
 	}}>{right}</span>}<Icon d={I.chevR} size={15} color={T.subd} /></div>;
 	return <div style={{
@@ -4826,7 +4860,7 @@ function Profile({ name, onTraveler, onEditName, onOpenDocs, setToast, notifyPre
 		fontWeight: 800,
 		color: T.text
 	}}>Данные путешественника</div><div style={{
-		fontSize: 10.8,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 3
 	}}>{pct < 100 ? `Заполнено ${pct}% · данные только на устройстве` : "Профиль заполнен · данные только на устройстве"}</div></div><span style={{
@@ -4883,7 +4917,7 @@ function Profile({ name, onTraveler, onEditName, onOpenDocs, setToast, notifyPre
 		color: T.text,
 		flex: 1
 	}}>Версия</span><span style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd
 	}}>{APP_VERSION}</span></div>
       </div>
@@ -4928,7 +4962,7 @@ function TravelerRow({ flag, name, on, onToggle, sub, addMode }) {
 		fontSize: 14,
 		color: T.text
 	}}>{name}</span>{sub && <span style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd,
 		marginLeft: 6
 	}}>{sub}</span>}</div>
@@ -5071,7 +5105,7 @@ function Traveler({ onBack, safeTop, bottomStr = "0px" }) {
 		color: T.text
 	}}>Ваше гражданство</div>
         <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		marginBottom: 12
 	}}>Нажмите на страну, чтобы добавить или убрать</div>
@@ -5087,7 +5121,7 @@ function Traveler({ onBack, safeTop, bottomStr = "0px" }) {
 		color: T.text
 	}}>Ваши визы</div>
         <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		marginBottom: 12
 	}}>Выберите страны, для которых у вас есть действующие визы</div>
@@ -5102,7 +5136,7 @@ function Traveler({ onBack, safeTop, bottomStr = "0px" }) {
 		border: `1px solid ${T.line}`,
 		borderRadius: 12,
 		padding: 12,
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd
 	}}>ⓘ <b style={{ color: T.sub }}>Важно знать.</b> Гражданство и визы хранятся локально на этом устройстве и не передаются третьим лицам или внешним сервисам.</div>
       </>}
@@ -5300,7 +5334,7 @@ const KID_DOCS = [{
 	P: 0
 }, {
 	id: "kid_consent",
-	name: "Согласие на выезд (если ребёнок с одним родителем)",
+	name: "Проверить необходимость согласия на выезд ребёнка",
 	E: 9999,
 	P: 3
 }];
@@ -5598,7 +5632,7 @@ const VISA_INFO = {
 			url: "https://evisa.imigrasi.go.id"
 		}, {
 			label: "All Indonesia",
-			url: "https://allindonesia.beacukai.go.id"
+			url: "https://allindonesia.imigrasi.go.id"
 		}]
 	},
 	"Вьетнам": {
@@ -5687,13 +5721,13 @@ const VISA_INFO = {
 		}]
 	},
 	"Шри-Ланка": {
-		status: "Бесплатное разрешение",
+		status: "Разрешение ETA",
 		days: 30,
-		checked: CHECKED,
-		summary: "Для россиян въезд на 30 дней бесплатный: ETA онлайн либо виза по прибытии. Обязательность ETA была отменена — оформление добровольное, но рекомендуется.",
+		checked: "2026-09-08",
+		summary: "Оформите туристическое разрешение ETA до поездки. Для граждан России предусмотрено бесплатное ETA на 30 дней; бесплатность не отменяет оформление разрешения.",
 		must: [
-			"Загранпаспорт 6 мес.",
-			"ETA (рекомендуется) — бесплатно",
+			"Проверить срок действия загранпаспорта",
+			"Оформить ETA на официальном сайте",
 			"Обратный билет"
 		],
 		warn: "Оформляйте только на eta.gov.lk — платные сайты-двойники не имеют отношения к правительству.",
@@ -6038,7 +6072,7 @@ const ITEM_DESC = {
 	},
 	eta: {
 		what: "Разрешение на въезд ETA",
-		why: "Рекомендуется оформить заранее — с ним прохождение границы быстрее.",
+		why: "Туристическое разрешение оформляется до поездки на официальном сайте.",
 		cost: "бесплатно для россиян",
 		days: "обычно до 1 дня"
 	},
@@ -6624,7 +6658,7 @@ const DOC_INFO = {
 		req: ["Данные рейса", "Загранпаспорт"],
 		links: [{
 			label: "Сайт All Indonesia",
-			url: "https://allindonesia.beacukai.go.id"
+			url: "https://allindonesia.imigrasi.go.id"
 		}]
 	},
 	tdac: {
@@ -6765,7 +6799,7 @@ const DOC_INFO = {
 	},
 	kid_consent: {
 		type: "paper",
-		desc: "Нотариальное согласие второго родителя, если ребёнок выезжает с одним из родителей. Требования зависят от страны.",
+		desc: "Для выезда из РФ с одним родителем согласие второго обычно не требуется. Для визы, въезда в другую страну или поездки без родителей требования проверяются отдельно.",
 		req: [
 			"Паспортные данные родителей",
 			"Данные ребёнка",
@@ -7771,31 +7805,192 @@ const DOC_CONFIGS = {
 		]
 	}
 };
+const EXTRA_DOC_SOURCES = {
+	"jp_form": [
+		"Япония: визовая анкета",
+		"Япония",
+		"https://www.mofa.go.jp/files/000124525.pdf",
+		"official_pdf_source"
+	],
+	"jp_schedule": [
+		"Программа пребывания в Японии",
+		"Япония",
+		"https://www.mofa.go.jp/files/000262548.pdf",
+		"itinerary"
+	],
+	"schengen": [
+		"Шенгенская анкета",
+		"Шенген",
+		"https://home-affairs.ec.europa.eu/document/download/5fe79baa-2d46-4b65-84ec-ea2e9b5ab1d6_en?filename=Visa+Application+Form.pdf",
+		"official_pdf_source"
+	],
+	"tdac": [
+		"Thailand Digital Arrival Card",
+		"Таиланд",
+		"https://tdac.immigration.go.th/manual/en/index.html",
+		"online"
+	],
+	"evisa_id": [
+		"e-Visa Индонезии",
+		"Индонезия",
+		"https://evisa.imigrasi.go.id/",
+		"online"
+	],
+	"ecd": [
+		"All Indonesia: декларация прибытия",
+		"Индонезия",
+		"https://allindonesia.imigrasi.go.id/",
+		"online"
+	],
+	"eta": [
+		"ETA Шри-Ланки",
+		"Шри-Ланка",
+		"https://eta.gov.lk/",
+		"online"
+	],
+	"imuga": [
+		"IMUGA Traveller Declaration",
+		"Мальдивы",
+		"https://imuga.immigration.gov.mv/traveller",
+		"online"
+	],
+	"vjw": [
+		"Visit Japan Web",
+		"Япония",
+		"https://www.vjw.digital.go.jp/",
+		"online"
+	],
+	"tz_visa": [
+		"Tanzania eVisa",
+		"Танзания",
+		"https://visa.immigration.go.tz/",
+		"online"
+	],
+	"vn_evisa": [
+		"Vietnam eVisa",
+		"Вьетнам",
+		"https://evisa.gov.vn/",
+		"online"
+	],
+	"mu_form": [
+		"Mauritius All-in-One",
+		"Маврикий",
+		"https://safemauritius.govmu.org/",
+		"online"
+	],
+	"sc_ta": [
+		"Seychelles Travel Authorisation",
+		"Сейшелы",
+		"https://seychelles.govtas.com/en",
+		"online"
+	],
+	"ph_etd": [
+		"Philippines eTravel",
+		"Филиппины",
+		"https://etravel.gov.ph/",
+		"online"
+	],
+	"in_evisa": [
+		"Indian eVisa",
+		"Индия",
+		"https://indianvisaonline.gov.in/evisa/tvoa.html",
+		"online"
+	]
+};
+const extraField = (k, label, en, type = "text") => ({
+	k,
+	label,
+	en,
+	type,
+	req: false
+});
+const arrivalExtras = [
+	extraField("residenceCountry", "Страна проживания", "Country of residence"),
+	extraField("departureCountry", "Страна отправления", "Country of embarkation"),
+	extraField("entryPort", "Пункт въезда", "Port of entry"),
+	extraField("returnFlight", "Обратный рейс", "Return flight"),
+	extraField("visitedCountries", "Посещённые страны за последние 14 дней", "Countries visited in the last 14 days", "textarea"),
+	extraField("occupationExtra", "Род занятий", "Occupation")
+];
+for (const [id, [title, country, officialUrl, kind]] of Object.entries(EXTRA_DOC_SOURCES)) {
+	if (DOC_CONFIGS[id]) {
+		DOC_CONFIGS[id].officialUrl = officialUrl;
+		DOC_CONFIGS[id].resultType = "prepared_data";
+	} else DOC_CONFIGS[id] = {
+		title,
+		country,
+		officialUrl,
+		resultType: "prepared_data",
+		version: "2026-09-08",
+		steps: [
+			{
+				id: "personal",
+				title: "Личные данные",
+				groups: [{
+					title: "Как в загранпаспорте",
+					fields: [
+						F("surname"),
+						F("given"),
+						F("dob"),
+						F("sex"),
+						F("nation")
+					]
+				}]
+			},
+			{
+				id: "passport",
+				title: "Паспорт",
+				groups: [{
+					title: "Документ",
+					fields: [F("passport"), F("pexp")]
+				}]
+			},
+			{
+				id: "trip",
+				title: "Поездка",
+				groups: [{
+					title: "Даты и цель",
+					fields: [
+						F("arr"),
+						F("dep"),
+						F("purpose"),
+						F("flight", { req: false })
+					]
+				}]
+			},
+			{
+				id: "stay",
+				title: "Проживание и контакты",
+				groups: [{
+					title: "Адрес и связь",
+					fields: [
+						F("accType"),
+						F("hotelName"),
+						F("hotelAddr"),
+						F("hostName"),
+						F("hostAddr"),
+						F("email"),
+						F("phone")
+					]
+				}]
+			}
+		]
+	};
+	if (kind === "online") DOC_CONFIGS[id].steps.push({
+		id: "arrivalExtra",
+		title: "Дополнительно для онлайн-формы",
+		groups: [{
+			title: "Заполните известные сведения",
+			fields: arrivalExtras
+		}]
+	});
+}
 function docConfig(docId, docName, country) {
 	if (docId === "jvisa") return DOC_CONFIGS.jp_form;
+	if (docId === "tz_evisa") return DOC_CONFIGS.tz_visa;
 	if (DOC_CONFIGS[docId]) return DOC_CONFIGS[docId];
-	const legacy = DOC_FIELDS[docId];
-	if (!legacy) return null;
-	const chunks = [];
-	for (let i = 0; i < legacy.length; i += 4) chunks.push(legacy.slice(i, i + 4));
-	return {
-		title: docName || docId,
-		country: country || "",
-		resultType: "online_form_guide",
-		officialUrl: "",
-		version: "",
-		steps: chunks.map((fs, i) => ({
-			id: "s" + i,
-			title: chunks.length > 1 ? `Данные ${i + 1}` : "Данные",
-			groups: [{
-				title: "",
-				fields: fs.map((f) => ({
-					...f,
-					req: true
-				}))
-			}]
-		}))
-	};
+	// Legacy fields are not a server export schema; keep the existing instructions/coming-soon screen.
+	return null;
 }
 const fieldVisible = (f, ans) => !f.when || String(ans[f.when.f] || "") === String(f.when.eq);
 function visibleFields(cfg, ans) {
@@ -7809,7 +8004,7 @@ function visibleFields(cfg, ans) {
 function autofillFrom(cfg, trips) {
 	const prof = store.get("profile", {});
 	const trip = (trips || []).slice().sort((a, b) => (a.df || "") < (b.df || "") ? -1 : 1)[0] || {};
-	const out = {};
+	const out = { purpose: "tourism" };
 	for (const st of cfg.steps) for (const g of st.groups) for (const f of g.fields) {
 		if (!f.src) continue;
 		const [scope, key] = f.src.split(".");
@@ -7823,9 +8018,17 @@ function validateField(f, v) {
 	if (!s) return f.req ? "не заполнено" : null;
 	if (f.type === "email" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s)) return "похоже на некорректный email";
 	if (f.type === "phone" && !/^\+?[\d\s()-]{7,20}$/.test(s)) return "телефон в формате +7…";
-	if (f.type === "date" && !/^\d{4}-\d{2}-\d{2}$/.test(s)) return "выберите дату";
-	if (f.type === "lat" && /[а-яё]/i.test(s)) return "нужна латиница, как в загранпаспорте";
+	if (f.type === "date" && (!/^\d{4}-\d{2}-\d{2}$/.test(s) || !Number.isFinite(Date.parse(s)) || new Date(s).toISOString().slice(0, 10) !== s)) return "проверьте дату";
+	if (f.type === "lat" && /[^a-z\s.'-]/i.test(s)) return "нужна латиница, как в загранпаспорте";
 	if (f.k === "passport" && s.replace(/\s/g, "").length < 6) return "проверьте номер паспорта";
+	return null;
+}
+function validateDocumentField(f, ans) {
+	const err = validateField(f, ans[f.k]);
+	if (err) return err;
+	if (f.k === "dep" && ans.arr && ans.dep && ans.dep < ans.arr) return "выезд раньше въезда";
+	if (f.k === "dob" && ans.dob > new Date().toISOString().slice(0, 10)) return "дата рождения в будущем";
+	if (f.k === "pexp" && ans.arr && ans.pexp && ans.pexp < ans.arr) return "паспорт истекает до поездки";
 	return null;
 }
 function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = false, tripContext = null }) {
@@ -7859,7 +8062,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 	const [docId] = useState(savedId || doc.id + "-" + Date.now().toString(36));
 	const [ans, setAns] = useState(() => {
 		if (saved && saved.ans) return saved.ans;
-		return cfg ? autofillFrom(cfg, tripContext ? [tripContext] : store.get("trips", [])) : {};
+		return cfg ? autofillFrom(cfg, tripContext ? [tripContext] : []) : {};
 	});
 	const [stepIdx, setStepIdx] = useState(saved && saved.stepIdx ? saved.stepIdx : 0);
 	const [mode, setMode] = useState(saved && saved.status === "ready" ? "result" : "form");
@@ -7870,6 +8073,45 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 	const [aiBusy, setAiBusy] = useState(false);
 	const [aiOpen, setAiOpen] = useState(false);
 	const [aiMessages, setAiMessages] = useState([]);
+	const [exportBusy, setExportBusy] = useState(false), [exportResult, setExportResult] = useState(null), exportAttempt = useRef(null);
+	const exportDocument = async (delivery = "telegram", format) => {
+		if (exportBusy) return;
+		setExportBusy(true);
+		setExportResult(null);
+		const signature = JSON.stringify(ans);
+		if (!exportAttempt.current || exportAttempt.current.signature !== signature) exportAttempt.current = {
+			signature,
+			id: "doc-" + (crypto.randomUUID?.() || Date.now().toString(36))
+		};
+		try {
+			const result = await sharedApi("export-document", {
+				docId: doc.id,
+				answers: ans,
+				formats: format ? [format] : ["pdf", "docx"],
+				delivery,
+				requestId: exportAttempt.current.id
+			}, 1e5);
+			setExportResult(result);
+			if (delivery === "download" && result.ok) {
+				for (const file of result.files || []) {
+					const raw = atob(file.base64), bytes = Uint8Array.from(raw, (c) => c.charCodeAt(0)), url = URL.createObjectURL(new Blob([bytes], { type: file.mime }));
+					const a = document.createElement("a");
+					a.href = url;
+					a.download = file.name;
+					a.click();
+					setTimeout(() => URL.revokeObjectURL(url), 6e4);
+				}
+			}
+			setToast(result.ok ? delivery === "telegram" ? "PDF и Word отправлены в чат с ботом" : "Файл подготовлен к скачиванию" : result.needStart ? "Откройте чат с ботом и нажмите Старт" : "Не всё отправлено. Проверьте результат ниже.");
+		} catch {
+			setExportResult({
+				ok: false,
+				error: "Соединение прервалось. Проверьте чат перед повторной отправкой."
+			});
+		} finally {
+			setExportBusy(false);
+		}
+	};
 	const rq = REQUEST_DOCS[doc.id];
 	if (rq) {
 		const copyTpl = async () => {
@@ -7891,7 +8133,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			marginBottom: 12
 		}}>
           <div style={{
-			fontSize: 11,
+			fontSize: 12,
 			color: T.violet,
 			fontWeight: 800,
 			marginBottom: 4
@@ -7971,7 +8213,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			flex: 1
 		}}>Образец текста</div>
             <span onClick={copyTpl} className="press" style={{
-			fontSize: 11.5,
+			fontSize: 12,
 			fontWeight: 700,
 			color: T.violet,
 			border: `1px solid ${T.violet}55`,
@@ -8015,7 +8257,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
           </div>)}
         </>}
         <div style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			color: checkIsStale(rq.checked) ? T.gold : T.subd,
 			marginTop: 12
 		}}>{checkIsStale(rq.checked) ? "Проверка устарела: " : "Требования проверены "}{rq.checked}. Перед подачей сверьтесь с сайтом консульства — правила меняются.</div>
@@ -8049,11 +8291,11 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 	const step = steps[Math.min(stepIdx, Math.max(0, steps.length - 1))] || cfg.steps[0];
 	const allVisible = visibleFields(cfg, ans);
 	const reqAll = allVisible.filter((f) => f.req);
-	const filledReq = reqAll.filter((f) => !validateField(f, ans[f.k]));
+	const filledReq = reqAll.filter((f) => !validateDocumentField(f, ans));
 	const pct = reqAll.length ? Math.round(filledReq.length / reqAll.length * 100) : 0;
-	const problems = reqAll.map((f) => ({
+	const problems = allVisible.map((f) => ({
 		f,
-		err: validateField(f, ans[f.k])
+		err: validateDocumentField(f, ans)
 	})).filter((x) => x.err);
 	const persist = (nextAns, status, si) => {
 		try {
@@ -8165,7 +8407,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 	};
 	const Field = ({ f }) => {
 		const v = ans[f.k] || "";
-		const err = touched[f.k] ? validateField(f, v) : null;
+		const err = touched[f.k] ? validateDocumentField(f, ans) : null;
 		const autofilled = !!f.src && !!v && !editing[f.k] && !touched[f.k];
 		if (autofilled) return <div style={{
 			display: "flex",
@@ -8181,7 +8423,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			flex: 1,
 			minWidth: 0
 		}}><div style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			color: T.subd
 		}}>{f.label}</div><div style={{
 			fontSize: 14,
@@ -8196,7 +8438,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			[f.k]: true
 		})} className="press" style={{
 			flexShrink: 0,
-			fontSize: 11.5,
+			fontSize: 12,
 			color: T.violet,
 			fontWeight: 700,
 			cursor: "pointer"
@@ -8234,7 +8476,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			display: "grid",
 			placeItems: "center",
 			color: T.violet,
-			fontSize: 11,
+			fontSize: 12,
 			fontWeight: 800,
 			cursor: "pointer"
 		}}>?</span>
@@ -8258,7 +8500,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			fontWeight: 700,
 			color: v === ov ? T.violet : T.text,
 			cursor: "pointer"
-		}}>{ol}</div>)}</div> : f.type === "textarea" ? <textarea value={v} onFocus={() => setFocusF(f)} rows={4} onChange={(e) => {
+		}}>{ol}</div>)}</div> : f.type === "textarea" ? <textarea aria-label={f.label} aria-invalid={!!err} value={v} onFocus={() => setFocusF(f)} rows={4} onChange={(e) => {
 			setVal(f.k, e.target.value);
 			setTouched({
 				...touched,
@@ -8270,7 +8512,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			resize: "vertical",
 			minHeight: 84,
 			lineHeight: 1.45
-		}} /> : <input type={f.type === "date" ? "date" : f.type === "email" ? "email" : "text"} value={v} onFocus={() => setFocusF(f)} onChange={(e) => {
+		}} /> : <input aria-label={f.label} aria-invalid={!!err} type={f.type === "date" ? "date" : f.type === "email" ? "email" : "text"} value={v} onFocus={() => setFocusF(f)} onChange={(e) => {
 			const nv = f.type === "up" ? e.target.value.toUpperCase() : e.target.value;
 			setVal(f.k, nv);
 			setTouched({
@@ -8282,7 +8524,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			borderColor: err ? "#ff6db088" : T.line2
 		}} />}
       {err && <div style={{
-			fontSize: 11,
+			fontSize: 12,
 			color: "#ff6db0",
 			marginTop: 4
 		}}>{err}</div>}
@@ -8338,7 +8580,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 		flex: 1
 	}}>{focusF ? `Спросить про «${focusF.label}»` : `Ask TripWise…`}</span><Icon d={I.arrow} size={15} color={T.violet} /></div>
     {aiOpen && <Overlay zIndex={112} onClose={() => setAiOpen(false)}><SheetHead title="Ask TripWise" onClose={() => setAiOpen(false)} /><div style={{
-		fontSize: 10.8,
+		fontSize: 12,
 		color: T.subd,
 		lineHeight: 1.45,
 		marginBottom: 9
@@ -8361,11 +8603,11 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 		lineHeight: 1.45,
 		whiteSpace: "pre-wrap"
 	}}>{m.text}</div>) : <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		padding: "8px 0"
 	}}>Спросите, что указать в поле, как трактовать вопрос анкеты или какой формат нужен.</div>}{aiBusy && <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd
 	}}>TripWise думает…</div>}</div><div style={{
 		display: "flex",
@@ -8390,7 +8632,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
   </>;
 	if (mode === "result") {
 		const ready = allVisible.filter((f) => ans[f.k]);
-		return <Wrap onClose={onClose}><WizardHead title="Документ готов" back={() => setMode("form")} />
+		return <Wrap onClose={onClose}><WizardHead title="Данные подготовлены" back={() => setMode("form")} />
       <div style={{
 			maxHeight: "62vh",
 			overflowY: "auto",
@@ -8402,7 +8644,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			color: T.subd,
 			marginBottom: 12,
 			lineHeight: 1.45
-		}}>Значения подготовлены в формате официальной формы{cfg.officialUrl ? " — перенесите их на официальный сайт" : ""}. Данные хранятся только на вашем устройстве.</div>
+		}}>Анкета подготовлена для переноса данных. PDF и Word можно отправить в ваш чат с ботом или скачать. Подача на официальном сайте, подписи и приложения — следующий шаг.</div>
         {ready.map((f) => <div key={f.k} style={{
 			display: "flex",
 			alignItems: "center",
@@ -8417,7 +8659,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			flex: 1,
 			minWidth: 0
 		}}><div style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			color: T.subd
 		}}>{f.en || f.label}</div><div style={{
 			fontSize: 14,
@@ -8429,7 +8671,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			await copyText(val(f)) ? setToast("Скопировано") : setToast("Не удалось");
 		}} className="press" style={{
 			flexShrink: 0,
-			fontSize: 11.5,
+			fontSize: 12,
 			fontWeight: 700,
 			color: T.violet,
 			border: `1px solid ${T.violet}55`,
@@ -8472,6 +8714,27 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			cursor: "pointer"
 		}}>Скопировать всё</div>
       </div>
+      <button disabled={exportBusy} onClick={() => exportDocument()} style={{
+			width: "100%",
+			background: GRAD.cta,
+			color: "#fff",
+			marginTop: 12
+		}}>{exportBusy ? "Готовим файлы…" : "Отправить PDF и Word в Telegram"}</button>
+      <div style={{
+			display: "flex",
+			gap: 8,
+			marginTop: 8
+		}}><button disabled={exportBusy} onClick={() => exportDocument("download", "pdf")} style={{ flex: 1 }}>Скачать PDF</button><button disabled={exportBusy} onClick={() => exportDocument("download", "docx")} style={{ flex: 1 }}>Скачать Word</button></div>
+      {exportResult && !exportResult.ok && <div role="status" style={{
+			color: T.gold,
+			fontSize: 13,
+			marginTop: 10,
+			lineHeight: 1.5
+		}}>{exportResult.needStart ? "Бот пока не может написать вам. Откройте чат, нажмите Старт и повторите отправку." : exportResult.error || "Часть файлов не отправлена."}{exportResult.files?.map((f) => <div key={f.format}>{f.format.toUpperCase()}: {f.sent ? "отправлен" : f.status === "uncertain" ? "проверьте чат перед повтором" : "не отправлен"}</div>)}{exportResult.botUrl && <a href={exportResult.botUrl} target="_blank" rel="noreferrer" style={{
+			display: "block",
+			color: T.violet,
+			paddingTop: 8
+		}}>Открыть чат с ботом →</a>}</div>}
       {cfg.officialUrl && <div onClick={() => {
 			try {
 				window.open(cfg.officialUrl, "_blank");
@@ -8495,10 +8758,10 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			overscrollBehavior: "contain"
 		}}>
         {steps.map((st) => {
-			const sf = allVisible.filter((f) => f.stepId === st.id && f.req);
+			const sf = allVisible.filter((f) => f.stepId === st.id);
 			const bad = sf.map((f) => ({
 				f,
-				err: validateField(f, ans[f.k])
+				err: validateDocumentField(f, ans)
 			})).filter((x) => x.err);
 			return <div key={st.id} style={{ marginBottom: 10 }}>
             <div style={{
@@ -8578,7 +8841,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 		marginBottom: 6
 	}}>
         <span style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.violet,
 		fontWeight: 800
 	}}>Шаг {stepIdx + 1} из {steps.length}</span>
@@ -8602,7 +8865,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 		transition: "width .2s"
 	}} /></div>
       <div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 5
 	}}>Заполнено {filledReq.length} из {reqAll.length} обязательных полей</div>
@@ -8626,7 +8889,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			marginBottom: 10
 		}}>
           {g.title && <div style={{
-			fontSize: 11.5,
+			fontSize: 12,
 			color: T.subd,
 			fontWeight: 700,
 			marginBottom: 9
@@ -8669,9 +8932,9 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 		cursor: "pointer"
 	}}>{last ? "Проверить документ" : "Продолжить"}</div>
       </div>
-      {!fullScreen && <AiBar />}
+      {!fullScreen && AiBar()}
     </div>
-    {fullScreen && <AiBar fixed />}
+    {fullScreen && AiBar({ fixed: true })}
   </Wrap>;
 }
 const tripBlocks = (t) => ({
@@ -8939,7 +9202,7 @@ const Check = ({ on, onClick }) => <div onClick={onClick} className="press" styl
 	flexShrink: 0
 }}>{on && <Icon d={I.check} size={13} color={T.green} />}</div>;
 const TimeBadge = ({ st }) => st.label ? <span style={{
-	fontSize: 10,
+	fontSize: 12,
 	fontWeight: 700,
 	color: ST_COLOR[st.key] || (st.key === "now" ? T.violet : T.subd),
 	background: (ST_COLOR[st.key] || (st.key === "now" ? T.violet : T.subd)) + "1c",
@@ -8978,7 +9241,7 @@ function TripCard({ t, onOpen }) {
 		fontSize: 16,
 		lineHeight: 1.2
 	}}>{t.df ? fmtShort(new Date(t.df)) : "Даты не выбраны"}{t.dt ? ` — ${fmtShort(new Date(t.dt))}` : ""}</strong><span style={{
-		fontSize: 10,
+		fontSize: 12,
 		fontWeight: 800,
 		color,
 		background: color + "20",
@@ -8990,7 +9253,7 @@ function TripCard({ t, onOpen }) {
 		fontWeight: 800,
 		marginTop: 8
 	}}>{customTitle ? t.title || "Новая поездка" : destination || t.title || "Новая поездка"}</div><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 4
 	}}>{[customTitle ? destination : "", `${activeTravelers(t).length} чел.`].filter(Boolean).join(" · ")}</div>
@@ -9010,10 +9273,10 @@ function TripCard({ t, onOpen }) {
 		background: GRAD.cta,
 		borderRadius: 4
 	}} /></div><span style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd
 	}}>{p.pct}% готово</span></div><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: act.tone || T.violet,
 		background: (act.tone || T.violet) + "12",
 		borderRadius: 10,
@@ -9022,7 +9285,7 @@ function TripCard({ t, onOpen }) {
 		fontWeight: 700
 	}}><span style={{
 		display: "block",
-		fontSize: 9.5,
+		fontSize: 12,
 		letterSpacing: .4,
 		textTransform: "uppercase",
 		opacity: .72,
@@ -9175,7 +9438,7 @@ function tripTimeline(t) {
 			id: `stay-in-${x.id}`,
 			type: "stay",
 			date: x.startDate,
-			time: x.startTime || "15:00",
+			time: x.startTime || "",
 			title: `Заезд · ${x.name}`,
 			sub: x.location || "",
 			location: x.location || x.name,
@@ -9185,7 +9448,7 @@ function tripTimeline(t) {
 			id: `stay-out-${x.id}`,
 			type: "stay-out",
 			date: x.endDate,
-			time: x.endTime || "11:00",
+			time: x.endTime || "",
 			title: `Выезд · ${x.name}`,
 			sub: x.location || "",
 			location: x.location || x.name,
@@ -9386,6 +9649,10 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 	const [peopleOpen, setPeopleOpen] = useState(false), [travelerOpen, setTravelerOpen] = useState(null);
 	const [settingsOpen, setSettingsOpen] = useState(false), [budgetOpen, setBudgetOpen] = useState(initialBlk === "budget"), [timelineOpen, setTimelineOpen] = useState(initialBlk === "timeline"), [activityOpen, setActivityOpen] = useState(initialBlk === "activity");
 	const [renameValue, setRenameValue] = useState(t.title || ""), [inviteOpen, setInviteOpen] = useState(false), [inviteUrl, setInviteUrl] = useState("");
+	const [inviteError, setInviteError] = useState(""), [inviteAppUrl, setInviteAppUrl] = useState("");
+	const [panelBusy, setPanelBusy] = useState(false), [panelBotUrl, setPanelBotUrl] = useState(""), [panelNotice, setPanelNotice] = useState("");
+	const panelInFlight = useRef(false), inviteInFlight = useRef(false);
+	const latestTripRef = useRef(t); latestTripRef.current = t;
 	const [askOpen, setAskOpen] = useState(false), [askTitle, setAskTitle] = useState(""), [askDesc, setAskDesc] = useState(""), [askType, setAskType] = useState("yesno"), [askOptions, setAskOptions] = useState(["Да", "Нет"]);
 	const emptyCost = () => ({
 		name: "",
@@ -9428,7 +9695,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 	const [addPlanOpen, setAddPlanOpen] = useState(false);
 	const [hiddenSectionsOpen, setHiddenSectionsOpen] = useState(false), holdTimer = useRef(null), holdTriggered = useRef(false);
 	const [transferTo, setTransferTo] = useState(""), [transferBusy, setTransferBusy] = useState(false);
-	const [chatLoaded, setChatLoaded] = useState(false), [chatPending, setChatPending] = useState(false);
+	const chatHistory = useRef(null), [chatPending, setChatPending] = useState(false);
 	const [publishOpen, setPublishOpen] = useState(false), [publishBusy, setPublishBusy] = useState(false);
 	const publication = t.publication && typeof t.publication === "object" ? t.publication : {};
 	const publicBudgetAuto = budget.baseTotal != null && travelers.length ? Math.round(budget.baseTotal / Math.max(1, travelers.length)) : "";
@@ -9689,7 +9956,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			e.stopPropagation();
 			openCost(kind, item);
 		}} className="press" title={names.length ? `Делится: ${names.join(", ")}` : ""} style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			fontWeight: 800,
 			color: c ? T.cyan : T.subd,
 			border: `1px solid ${c ? T.cyan + "55" : T.line}`,
@@ -9700,24 +9967,48 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		}}>{c ? money(c.total, c.currency) : "＋ цена"}</span>;
 	};
 	const invite = async () => {
-		if (!isCreator) return;
+		if (!isCreator || inviteInFlight.current) return;
+		if (syncState !== "saved") { setToast("Сначала дождитесь сохранения поездки"); return; }
+		inviteInFlight.current = true;
 		setInviteOpen(true);
 		setInviteUrl("");
-		const r = await sharedApi("invite-trip", { tripId: t.id });
-		if (r.ok) setInviteUrl(r.url || "");
-		else setToast(r.error === "telegram required" ? "Откройте TripWise в Telegram для приглашения" : "Не удалось создать приглашение");
+		setInviteError("");
+		setInviteAppUrl("");
+		try {
+			const r = await sharedApi("invite-trip", { tripId: t.id });
+			if (r.ok && r.url) { setInviteUrl(r.botUrl || r.url); setInviteAppUrl(r.url); if (r.trip && latestTripRef.current === t) replace(r.trip); }
+			else setInviteError(r.error === "telegram required" ? "Откройте TripWise в Telegram для приглашения" : "Не удалось создать приглашение. Повторите попытку.");
+		} finally { inviteInFlight.current = false; }
 	};
-	const shareInvite = () => {
+	const copyInvite = async () => {
+		try { await navigator.clipboard.writeText(inviteUrl); setToast("Ссылка скопирована"); }
+		catch { setToast("Не удалось скопировать. Используйте «Отправить» или выделите ссылку."); }
+	};
+	const openPanelBot = () => {
+		const tg = window.Telegram?.WebApp;
+		if (tg?.openTelegramLink) tg.openTelegramLink(panelBotUrl);
+		else window.open(panelBotUrl, "_blank", "noopener,noreferrer");
+	};
+	const sendPanel = async () => {
+		if (panelInFlight.current) return;
+		if (syncState !== "saved") { setToast("Сначала дождитесь сохранения поездки"); return; }
+		panelInFlight.current = true; setPanelBusy(true); setPanelNotice(""); setPanelBotUrl("");
+		try {
+			const r = await sharedApi("trip-cockpit-send", {tripId:t.id});
+			if (r.botUrl) setPanelBotUrl(r.botUrl);
+			setPanelNotice(r.ok ? (r.updated ? "Пульт обновлён в чате с ботом." : "Пульт отправлен в чат с ботом.") : r.error === "bot start required" ? "Откройте бота, нажмите «Начать», затем повторите отправку." : r.error === "telegram required" ? "Откройте TripWise в Telegram." : r.error === "timeout" ? "Нет подтверждения доставки. Проверьте чат с ботом перед повторной попыткой." : r.error || "Не удалось отправить пульт.");
+		} finally { panelInFlight.current = false; setPanelBusy(false); }
+	};
+	const shareInvite = async () => {
 		if (!inviteUrl) return;
-		const text = `Присоединяйся к поездке «${t.title}» в TripWiseAI`;
+		const text = `Приглашаю в «${t.title}» · ${[t.dcName, t.country].filter(Boolean).join(", ")} · ${t.df || "даты уточняются"}${t.dt ? " — " + t.dt : ""}. По ссылке — описание и подтверждение участия.`;
 		const tg = typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp;
 		const url = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
 		try {
 			if (tg && tg.openTelegramLink) tg.openTelegramLink(url);
 			else window.open(url, "_blank");
 		} catch (e) {
-			navigator.clipboard && navigator.clipboard.writeText(inviteUrl);
-			setToast("Ссылка скопирована");
+			await copyInvite();
 		}
 	};
 	const removeMember = async (m) => {
@@ -10058,12 +10349,14 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		patchArrayItem("flightJourneys", j.id, { legs });
 		setToast("Запрос данных рейса завершён; проверьте сохранённое расписание");
 	};
-	const loadChatHistory = async () => {
-		if (chatLoaded) return;
-		setChatLoaded(true);
-		const r = await sharedApi("trip-ai-history", { tripId: t.id }, 12e3);
-		if (r.ok && Array.isArray(r.messages) && r.messages.length) setMessages(r.messages);
-		if (r.ok) setChatPending(!!r.pendingAction);
+	const loadChatHistory = () => {
+		if (!chatHistory.current) chatHistory.current = (async () => {
+			const r = await sharedApi("trip-ai-history", { tripId: t.id }, 12e3);
+			if (r.ok && Array.isArray(r.messages) && r.messages.length) setMessages(r.messages);
+			if (r.ok) setChatPending(!!r.pendingAction);
+			return r;
+		})();
+		return chatHistory.current;
 	};
 	const askAI = async (preset) => {
 		const q = String(preset || chatText || "").trim();
@@ -10075,13 +10368,13 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			return;
 		}
 		setChatOpen(true);
-		loadChatHistory();
+		setChatBusy(true);
+		await loadChatHistory();
 		setChatText("");
 		setMessages((m) => [...m, {
 			role: "user",
 			text: q
 		}]);
-		setChatBusy(true);
 		try {
 			const r = await sharedApi("trip-ai", {
 				tripId: t.id,
@@ -10423,7 +10716,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		}, 650);
 	};
 	const holdEnd = () => clearTimeout(holdTimer.current);
-	const SectionHead = ({ k, icon, title, sub, done, total, action }) => <div onPointerDown={() => holdStart(k, title)} onPointerUp={holdEnd} onPointerLeave={holdEnd} onPointerCancel={holdEnd} onClick={() => {
+	const SectionHead = ({ k, icon, title, sub, done, total, action }) => <div data-plan-section={k} onPointerDown={() => holdStart(k, title)} onPointerUp={holdEnd} onPointerLeave={holdEnd} onPointerCancel={holdEnd} onClick={() => {
 		if (holdTriggered.current) {
 			holdTriggered.current = false;
 			return;
@@ -10456,11 +10749,11 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		color: T.text,
 		fontFamily: "Sora,sans-serif"
 	}}>{title}</div><div style={{
-		fontSize: 10.8,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 2
 	}}>{sub}</div></div>{total > 0 && <span style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		fontWeight: 800,
 		color: done === total ? T.green : T.subd
 	}}>{done}/{total}</span>}{action && <span onPointerDown={(e) => e.stopPropagation()} onClick={(e) => {
@@ -10476,12 +10769,12 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		display: "inline-flex"
 	}}><Icon d={I.chevR} size={14} color={T.subd} /></span></div>;
 	const Empty = ({ children }) => <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		padding: "6px 0 9px"
 	}}>{children}</div>;
 	const ScheduleFields = ({ kind, form, setForm }) => <div style={{ marginTop: 10 }}><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginBottom: 6
 	}}>Когда и где</div>{kind === "stays" || kind === "transport" ? <><DateRangeField from={form.startDate || ""} to={form.endDate || ""} title={kind === "stays" ? "Период проживания" : "Период транспорта"} allowSameDay={kind === "transport"} onChange={(a, b) => setForm((x) => ({
@@ -10600,12 +10893,12 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		background: form.pricingMode === v ? T.violet + "18" : T.card,
 		borderRadius: 10,
 		padding: 8,
-		fontSize: 11,
+		fontSize: 12,
 		fontWeight: 800,
 		color: form.pricingMode === v ? T.violet : T.subd,
 		cursor: "pointer"
 	}}>{l}</div>)}</div><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 10,
 		marginBottom: 5
@@ -10616,7 +10909,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 	}}>{travelers.map((tr) => {
 		const on = (form.splitTravelerIds || []).includes(tr.id);
 		return <span key={tr.id} onClick={() => toggleSplit(setForm, tr.id)} className="press" style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			fontWeight: 700,
 			color: on ? T.violet : T.subd,
 			border: `1px solid ${on ? T.violet + "66" : T.line}`,
@@ -10626,7 +10919,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			cursor: "pointer"
 		}}>{tr.name}</span>;
 	})}</div><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 11,
 		marginBottom: 5
@@ -10684,7 +10977,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			}]
 		}));
 	}} style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.violet,
 		fontWeight: 800,
 		cursor: "pointer",
@@ -10709,11 +11002,11 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			color: T.text,
 			flex: 1
 		}}>{j.name || `${legs[0]?.fromCode || "?"} → ${legs[legs.length - 1]?.toCode || "?"}`}</div>{!legacy && j.id && <PriceBadge kind="journey" item={j} />}{isCreator && !legacy && j.id && <span onClick={() => refreshJourney(j)} style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			color: T.violet,
 			cursor: "pointer"
 		}}>обновить</span>}</div>{warnings.map((w, i) => <div key={i} style={{
-			fontSize: 10.3,
+			fontSize: 12,
 			color: "#ffb45c",
 			background: "#ffb45c12",
 			borderRadius: 8,
@@ -10722,7 +11015,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		}}>⚠ {w}</div>)}{legs.map((s, i) => {
 			const gap = i ? legGapMin(legs[i - 1], s) : null;
 			return <React.Fragment key={s.id || i}>{gap && <div style={{
-				fontSize: 10.5,
+				fontSize: 12,
 				color: T.cyan,
 				margin: "5px 0 5px 11px"
 			}}>↳ пересадка {hm(gap)}</div>}<div style={{
@@ -10739,18 +11032,18 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 				color: T.text,
 				flex: 1
 			}}>{prettyFlightNumber(s.flightNumber) || "Рейс"} · {s.fromCode || "?"} → {s.toCode || "?"}</div><span style={{
-				fontSize: 10,
+				fontSize: 12,
 				color: T.subd
 			}}>{s.date || s.departISO && String(s.departISO).slice(0, 10) || ""}</span></div><div style={{
-				fontSize: 10.7,
+				fontSize: 12,
 				color: T.subd,
 				marginTop: 3
 			}}>{s.departTime || s.departISO && String(s.departISO).slice(11, 16) || ""}{s.arriveTime ? ` → ${s.arriveTime}` : ""}{s.durationMin ? ` · ${hm(s.durationMin)}` : ""}</div><div style={{
-				fontSize: 10.7,
+				fontSize: 12,
 				color: T.subd,
 				marginTop: 2
 			}}>✈ {s.aircraft || "самолёт уточняется"}{s.aircraftReg ? ` · ${s.aircraftReg}` : ""}{s.status ? ` · ${s.status}` : ""}{s.departureTerminal ? ` · терминал ${s.departureTerminal}` : ""}{s.departureGate ? ` · gate ${s.departureGate}` : ""}</div>{s.operatedBy && <div style={{
-				fontSize: 10,
+				fontSize: 12,
 				color: T.subd,
 				marginTop: 2
 			}}>Выполняет: {s.operatedBy}</div>}</div></React.Fragment>;
@@ -10779,14 +11072,14 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			textOverflow: "ellipsis",
 			whiteSpace: "nowrap"
 		}}>{item.name}</span><span style={{
-			fontSize: 9.5,
+			fontSize: 12,
 			color: sc,
 			border: `1px solid ${sc}44`,
 			borderRadius: 999,
 			padding: "2px 6px",
 			whiteSpace: "nowrap"
 		}}>{sl}</span></div><div style={{
-			fontSize: 10.2,
+			fontSize: 12,
 			color: T.subd,
 			marginTop: 2
 		}}>{[
@@ -10827,7 +11120,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			textOverflow: "ellipsis",
 			whiteSpace: "nowrap"
 		}}>{item.name || legs.map((x) => prettyFlightNumber(x.flightNumber)).filter(Boolean).join(" → ") || "Перелёт"}</div><div style={{
-			fontSize: 10.3,
+			fontSize: 12,
 			color: T.subd,
 			marginTop: 2
 		}}>{[
@@ -10859,13 +11152,13 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			fontWeight: 900,
 			color: T.text
 		}}>{prettyFlightNumber(leg.flightNumber) || `Рейс ${i + 1}`}</span>{leg.status && <span style={{
-			fontSize: 9.5,
+			fontSize: 12,
 			color: T.green,
 			border: `1px solid ${T.green}44`,
 			borderRadius: 999,
 			padding: "2px 6px"
 		}}>{String(leg.status).toLowerCase()}</span>}</div><div style={{
-			fontSize: 11,
+			fontSize: 12,
 			color: T.sub,
 			marginTop: 4
 		}}>{[
@@ -10873,7 +11166,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			leg.departTime || String(leg.departISO || "").slice(11, 16),
 			leg.arriveTime || String(leg.arriveISO || "").slice(11, 16)
 		].filter(Boolean).join(" · ")}</div><div style={{
-			fontSize: 10.3,
+			fontSize: 12,
 			color: T.subd,
 			marginTop: 3
 		}}>{[
@@ -10881,7 +11174,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			leg.terminal ? `терминал ${leg.terminal}` : "",
 			leg.gate ? `гейт ${leg.gate}` : ""
 		].filter(Boolean).join(" · ")}</div></div>) : <div style={{
-			fontSize: 11,
+			fontSize: 12,
 			color: T.subd
 		}}>Детали рейса пока не получены.</div>}<div style={{
 			display: "flex",
@@ -10892,7 +11185,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			e.stopPropagation();
 			refreshJourney(item);
 		}} style={{
-			fontSize: 10.8,
+			fontSize: 12,
 			color: T.violet,
 			fontWeight: 800,
 			cursor: "pointer"
@@ -10900,7 +11193,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			e.stopPropagation();
 			openCost("journey", item);
 		}} style={{
-			fontSize: 10.8,
+			fontSize: 12,
 			color: T.violet,
 			fontWeight: 800,
 			cursor: "pointer"
@@ -10916,7 +11209,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 				})
 			});
 		}} style={{
-			fontSize: 10.8,
+			fontSize: 12,
 			color: "#ff7ba9",
 			fontWeight: 800,
 			cursor: "pointer"
@@ -10939,66 +11232,75 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		return Number.isFinite(n) && n > 0 ? n : null;
 	};
 	const TimelinePreview = () => {
-		const upcoming = timeline.filter((e) => e.date >= today.today).slice(0, 3);
-		const activities = (t.activities || []).filter((x) => x.startDate).length;
-		return <div onClick={() => setTimelineOpen(true)} className="press" style={{
+		const events = timeline.filter((e) => e.type !== "trip-start" && e.type !== "trip-end");
+		const upcoming = events.filter((e) => {
+			const instant = e.type === "flight" ? e.raw?.departISO : e.type === "flight-arrival" ? e.raw?.arriveISO : null;
+			if (instant && isoOffsetMinutes(instant) != null) return Date.parse(instant) >= Date.now();
+			return e.date > today.today || e.date === today.today && (!e.time || e.time >= today.nowHM);
+		}).slice(0, 3);
+		return <button onClick={() => setTimelineOpen(true)} className="press" style={{
+			display: "block",
+			width: "100%",
+			textAlign: "left",
 			background: T.card,
 			border: `1px solid ${T.line}`,
 			borderRadius: 16,
 			padding: 13,
-			marginBottom: 10,
-			cursor: "pointer"
-		}}><div style={{
+			marginBottom: 10
+		}}>
+      <div style={{
 			display: "flex",
 			alignItems: "center",
 			gap: 8
-		}}><div style={{ fontSize: 18 }}>🗓️</div><div style={{
-			fontSize: 13.5,
+		}}><span style={{ fontSize: 18 }}>🗓️</span><span style={{
+			fontSize: 14,
 			fontWeight: 800,
 			color: T.text,
 			flex: 1
-		}}>Таймлайн поездки</div><span style={{
-			fontSize: 10.5,
-			color: T.subd
-		}}>{activities ? `${activities} ${plural(activities, "активность", "активности", "активностей")}` : `${timeline.length} событий`}</span><Icon d={I.chevR} size={14} color={T.subd} /></div>{upcoming.length > 0 && <div style={{ marginTop: 9 }}>{upcoming.map((e) => <div key={e.id} style={{
+		}}>Ближайшие события</span><Icon d={I.chevR} size={14} color={T.subd} /></div>
+      {upcoming.map((e) => <div key={e.id} style={{
 			display: "flex",
-			alignItems: "center",
+			alignItems: "flex-start",
 			gap: 8,
-			padding: "5px 0",
-			fontSize: 11
-		}}><span style={{
-			width: 20,
-			textAlign: "center",
-			fontSize: 13
-		}}>{timelineGlyph(e.type)}</span><span style={{
+			padding: "7px 0",
+			fontSize: 12
+		}}><span>{timelineGlyph(e.type)}</span><span style={{
 			color: T.subd,
-			minWidth: 72
-		}}>{fmtShort(new Date(e.date))}{e.time ? ` · ${e.time}` : ""}</span><span style={{
+			flexShrink: 0
+		}}>{fmtShort(new Date(e.date))}<br />{e.time || "Время уточняется"}</span><span style={{
 			color: T.sub,
-			overflow: "hidden",
-			textOverflow: "ellipsis",
-			whiteSpace: "nowrap"
-		}}>{e.title}</span></div>)}</div>}<div style={{
-			fontSize: 10.4,
+			minWidth: 0,
+			overflowWrap: "anywhere"
+		}}>{e.title}</span></div>)}
+      <div style={{
+			fontSize: 12,
 			color: T.subd,
 			marginTop: 8
-		}}>Документы и подготовка показываются сводкой, а не отдельными событиями.</div></div>;
+		}}>{upcoming.length ? "Открыть весь таймлайн" : events.length ? "Все добавленные события уже прошли · Открыть таймлайн" : "Добавьте перелёт, проживание или активность"}</div>
+    </button>;
 	};
 	const travelerMember = (tr) => members.find((m) => String(m.id) === String(tr.memberId || "")) || null;
 	const runNextAction = () => {
-		if (act.act === "docs") return goDocs && goDocs();
-		if (act.act === "tickets") return onFindTickets && onFindTickets(t);
-		if (act.act === "hotels") return goHotels && goHotels();
+		if (act.act === "overview") return setSettingsOpen(true);
 		if (act.act === "budget") return setBudgetOpen(true);
 		if (act.act === "group") return setMode("group");
+		if (act.block === "tickets" && !flightCount) return setFlightOpen(true);
+		if (act.block === "lodging" && !stays.length) return startAdd("stays");
+		if (act.block === "docs" && !docs.length) return goDocs?.();
+		const key = act.block === "services" ? "prep" : act.block || "prep";
+		setMode("trip");
 		setOpen((x) => ({
 			...x,
-			[act.block || "overview"]: true
+			[key]: true
 		}));
+		setTimeout(() => document.querySelector(`[data-plan-section="${key}"]`)?.scrollIntoView({
+			behavior: "smooth",
+			block: "start"
+		}), 80);
 	};
 	return <div style={{
 		padding: "12px 14px",
-		paddingBottom: 150,
+		paddingBottom: 100,
 		animation: "slideIn .18s ease-out"
 	}}>
     <div style={{
@@ -11055,7 +11357,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			background: gradFor((tr.name || "X").slice(0, 2)),
 			display: "grid",
 			placeItems: "center",
-			fontSize: 9.5,
+			fontSize: 12,
 			fontWeight: 800,
 			color: "#fff",
 			overflow: "hidden"
@@ -11066,7 +11368,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		}} /> : String(tr.name || "?").split(/\s+/).map((x) => x[0]).join("").slice(0, 2).toUpperCase()}</div>;
 	})}{travelers.length > 4 && <div style={{
 		marginLeft: -5,
-		fontSize: 9.5,
+		fontSize: 12,
 		fontWeight: 900,
 		color: "#fff",
 		background: "rgba(5,8,20,.6)",
@@ -11116,17 +11418,17 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		fontSize: 12,
 		color: "rgba(255,255,255,.84)",
 		marginTop: 3
-	}}>{[t.dcName, t.country].filter(Boolean).join(", ")}{t.df ? ` · ${fmtShort(new Date(t.df))}` : ""}{t.dt ? ` — ${fmtShort(new Date(t.dt))}` : ""}{today.active ? " · сейчас в поездке" : d != null ? ` · через ${d} дн.` : ""}</div><div style={{
+	}}>{[t.dcName, t.country].filter(Boolean).join(", ")}{t.df ? ` · ${fmtShort(new Date(t.df))}` : ""}{t.dt ? ` — ${fmtShort(new Date(t.dt))}` : ""}{today.active ? " · сейчас в поездке" : d != null && d > 0 ? ` · через ${d} дн.` : ""}</div><div style={{
 		display: "inline-flex",
 		marginTop: 6,
 		padding: "4px 8px",
 		borderRadius: 999,
 		background: "rgba(255,255,255,.14)",
 		color: "#fff",
-		fontSize: 10.5,
+		fontSize: 12,
 		fontWeight: 800
-	}}>{today.active ? "В поездке" : t.status === "completed" ? "Завершена" : t.status === "waiting" ? "Ожидание" : "Подготовка"}</div><div onClick={() => setPeopleOpen(true)} style={{
-		fontSize: 10.7,
+	}}>{tripPhase(t).label} · {p.pct}% готово</div><div onClick={() => setPeopleOpen(true)} style={{
+		fontSize: 12,
 		color: "rgba(255,255,255,.72)",
 		marginTop: 5,
 		cursor: "pointer"
@@ -11134,7 +11436,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		marginLeft: 7,
 		color: "#8ef5dc",
 		fontWeight: 900
-	}}> · Публичная</span> : null}</div></div>
+	}}> · Публичная</span> : null}</div><button type="button" onClick={() => setSettingsOpen(true)} style={{minHeight:44,marginTop:8,padding:"8px 12px",borderRadius:11,border:"1px solid rgba(255,255,255,.35)",background:"rgba(5,8,20,.48)",color:"#fff",fontSize:13,fontWeight:700}}>Пульт в Telegram ↗</button></div>
     </div>
 
     <div style={{
@@ -11157,103 +11459,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 	}}>{l}{k === "group" && (t.askGroup || []).filter((x) => x.status === "open").length > 0 ? ` · ${(t.askGroup || []).filter((x) => x.status === "open").length}` : ""}</div>)}</div>
 
     {mode === "trip" ? <>
-      {false && today.active && <div style={{
-		background: "linear-gradient(135deg,rgba(48,215,184,.18),rgba(124,92,255,.12))",
-		border: `1px solid ${T.green}55`,
-		borderRadius: 18,
-		padding: 15,
-		marginBottom: 10
-	}}><div style={{
-		display: "flex",
-		alignItems: "baseline",
-		gap: 8
-	}}><div style={{
-		fontFamily: "Sora,sans-serif",
-		fontSize: 20,
-		fontWeight: 800,
-		color: T.text
-	}}>Сегодня</div><div style={{
-		fontSize: 11.5,
-		color: T.subd
-	}}>{fmtShort(new Date(today.today))}</div><div style={{ flex: 1 }} /><span style={{
-		fontSize: 10.5,
-		color: T.green,
-		fontWeight: 800
-	}}>TRAVEL MODE</span></div>{today.next ? <><div style={{
-		fontSize: 11,
-		color: T.subd,
-		marginTop: 10
-	}}>Следующее</div><div style={{
-		fontSize: 14,
-		fontWeight: 800,
-		color: T.text,
-		marginTop: 2
-	}}>{today.next.time ? `${today.next.time} · ` : ""}{today.next.title}</div>{today.next.sub && <div style={{
-		fontSize: 11,
-		color: T.subd,
-		marginTop: 3
-	}}>{today.next.sub}</div>}</> : <div style={{
-		fontSize: 12,
-		color: T.sub,
-		marginTop: 9
-	}}>На сегодня ничего не запланировано. Спроси TripWise, что посмотреть рядом.</div>}{today.todayEvents.length > 1 && <div style={{
-		display: "flex",
-		gap: 12,
-		alignItems: "center",
-		marginTop: 10
-	}}><div onClick={() => setTimelineOpen(true)} style={{
-		fontSize: 11.5,
-		color: T.violet,
-		fontWeight: 800,
-		cursor: "pointer"
-	}}>Весь день · {today.todayEvents.length} событий →</div>{todayLocations.length > 1 && <div onClick={openTodayMap} style={{
-		fontSize: 11.5,
-		color: T.cyan,
-		fontWeight: 800,
-		cursor: "pointer"
-	}}>Маршрут на карте ↗</div>}</div>}</div>}
 
-      <div style={{
-		background: "linear-gradient(135deg,rgba(124,92,255,.18),rgba(72,220,220,.08))",
-		border: `1px solid ${T.violet}55`,
-		borderRadius: 18,
-		padding: 15,
-		marginBottom: 10
-	}}><div style={{
-		display: "flex",
-		alignItems: "flex-end",
-		gap: 8
-	}}><div style={{
-		fontFamily: "Sora,sans-serif",
-		fontSize: 25,
-		fontWeight: 800,
-		color: T.text,
-		lineHeight: 1
-	}}>{p.pct}%</div><div style={{
-		fontSize: 12,
-		fontWeight: 800,
-		color: p.pct === 100 ? T.green : T.violet,
-		paddingBottom: 2
-	}}>ready</div><div style={{ flex: 1 }} /><div style={{
-		fontSize: 11,
-		color: T.subd
-	}}>{p.total - p.done} {plural(p.total - p.done, "действие", "действия", "действий")} осталось</div></div><div style={{
-		height: 9,
-		borderRadius: 999,
-		background: "rgba(255,255,255,.08)",
-		marginTop: 12,
-		overflow: "hidden"
-	}}><div style={{
-		height: "100%",
-		width: p.pct + "%",
-		borderRadius: 999,
-		background: GRAD.cta,
-		transition: "width .25s"
-	}} /></div><div style={{
-		fontSize: 11.5,
-		color: T.sub,
-		marginTop: 10
-	}}>{p.pct === 100 ? "Поездка готова. Можно ехать." : act.title + " — " + act.sub}</div></div>
       <div style={{
 		background: T.card,
 		border: `1px solid ${T.violet}66`,
@@ -11261,7 +11467,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		padding: 13,
 		marginBottom: 10
 	}}><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.violet,
 		fontWeight: 900,
 		textTransform: "uppercase",
@@ -11275,28 +11481,26 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		flex: 1,
 		minWidth: 0
 	}}><div style={{
-		fontSize: 14,
-		fontWeight: 900,
+		fontSize: 16,
+		fontWeight: 800,
 		color: T.text,
-		overflow: "hidden",
-		textOverflow: "ellipsis",
-		whiteSpace: "nowrap"
+		lineHeight: 1.35
 	}}>{p.pct === 100 ? "Поездка готова" : act.title}</div><div style={{
-		fontSize: 10.8,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 3
-	}}>{p.pct === 100 ? "Можно отправляться" : "Готовность поездки · " + p.pct + "% · " + act.sub}</div></div>{act.btn && <div onClick={runNextAction} className="press" style={{
+	}}>{p.pct === 100 ? "Можно отправляться" : "Готовность поездки · " + p.pct + "% · " + act.sub}</div></div>{p.pct < 100 && <div onClick={runNextAction} className="press" style={{
 		flexShrink: 0,
 		background: GRAD.cta,
 		borderRadius: 10,
 		padding: "8px 10px",
 		color: "#fff",
-		fontSize: 10.5,
+		fontSize: 12,
 		fontWeight: 900,
 		cursor: "pointer"
-	}}>{act.btn}</div>}</div></div>
+	}}>{act.btn || "Открыть"}</div>}</div></div>
 
-      {(t.activityLog || []).length > 0 && <div onClick={openActivity} className="press" style={{
+      {unseenActivity > 0 && <div onClick={openActivity} className="press" style={{
 		display: "flex",
 		alignItems: "center",
 		gap: 8,
@@ -11314,7 +11518,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		fontWeight: 800,
 		color: T.text
 	}}>{unseenActivity ? `Что нового · ${unseenActivity}` : "История изменений"}</div><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		whiteSpace: "nowrap",
 		overflow: "hidden",
@@ -11322,8 +11526,6 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		marginTop: 2
 	}}>{latestActivity && latestActivity.text}</div></div><Icon d={I.chevR} size={14} color={T.subd} /></div>}
 
-      {false && <div onClick={() => setBudgetOpen(true)} />}
-      {false && <TimelinePreview />}
 
       <div style={{
 		background: T.card,
@@ -11345,70 +11547,9 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		flex: 1
 	}}>План поездки</div><span role="button" tabIndex={0} onClick={onRetrySync} onKeyDown={(e) => e.key === "Enter" && onRetrySync?.()} style={{
 		cursor: "pointer",
-		fontSize: 10.3,
+		fontSize: 12,
 		color: syncState === "error" ? "#ff7ba9" : syncState === "syncing" ? T.cyan : T.subd
 	}}>{syncState === "blocked" ? "Не сохранено · повторить" : syncState === "local" ? "Локальный черновик" : syncState === "error" ? "Нет связи · повторяем" : syncState === "syncing" ? "Синхронизация…" : "Сохранено"}</span></div>
-        {isCreator && <div style={{ marginBottom: 12 }}><DateRangeField title="Даты поездки" from={t.df || ""} to={t.dt || ""} allowSameDay onChange={(df, dt) => {
-		if (df && dt && dt >= df) creatorUpd((x) => ({
-			...x,
-			df,
-			dt
-		}));
-	}} /></div>}
-        {isCreator && <label style={{
-		display: "flex",
-		alignItems: "center",
-		gap: 10,
-		fontSize: 12,
-		color: T.sub,
-		margin: "4px 0 12px"
-	}}>Статус поездки<select aria-label="Статус поездки" value={t.status || "preparing"} onChange={(e) => {
-		const status = e.target.value;
-		creatorUpd((x) => ({
-			...x,
-			status
-		}));
-	}} style={{
-		flex: 1,
-		background: T.card2,
-		border: `1px solid ${T.line}`,
-		borderRadius: 10,
-		color: T.text,
-		padding: 9,
-		fontSize: 14
-	}}>{[
-		["preparing", "Подготовка"],
-		["waiting", "Ожидание"],
-		["completed", "Завершена"],
-		["cancelled", "Отменена"]
-	].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>}
-        {isCreator && (!sectionHasContent("tickets") || !sectionHasContent("lodging")) && <div style={{
-		fontSize: 12,
-		color: T.sub,
-		marginBottom: 12
-	}}>
-          <div style={{
-		fontSize: 11,
-		color: T.subd,
-		marginBottom: 7
-	}}>Уберите из расчёта готовности то, что не требуется в этой поездке.</div>
-          {[["tickets", "Билеты не нужны"], ["lodging", "Жильё не нужно"]].filter(([key]) => !sectionHasContent(key)).map(([key, label]) => <label key={key} style={{
-		display: "flex",
-		gap: 8,
-		alignItems: "center",
-		padding: "7px 0"
-	}}><input type="checkbox" checked={!bOn[key]} onChange={(e) => {
-		const needed = !e.target.checked;
-		creatorUpd((x) => ({
-			...x,
-			blocksOn: {
-				...tripBlocks(x),
-				[key]: needed
-			},
-			...key === "lodging" ? { lodgingOff: !needed } : {}
-		}));
-	}} />{label}</label>)}
-        </div>}
         <div onClick={() => setAddPlanOpen(true)} className="press" style={{
 		display: "flex",
 		alignItems: "center",
@@ -11420,12 +11561,12 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		padding: 10,
 		margin: "0 0 8px",
 		color: T.violet,
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 900,
 		cursor: "pointer"
 	}}>＋ Добавить в план</div>
         {isCreator && <div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		margin: "0 2px 5px"
 	}}>Зажмите раздел, чтобы удалить его целиком. Пустые разделы не показываются никому.</div>}
@@ -11435,7 +11576,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		padding: 9,
 		margin: "4px 0 7px"
 	}}><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 800,
 		color: T.text
 	}}>{t.route.codes || "Выбранный маршрут"}</div><div style={{
@@ -11443,7 +11584,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		gap: 10,
 		marginTop: 6
 	}}><span onClick={() => onFindTickets(t)} style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.violet,
 		fontWeight: 800,
 		cursor: "pointer"
@@ -11460,7 +11601,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			}
 		}))
 	})} style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: "#ff7ba9",
 		fontWeight: 800,
 		cursor: "pointer"
@@ -11470,12 +11611,12 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		flexWrap: "wrap",
 		marginTop: 6
 	}}><span onClick={() => setFlightOpen(true)} style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.violet,
 		fontWeight: 800,
 		cursor: "pointer"
 	}}>＋ Добавить рейс</span><span onClick={() => onFindTickets(t)} style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.violet,
 		fontWeight: 800,
 		cursor: "pointer"
@@ -11486,7 +11627,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			tickets: !checks.tickets
 		}
 	}))} style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: checks.tickets ? T.green : T.subd,
 		fontWeight: 800,
 		cursor: "pointer"
@@ -11496,12 +11637,12 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		gap: 10,
 		marginTop: 5
 	}}><span onClick={() => startAdd("stays")} style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.violet,
 		fontWeight: 800,
 		cursor: "pointer"
 	}}>＋ Добавить бронь</span><span onClick={goHotels} style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.violet,
 		fontWeight: 800,
 		cursor: "pointer"
@@ -11524,13 +11665,13 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 				cursor: "pointer"
 			}}>{doc.name}</span><TimeBadge st={docStatus(doc, t.df)} /></div>;
 		})}{left > 0 && <div onClick={() => setDocsExpanded(true)} style={{
-			fontSize: 11,
+			fontSize: 12,
 			color: T.violet,
 			fontWeight: 800,
 			padding: "5px 0",
 			cursor: "pointer"
 		}}>Ещё {left}</div>}{docsExpanded && docs.length > 5 && <div onClick={() => setDocsExpanded(false)} style={{
-			fontSize: 11,
+			fontSize: 12,
 			color: T.subd,
 			fontWeight: 700,
 			padding: "5px 0",
@@ -11549,30 +11690,35 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 	}}>{it.name}</span>{it.item && <PriceBadge kind="custom" item={it.item} />}</div>) : <Empty>Сборов пока нет.</Empty>}</div>}</>}
       </div>
       <TimelinePreview />
-      <div onClick={() => setBudgetOpen(true)} className="press" style={{
+      <button onClick={() => setBudgetOpen(true)} className="budget-summary" style={{
+		display: "block",
+		width: "100%",
+		textAlign: "left",
 		background: T.card,
 		border: `1px solid ${T.line}`,
 		borderRadius: 16,
-		padding: 13,
+		padding: 14,
 		marginBottom: 10,
-		cursor: "pointer"
+		color: T.text
 	}}><div style={{
 		display: "flex",
-		alignItems: "center",
-		gap: 8
-	}}><div style={{ fontSize: 18 }}>💸</div><div style={{
-		fontSize: 13.5,
-		fontWeight: 800,
-		color: T.text,
-		flex: 1
-	}}>Бюджет поездки</div>{budget.baseTotal != null && <b style={{
-		fontSize: 12,
-		color: T.text
-	}}>≈ {money(budget.baseTotal, budget.baseCurrency)}</b>}<Icon d={I.chevR} size={14} color={T.subd} /></div><div style={{
-		fontSize: 11,
-		color: T.subd,
-		marginTop: 6
-	}}>{budget.baseTotal != null ? `Потрачено и распределено по ${budget.groups.length || 1} валюте(ам) · открыть детали` : "Добавьте цены — здесь появятся общий бюджет, остаток и доля каждого."}</div></div>
+		gap: 8,
+		alignItems: "center"
+	}}><span style={{ fontSize: 18 }}>💸</span><b style={{
+		flex: 1,
+		fontSize: 16
+	}}>Бюджет поездки</b><Icon d={I.chevR} size={16} color={T.sub} /></div>{budget.groups.length ? budget.groups.slice(0, 2).map((g) => <div key={g.currency} style={{
+		marginTop: 10,
+		lineHeight: 1.6,
+		fontSize: 13
+	}}><div style={{
+		display: "flex",
+		justifyContent: "space-between"
+	}}><span>Всего по плану</span><b>{money(g.total, g.currency)}</b></div><div style={{ color: T.sub }}>Оплачено {money(g.paid, g.currency)} · осталось оплатить {money(g.unpaidProvider, g.currency)}</div>{budget.me && <div style={{ color: T.sub }}>Ваша доля {money(g.myShare, g.currency)}</div>}{g.overpaidProvider > 0 && <div style={{ color: T.gold }}>Проверьте переплату {money(g.overpaidProvider, g.currency)}</div>}</div>) : <div style={{
+		fontSize: 13,
+		color: T.sub,
+		marginTop: 9
+	}}>Добавьте первый расход и выберите, кто участвует в оплате.</div>}{budget.groups.length > 2 && <div style={{ marginTop: 6 }}>Ещё {budget.groups.length - 2} валюты →</div>}</button>
       <div style={{ marginTop: 10 }}><div onClick={() => setImportOpen(true)} className="press" style={{
 		textAlign: "center",
 		border: `1px solid ${T.violet}55`,
@@ -11580,7 +11726,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		borderRadius: 13,
 		padding: 11,
 		color: T.violet,
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 800,
 		cursor: "pointer"
 	}}>✦ Импортировать бронь в поездку</div></div>
@@ -11595,7 +11741,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		fontWeight: 800,
 		color: T.text
 	}}>Решения группы</div><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 2
 	}}>Вопросы уходят участникам в бот; обычные изменения собираются в тихий дайджест.</div></div><div onClick={() => setAskOpen(true)} className="press" style={{
@@ -11604,7 +11750,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		border: `1px solid ${T.violet}55`,
 		padding: "7px 11px",
 		color: T.violet,
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 800,
 		cursor: "pointer"
 	}}>＋ Спросить</div></div>
@@ -11624,7 +11770,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			display: "flex",
 			gap: 8
 		}}><div style={{ flex: 1 }}><div style={{
-			fontSize: 10,
+			fontSize: 12,
 			color: T.violet,
 			fontWeight: 800,
 			marginBottom: 3
@@ -11638,15 +11784,15 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			fontWeight: 800,
 			color: T.text
 		}}>{q.title}</div>{q.description && <div style={{
-			fontSize: 11,
+			fontSize: 12,
 			color: T.subd,
 			marginTop: 3
 		}}>{q.description}</div>}<div style={{
-			fontSize: 10,
+			fontSize: 12,
 			color: T.subd,
 			marginTop: 5
 		}}>от {q.createdByName || "участника"}</div></div>{q.status !== "open" && <span style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			fontWeight: 800,
 			color: T.green
 		}}>РЕШЕНО</span>}</div><div style={{
@@ -11668,19 +11814,19 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			color: T.text,
 			flex: 1
 		}}>{o.label}</span><span style={{
-			fontSize: 11,
+			fontSize: 12,
 			fontWeight: 800,
 			color: myVote === o.id ? T.violet : T.subd
 		}}>{counts[o.id] || 0}</span>{isCreator && q.status === "open" && <span onClick={(e) => {
 			e.stopPropagation();
 			resolvePoll(q, o.id);
 		}} style={{
-			fontSize: 10,
+			fontSize: 12,
 			color: T.subd,
 			paddingLeft: 5,
 			cursor: "pointer"
 		}}>зафиксировать</span>}</div>)}</div>{resolved && <div style={{
-			fontSize: 11.5,
+			fontSize: 12,
 			color: T.green,
 			marginTop: 9
 		}}>✓ Решение: {resolved.label}</div>}</div>;
@@ -11696,7 +11842,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		color: T.text,
 		marginTop: 6
 	}}>Пока ничего не обсуждаем</div><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 4
 	}}>Предложите отель, ресторан, активность или любой другой вариант.</div></div>}
@@ -11713,21 +11859,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		paddingBottom: `max(${bottomStr}, 12px)`,
 		background: "linear-gradient(transparent,#0a0a18 22%)",
 		zIndex: 24
-	}}><div className="carousel" style={{
-		display: "flex",
-		gap: 6,
-		overflowX: "auto",
-		padding: "10px 1px 7px"
-	}}>{quick.map((q) => <div key={q} onClick={() => askAI(q)} className="press" style={{
-		flexShrink: 0,
-		border: `1px solid ${T.line}`,
-		background: T.card,
-		borderRadius: 999,
-		padding: "6px 10px",
-		fontSize: 10.8,
-		color: T.sub,
-		cursor: "pointer"
-	}}>{q}</div>)}</div><div onClick={() => {
+	}}><div onClick={() => {
 		setChatOpen(true);
 		loadChatHistory();
 	}} className="press" style={{
@@ -11755,7 +11887,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 	}}>Спросить про поездку…</span><Icon d={I.arrow} size={15} color={T.violet} /></div></div>
 
     {peopleOpen && <Overlay onClose={() => setPeopleOpen(false)}><SheetHead title={`Путешественники · ${travelers.length}`} onClose={() => setPeopleOpen(false)} /><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd,
 		marginBottom: 10
 	}}>{members.length} в TripWise · финансовый план считается по {travelers.length} {plural(travelers.length, "человеку", "людям", "людям")}</div><div style={{
@@ -11780,7 +11912,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			background: gradFor(tr.name.slice(0, 2)),
 			display: "grid",
 			placeItems: "center",
-			fontSize: 11,
+			fontSize: 12,
 			fontWeight: 800,
 			color: "#fff",
 			overflow: "hidden"
@@ -11793,14 +11925,14 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			fontWeight: 700,
 			color: T.text
 		}}>{tr.name}</div><div style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			color: m ? T.green : T.subd
 		}}>{m ? `✓ в TripWise${String(m.id) === String(t.creatorId) ? " · создатель" : ""}` : "без аккаунта · участвует в расчётах"}</div></div><div style={{ textAlign: "right" }}><div style={{
 			fontSize: 13,
 			fontWeight: 800,
 			color: r.pct === 100 ? T.green : T.violet
 		}}>{r.pct}%</div><div style={{
-			fontSize: 9.5,
+			fontSize: 12,
 			color: T.subd
 		}}>лично</div></div>{isCreator && m && String(m.id) !== String(t.creatorId) && <span onClick={(e) => {
 			e.stopPropagation();
@@ -11811,7 +11943,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 				action: () => removeMember(m)
 			});
 		}} style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			color: "#ff6db0",
 			cursor: "pointer"
 		}}>×</span>}{isCreator && !m && travelers.length > 1 && <span onClick={(e) => {
@@ -11823,7 +11955,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 				action: () => removeTraveler(tr)
 			});
 		}} style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			color: T.subd,
 			cursor: "pointer"
 		}}>×</span>}</div>;
@@ -11892,7 +12024,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		}}>{it.label}</span>{it.kind === "doc" && (isCreator || own) && (() => {
 			const docId = it.id.slice(4), doc = docs.find((x) => x.id === docId);
 			return doc ? <span onClick={() => setTravelerDoc(tr, doc, !it.done)} style={{
-				fontSize: 10.5,
+				fontSize: 12,
 				color: T.violet,
 				cursor: "pointer"
 			}}>{it.done ? "снять" : "готово"}</span> : null;
@@ -11910,7 +12042,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		alignItems: "center",
 		gap: 8
 	}}><div style={{ flex: 1 }}><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd
 	}}>Базовая валюта</div><div style={{
 		fontSize: 13.5,
@@ -11927,7 +12059,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		padding: "8px 10px",
 		background: T.violet + "22",
 		color: T.violet,
-		fontSize: 10.5,
+		fontSize: 12,
 		fontWeight: 800,
 		cursor: "pointer"
 	}}>{fxBusy ? "…" : "Обновить"}</div>}</div>{budget.baseTotal != null && <div style={{
@@ -11945,7 +12077,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		borderRadius: 12,
 		padding: 9,
 		color: T.cyan,
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 800,
 		cursor: "pointer",
 		marginBottom: 10
@@ -11971,7 +12103,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 	}}>{money(g.total, g.currency)}</div></div><div style={{
 		display: "flex",
 		gap: 10,
-		fontSize: 10.8,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 5,
 		flexWrap: "wrap"
@@ -11981,28 +12113,28 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		padding: "7px 0",
 		borderTop: `1px solid ${T.line}`
 	}}><div style={{ flex: 1 }}><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.text,
 		fontWeight: 700
 	}}>{it.name}{it.estimate ? " · оценка" : ""}</div><div style={{
-		fontSize: 10,
+		fontSize: 12,
 		color: T.subd
 	}}>{(() => {
 		const ns = (it.splitIds || []).map((id) => budget.names[id]).filter(Boolean);
 		return ns.length ? `делится: ${ns.join(", ")}` : `${it.splitIds.length} ${plural(it.splitIds.length, "человек", "человека", "человек")}`;
 	})()} · оплачено {money(it.paidAmount || 0, it.currency)}</div></div><b style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.text
 	}}>{money(it.total, it.currency)}</b>{!it.estimate && <span onClick={() => {
 		setBudgetOpen(false);
 		openCost(it.kind, it.raw);
 	}} style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.violet,
 		fontWeight: 800,
 		cursor: "pointer"
 	}}>изменить</span>}</div>)}</div>{g.settlements.length > 0 && <><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		fontWeight: 800,
 		color: T.text,
 		marginTop: 9
@@ -12014,14 +12146,14 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			gap: 7,
 			marginTop: 7
 		}}><span style={{
-			fontSize: 11,
+			fontSize: 12,
 			color: T.sub,
 			flex: 1
 		}}>{budget.names[s.from] || "Участник"} → {budget.names[s.to] || "Участник"}: <b>{money(s.amount, g.currency)}</b></span>{can && <span onClick={() => !settleBusy && markSettlement({
 			...s,
 			currency: g.currency
 		})} style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			color: T.violet,
 			fontWeight: 800,
 			cursor: "pointer"
@@ -12032,10 +12164,10 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		borderRadius: 15,
 		padding: 18,
 		textAlign: "center",
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd
 	}}>Цен пока нет. Добавьте стоимость к жилью, транспорту, активностям или перелётам.</div>}{(t.settlementPayments || []).length > 0 && <div style={{ marginTop: 12 }}><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 800,
 		color: T.text,
 		marginBottom: 5
@@ -12044,7 +12176,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		return <div key={x.id} style={{
 			display: "flex",
 			gap: 7,
-			fontSize: 10.8,
+			fontSize: 12,
 			color: T.sub,
 			padding: "6px 0",
 			borderTop: `1px solid ${T.line}`
@@ -12053,7 +12185,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			cursor: "pointer"
 		}}>отменить</span>}</div>;
 	})}</div>}<div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		lineHeight: 1.45,
 		marginTop: 10
@@ -12077,7 +12209,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		color: T.text,
 		flex: 1
 	}}>До поездки</div><span style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		fontWeight: 900,
 		color: p.pct === 100 ? T.green : T.violet
 	}}>{p.pct}% ready</span></div><div style={{
@@ -12093,10 +12225,10 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		background: x.ok ? T.green + "0f" : T.card,
 		borderRadius: 999,
 		padding: "5px 8px",
-		fontSize: 10.5,
+		fontSize: 12,
 		color: x.ok ? T.green : T.sub
 	}}><span>{x.icon}</span><span>{x.label} · <b>{x.value}</b></span></div>)}</div>{docsUnits.total > 0 && <div style={{
-		fontSize: 10.3,
+		fontSize: 12,
 		color: T.subd,
 		lineHeight: 1.4,
 		marginTop: 8
@@ -12117,11 +12249,11 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 				fontWeight: 800,
 				color: date === today.today ? T.green : T.text
 			}}>{fmtShort(new Date(date))}{date === today.today ? " · сегодня" : ""}</div>{dn && <span style={{
-				fontSize: 10.3,
+				fontSize: 12,
 				color: T.violet,
 				fontWeight: 800
 			}}>День {dn}</span>}<div style={{ flex: 1 }} />{locs.length > 0 && <span style={{
-				fontSize: 10.2,
+				fontSize: 12,
 				color: T.subd,
 				maxWidth: 130,
 				overflow: "hidden",
@@ -12147,10 +12279,10 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 				border: `1px solid ${e.type === "trip-start" || e.type === "trip-end" ? T.violet + "66" : T.line}`,
 				display: "grid",
 				placeItems: "center",
-				fontSize: 10
+				fontSize: 12
 			}}>{timelineGlyph(e.type)}</div><div style={{
 				width: 43,
-				fontSize: 10.8,
+				fontSize: 12,
 				color: T.subd
 			}}>{e.time || ""}</div><div style={{
 				flex: 1,
@@ -12160,7 +12292,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 				color: T.text,
 				fontWeight: e.type === "trip-start" || e.type === "trip-end" ? 800 : 700
 			}}>{e.title}</div>{e.sub && <div style={{
-				fontSize: 10.5,
+				fontSize: 12,
 				color: T.subd,
 				marginTop: 2,
 				lineHeight: 1.35
@@ -12183,7 +12315,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		fontSize: 12,
 		color: T.text
 	}}>{e.text}</div><div style={{
-		fontSize: 9.8,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 2
 	}}>{e.createdAt ? new Date(e.createdAt).toLocaleString("ru-RU", {
@@ -12193,8 +12325,77 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		minute: "2-digit"
 	}) : ""}</div></div></div>) : <Empty>Изменений пока нет.</Empty>}</Overlay>}
 
-    {settingsOpen && <Overlay onClose={() => setSettingsOpen(false)}><SheetHead title="Настройки поездки" onClose={() => setSettingsOpen(false)} />{isCreator ? <><div style={{
-		fontSize: 11.5,
+    {settingsOpen && <Overlay onClose={() => setSettingsOpen(false)}><SheetHead title="Настройки поездки" onClose={() => setSettingsOpen(false)} />
+      <div style={{padding:14,marginBottom:14,border:`1px solid ${T.line}`,borderRadius:14}}>
+        <div style={{fontSize:15,fontWeight:800,color:T.text}}>Пульт поездки в Telegram</div>
+        <p style={{fontSize:13,lineHeight:1.45,color:T.subd}}>План, голосование и ваши напоминания — в одном сообщении бота. Повторное нажатие обновит тот же пульт.</p>
+        <button type="button" disabled={panelBusy} onClick={sendPanel} style={{width:"100%",minHeight:44,border:0,borderRadius:12,background:GRAD.cta,color:"#fff",fontSize:14,fontWeight:800,padding:11,cursor:panelBusy?"wait":"pointer"}}>{panelBusy ? "Отправляю…" : "Отправить / обновить пульт"}</button>
+        {panelNotice && <p role="status" style={{fontSize:13,lineHeight:1.45,color:T.sub,overflowWrap:"anywhere"}}>{panelNotice}</p>}
+        {panelBotUrl && <button type="button" onClick={openPanelBot} style={{width:"100%",minHeight:44,background:T.card2,color:T.text,border:`1px solid ${T.line}`,borderRadius:12,fontSize:14,marginTop:8}}>Открыть чат с ботом</button>}
+      </div>
+      {isCreator && <div style={{ marginBottom: 12 }}><DateRangeField title="Даты поездки" from={t.df || ""} to={t.dt || ""} allowSameDay onChange={(df, dt) => {
+		if (df && dt && dt >= df) creatorUpd((x) => ({
+			...x,
+			df,
+			dt
+		}));
+	}} /></div>}
+        {isCreator && <label style={{
+		display: "flex",
+		alignItems: "center",
+		gap: 10,
+		fontSize: 12,
+		color: T.sub,
+		margin: "4px 0 12px"
+	}}>Статус поездки<select aria-label="Статус поездки" value={t.status || "preparing"} onChange={(e) => {
+		const status = e.target.value;
+		creatorUpd((x) => ({
+			...x,
+			status
+		}));
+	}} style={{
+		flex: 1,
+		background: T.card2,
+		border: `1px solid ${T.line}`,
+		borderRadius: 10,
+		color: T.text,
+		padding: 9,
+		fontSize: 14
+	}}>{[
+		["preparing", "Подготовка"],
+		["waiting", "Ожидание"],
+		["completed", "Завершена"],
+		["cancelled", "Отменена"]
+	].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>}
+        {isCreator && (!sectionHasContent("tickets") || !sectionHasContent("lodging")) && <div style={{
+		fontSize: 12,
+		color: T.sub,
+		marginBottom: 12
+	}}>
+          <div style={{
+		fontSize: 12,
+		color: T.subd,
+		marginBottom: 7
+	}}>Уберите из расчёта готовности то, что не требуется в этой поездке.</div>
+          {[["tickets", "Билеты не нужны"], ["lodging", "Жильё не нужно"]].filter(([key]) => !sectionHasContent(key)).map(([key, label]) => <label key={key} style={{
+		display: "flex",
+		gap: 8,
+		alignItems: "center",
+		padding: "7px 0"
+	}}><input type="checkbox" checked={!bOn[key]} onChange={(e) => {
+		const needed = !e.target.checked;
+		creatorUpd((x) => ({
+			...x,
+			blocksOn: {
+				...tripBlocks(x),
+				[key]: needed
+			},
+			...key === "lodging" ? { lodgingOff: !needed } : {}
+		}));
+	}} />{label}</label>)}
+        </div>}
+<button onClick={openActivity}>История изменений</button>{isCreator ? <><div style={{
+		fontSize: 12,
 		color: T.subd,
 		marginBottom: 6
 	}}>Название</div><input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveTitle()} style={{
@@ -12235,7 +12436,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		fontWeight: 800,
 		color: T.text
 	}}>Уведомления через бота</div><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 2
 	}}>Сразу — Ask Group и критичное; обычные изменения — тихим дайджестом.</div></div><span style={{ color: t.notify !== false ? T.green : T.subd }}>{t.notify !== false ? "Вкл" : "Выкл"}</span></div><div onClick={() => {
@@ -12270,7 +12471,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		fontWeight: 800,
 		color: publication.active ? T.green : T.text
 	}}>{publication.active ? "Публичная поездка" : "Опубликовать поездку"}</div><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 2
 	}}>{publication.active ? `${Math.max(0, (publication.capacity || travelers.length) - travelers.length)} свободных мест · изменить условия` : "Найти попутчиков через витрину TripWise"}</div></div><Icon d={I.chevR} size={14} color={T.subd} /></div>{members.filter((m) => String(m.id) !== meId).length > 0 && <div style={{
@@ -12280,7 +12481,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		padding: 10,
 		marginBottom: 9
 	}}><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 800,
 		color: T.text,
 		marginBottom: 6
@@ -12304,7 +12505,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		borderRadius: 9,
 		background: transferTo ? T.violet + "22" : T.card2,
 		color: transferTo ? T.violet : T.subd,
-		fontSize: 10.5,
+		fontSize: 12,
 		fontWeight: 800,
 		cursor: transferTo ? "pointer" : "default"
 	}}>{transferBusy ? "…" : "Передать"}</div></div></div>}<div onClick={() => {
@@ -12351,7 +12552,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 	}}>Выйти из поездки</div></>}</Overlay>}
 
     {publishOpen && <Overlay onClose={() => setPublishOpen(false)}><SheetHead title={publication.active ? "Публичная поездка" : "Опубликовать поездку"} onClose={() => setPublishOpen(false)} /><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		lineHeight: 1.45,
 		marginBottom: 11
@@ -12374,7 +12575,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		gap: 8,
 		marginTop: 9
 	}}><label style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd
 	}}>Свободных мест<input type="number" min="1" max="20" value={pubForm.freeSeats} onChange={(e) => setPubForm((f) => ({
 		...f,
@@ -12389,7 +12590,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		color: T.text,
 		outline: "none"
 	}} /></label><label style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd
 	}}>Валюта<select value={pubForm.currency} onChange={(e) => setPubForm((f) => ({
 		...f,
@@ -12403,7 +12604,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		padding: 9,
 		color: T.text
 	}}>{COST_CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select></label></div><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 10
 	}}>Ориентир бюджета на человека</div><div style={{
@@ -12432,7 +12633,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		color: T.text,
 		outline: "none"
 	}} /></div><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 11,
 		marginBottom: 6
@@ -12449,7 +12650,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		...f,
 		costMode: v
 	}))} className="press" style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		fontWeight: 800,
 		color: pubForm.costMode === v ? T.violet : T.subd,
 		border: `1px solid ${pubForm.costMode === v ? T.violet + "66" : T.line}`,
@@ -12458,7 +12659,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		padding: "6px 9px",
 		cursor: "pointer"
 	}}>{l}</span>)}</div>{pubForm.costMode === "covered" && <><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 10,
 		marginBottom: 6
@@ -12471,7 +12672,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		["transport", "🚗 Транспорт"],
 		["activities", "🎟 Развлечения"]
 	].map(([v, l]) => <span key={v} onClick={() => togglePubChip("covered", v)} className="press" style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		fontWeight: 800,
 		color: (pubForm.covered || []).includes(v) ? T.green : T.subd,
 		border: `1px solid ${(pubForm.covered || []).includes(v) ? T.green + "66" : T.line}`,
@@ -12479,7 +12680,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		padding: "6px 9px",
 		cursor: "pointer"
 	}}>{l}</span>)}</div></>}<div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 11,
 		marginBottom: 6
@@ -12497,7 +12698,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		"Комфорт",
 		"Экономно"
 	].map((v) => <span key={v} onClick={() => togglePubChip("tags", v)} className="press" style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		fontWeight: 800,
 		color: (pubForm.tags || []).includes(v) ? T.cyan : T.subd,
 		border: `1px solid ${(pubForm.tags || []).includes(v) ? T.cyan + "66" : T.line}`,
@@ -12505,7 +12706,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		padding: "6px 9px",
 		cursor: "pointer"
 	}}>{v}</span>)}</div><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 11,
 		marginBottom: 5
@@ -12564,7 +12765,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		borderRadius: 13,
 		padding: 11,
 		color: T.subd,
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 800,
 		cursor: "pointer"
 	}}>Снять с публикации</div>}</Overlay>}
@@ -12578,32 +12779,29 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		fontSize: 13.5,
 		fontWeight: 800,
 		color: T.text
-	}}>Одна ссылка — один общий Trip</div><div style={{
-		fontSize: 11.5,
+	}}>Сначала описание, потом участие</div><div style={{
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 5,
 		lineHeight: 1.45
-	}}>Новый пользователь займёт свободный слот путешественника. Если слотов нет — TripWise добавит нового.</div>{inviteUrl ? <div style={{
+	}}>Бот покажет направление и даты. Участник сам подтвердит вступление в приложении, если есть место. Ссылка даёт доступ к вступлению: отправляйте её только тем, кого приглашаете.</div>{inviteUrl ? <div style={{
 		marginTop: 11,
 		background: T.card2,
 		border: `1px dashed ${T.violet}66`,
 		borderRadius: 11,
 		padding: 10,
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.sub,
 		wordBreak: "break-all"
 	}}>{inviteUrl}</div> : <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 11
-	}}>Создаю ссылку…</div>}</div>{inviteUrl && <div style={{
+	}} role="status">{inviteError || "Создаю ссылку…"}{inviteError && <button type="button" onClick={invite} style={{display:"block",minHeight:44,marginTop:8}}>Повторить</button>}</div>}</div>{inviteAppUrl && <a href={inviteAppUrl} target="_blank" rel="noopener noreferrer" style={{display:"block",fontSize:13,color:T.sub,marginTop:10,padding:8}}>Открыть приглашение сразу в приложении</a>}{inviteUrl && <div style={{
 		display: "flex",
 		gap: 8,
 		marginTop: 12
-	}}><div onClick={() => {
-		navigator.clipboard && navigator.clipboard.writeText(inviteUrl);
-		setToast("Ссылка скопирована");
-	}} className="press" style={{
+	}}><div onClick={copyInvite} className="press" style={{
 		flex: 1,
 		textAlign: "center",
 		background: T.card,
@@ -12643,7 +12841,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		borderRadius: 999,
 		padding: "6px 9px",
 		color: askType === k ? T.violet : T.subd,
-		fontSize: 10.5,
+		fontSize: 12,
 		fontWeight: 800,
 		cursor: "pointer"
 	}}>{l}</span>)}</div><input value={askTitle} onChange={(e) => setAskTitle(e.target.value)} placeholder="Что нужно решить?" style={{
@@ -12685,7 +12883,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		color: T.subd,
 		cursor: "pointer"
 	}}>×</div>}</div>)}{askType === "choice" && askOptions.length < 6 && <div onClick={() => setAskOptions((a) => [...a, ""])} style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.violet,
 		fontWeight: 800,
 		cursor: "pointer",
@@ -12702,7 +12900,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 	}}>Спросить группу</div></Overlay>}
 
     {addPlanOpen && <Overlay onClose={() => setAddPlanOpen(false)}><SheetHead title="Добавить в план" onClose={() => setAddPlanOpen(false)} /><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		lineHeight: 1.45,
 		marginBottom: 10
@@ -12835,7 +13033,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 	}}>Удалить пункт</div></Overlay>}
 
     {flightOpen && <Overlay onClose={() => setFlightOpen(false)}><SheetHead title="Добавить перелёт" onClose={() => setFlightOpen(false)} /><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd,
 		lineHeight: 1.45,
 		marginBottom: 10
@@ -12846,7 +13044,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		padding: 10,
 		marginBottom: 8
 	}}><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginBottom: 6
 	}}>{i === 0 ? "Рейс" : `Рейс после пересадки ${i}`}</div><div style={{
@@ -12876,12 +13074,12 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		outline: "none",
 		colorScheme: "dark"
 	}} /></div>{journeyLegs.length > 1 && <div onClick={() => setJourneyLegs((a) => a.filter((_, j) => j !== i))} style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: "#ff6db0",
 		marginTop: 6,
 		cursor: "pointer"
 	}}>Убрать этот рейс</div>}</div>)}<div onClick={addJourneyLeg} className="press" style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.violet,
 		fontWeight: 800,
 		cursor: "pointer",
@@ -12902,7 +13100,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 	}}>Добавить перелёт</div></Overlay>}
 
     {importOpen && <Overlay onClose={() => setImportOpen(false)}><SheetHead title="Импорт бронирования" onClose={() => setImportOpen(false)} /><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		lineHeight: 1.45,
 		marginBottom: 9
@@ -12928,7 +13126,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		borderRadius: 11,
 		padding: 9,
 		color: T.sub,
-		fontSize: 11,
+		fontSize: 12,
 		fontWeight: 800,
 		cursor: "pointer"
 	}}>Загрузить .txt / .eml<input type="file" accept=".txt,.eml,text/plain,message/rfc822" onChange={importFile} style={{ display: "none" }} /></label><div onClick={analyzeImport} className="press" style={{
@@ -12938,7 +13136,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		borderRadius: 11,
 		padding: 9,
 		color: "#fff",
-		fontSize: 11,
+		fontSize: 12,
 		fontWeight: 800,
 		cursor: "pointer"
 	}}>{importBusy ? "Разбираю…" : "Распознать"}</div></div>{importResult && <div style={{
@@ -12948,7 +13146,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		padding: 12,
 		marginTop: 11
 	}}><div style={{
-		fontSize: 10,
+		fontSize: 12,
 		color: T.violet,
 		fontWeight: 800
 	}}>{String(importResult.kind || "").toUpperCase()} · уверенность {Math.round((importResult.confidence || 0) * 100)}%</div><div style={{
@@ -12957,7 +13155,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		color: T.text,
 		marginTop: 4
 	}}>{importResult.title || "Бронирование"}</div><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 5
 	}}>{[
@@ -12966,7 +13164,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		importResult.location,
 		importResult.priceAmount && money(importResult.priceAmount, importResult.currency)
 	].filter(Boolean).join(" · ")}</div>{(importResult.flightLegs || []).length > 0 && <div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.sub,
 		marginTop: 6
 	}}>{importResult.flightLegs.map((x) => `${x.flightNumber} · ${x.date}`).join(" → ")}</div>}<div onClick={applyImport} className="press" style={{
@@ -12980,7 +13178,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		fontWeight: 800,
 		cursor: "pointer"
 	}}>Добавить в поездку</div></div>}<div style={{
-		fontSize: 10,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 10
 	}}>PDF и скриншоты пока не распознаются без OCR: из них можно скопировать текст и вставить сюда.</div></Overlay>}
@@ -13000,7 +13198,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 			lineHeight: 1.45,
 			marginBottom: 8
 		}}>{info.desc}</div>}{docOpen.checkedAt && <div style={{
-			fontSize: 10.3,
+			fontSize: 12,
 			color: T.subd,
 			marginBottom: 10
 		}}>Сведения от: {String(docOpen.checkedAt).slice(0, 10).split("-").reverse().join(".")}</div>}{(info.req || []).length > 0 && <><div style={{
@@ -13059,14 +13257,28 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		}}>{myDone ? "✓ Мой документ готов" : "Отметить мой документ готовым"}</div>}</Overlay>;
 	})()}
     {docWizard && <DocWizard doc={docWizard} fullScreen tripContext={t} onClose={() => setDocWizard(null)} setToast={setToast} savedId={(localDocRecord(t.id, docWizard.id) || {}).id || null} onSaved={(rec) => {
-		if (rec && rec.status === "ready" && viewerTraveler) setTravelerDoc(viewerTraveler, docWizard, true);
+		if (rec && rec.kind === "request" && rec.status === "ready" && viewerTraveler) setTravelerDoc(viewerTraveler, docWizard, true);
 	}} />}
     {confirmDanger && <ConfirmSheet title={confirmDanger.title} text={confirmDanger.text} danger confirmLabel={confirmDanger.label || "Подтвердить"} onClose={() => setConfirmDanger(null)} onConfirm={() => {
 		const c = confirmDanger;
 		setConfirmDanger(null);
 		c && c.action && c.action();
 	}} />}
-    {chatOpen && <Overlay onClose={() => setChatOpen(false)}><SheetHead title="Ask TripWise" onClose={() => setChatOpen(false)} /><div style={{
+    {chatOpen && <Overlay onClose={() => setChatOpen(false)}><SheetHead title="Спросить про поездку" onClose={() => setChatOpen(false)} /><div className="carousel" style={{
+		display: "flex",
+		gap: 6,
+		overflowX: "auto",
+		padding: "10px 1px 7px"
+	}}>{quick.map((q) => <div key={q} onClick={() => askAI(q)} className="press" style={{
+		flexShrink: 0,
+		border: `1px solid ${T.line}`,
+		background: T.card,
+		borderRadius: 999,
+		padding: "6px 10px",
+		fontSize: 12,
+		color: T.sub,
+		cursor: "pointer"
+	}}>{q}</div>)}</div><div style={{
 		maxHeight: "46vh",
 		overflowY: "auto",
 		display: "flex",
@@ -13085,7 +13297,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		lineHeight: 1.45,
 		whiteSpace: "pre-wrap"
 	}}>{m.text}</div>)}{chatBusy && <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd
 	}}>TripWise думает…</div>}</div>{chatPending && !chatBusy && <div style={{
 		display: "flex",
@@ -13099,7 +13311,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		borderRadius: 11,
 		padding: 9,
 		color: T.green,
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 900,
 		cursor: "pointer"
 	}}>Подтвердить</div><div onClick={() => askAI("Отмена")} className="press" style={{
@@ -13110,7 +13322,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		borderRadius: 11,
 		padding: 9,
 		color: T.sub,
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 800,
 		cursor: "pointer"
 	}}>Отмена</div></div>}<div style={{
@@ -13342,7 +13554,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
         <div style={{ position: "relative" }}>
           {t.route && t.route.stopover && <span style={{
 		display: "inline-block",
-		fontSize: 9.5,
+		fontSize: 12,
 		fontWeight: 800,
 		letterSpacing: .4,
 		color: "#fff",
@@ -13360,7 +13572,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
           <div style={{
 		fontSize: 12,
 		color: "rgba(255,255,255,.85)"
-	}}>{t.dcName}{t.country && t.country !== t.dcName ? `, ${t.country}` : ""}{t.df ? ` · ${fmtShort(new Date(t.df))}` : ""}{t.dt ? ` — ${fmtShort(new Date(t.dt))}` : ""}{d != null ? ` · через ${d} дн.` : ""}{t.adults > 1 ? ` · ${t.adults} чел.` : ""}</div>
+	}}>{t.dcName}{t.country && t.country !== t.dcName ? `, ${t.country}` : ""}{t.df ? ` · ${fmtShort(new Date(t.df))}` : ""}{t.dt ? ` — ${fmtShort(new Date(t.dt))}` : ""}{d != null && d > 0 ? ` · через ${d} дн.` : ""}{t.adults > 1 ? ` · ${t.adults} чел.` : ""}</div>
         </div>
       </div>
       {menu && <div style={{
@@ -13371,7 +13583,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		marginTop: 10
 	}}>
         <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		marginBottom: 6
 	}}>Название поездки</div>
@@ -13486,7 +13698,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		marginBottom: 10
 	}}>
           <span style={{
-		fontSize: 10,
+		fontSize: 12,
 		fontWeight: 800,
 		color: act.tone || T.violet,
 		background: (act.tone || T.violet) + "1c",
@@ -13505,7 +13717,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		fontWeight: 700,
 		color: T.text
 	}}>{act.title}</div><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 2
 	}}>{act.sub}</div></div>
@@ -13518,7 +13730,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		fontWeight: 800,
 		cursor: "pointer",
 		whiteSpace: "nowrap"
-	}}>{act.btn}</div>}
+	}}>{act.btn || "Открыть"}</div>}
           </div>
         </div>
         <div style={{
@@ -13558,11 +13770,11 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		fontWeight: 600,
 		color: T.text
 	}}>Билеты</div><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd
 	}}>{t.route.codes}</div></div>
               {t.checks.tickets && <span style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		fontWeight: 700,
 		color: T.green
 	}}>куплены</span>}
@@ -13588,7 +13800,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		fontWeight: 600,
 		color: T.text
 	}}>Найти билеты</div><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd
 	}}>маршрут пока не выбран</div></div>
               <Icon d={I.chevR} size={14} color={T.subd} />
@@ -13659,7 +13871,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 			lineHeight: 1.25
 		}}>{doc.name}</div>
               {t.checks.docs[doc.id] ? <span style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			fontWeight: 700,
 			color: T.green
 		}}>готово</span> : <TimeBadge st={st} />}
@@ -13684,7 +13896,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 			color: T.text
 		}}>{s.title}</div>
               {t.checks.services[id] && <span style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			fontWeight: 700,
 			color: T.green
 		}}>готово</span>}
@@ -13723,7 +13935,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		flexWrap: "wrap"
 	}}>
             {!bOn.tickets && <span onClick={() => enableBlock("tickets")} className="press" style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 700,
 		color: T.violet,
 		border: `1px dashed ${T.violet}66`,
@@ -13733,7 +13945,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		cursor: "pointer"
 	}}>＋ Билеты</span>}
             {!lodgeOn && <span onClick={() => enableBlock("lodging")} className="press" style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 700,
 		color: T.violet,
 		border: `1px dashed ${T.violet}66`,
@@ -13743,7 +13955,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		cursor: "pointer"
 	}}>＋ Жильё</span>}
             {!bOn.docs && <span onClick={() => enableBlock("docs")} className="press" style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 700,
 		color: T.violet,
 		border: `1px dashed ${T.violet}66`,
@@ -13756,7 +13968,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		enableBlock("extras");
 		setBlk("extras");
 	}} className="press" style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 700,
 		color: T.violet,
 		border: `1px dashed ${T.violet}66`,
@@ -13766,7 +13978,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		cursor: "pointer"
 	}}>＋ Сборы</span>}
             {extrasOn && <span onClick={() => setBlk("extras")} className="press" style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 700,
 		color: T.subd,
 		border: `1px dashed ${T.line}`,
@@ -13803,7 +14015,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		color: "#fff",
 		fontFamily: "Sora,sans-serif"
 	}}>Оформите страховку, eSIM или бизнес-зал</div><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: "rgba(255,255,255,.8)",
 		marginTop: 2
 	}}>Добавьте к поездке — напомним оформить вовремя</div></div>
@@ -13825,7 +14037,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		color: T.text
 	}}>{t.route.codes}</div>
           <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 2
 	}}>{t.route.stopover ? `стоповер в ${prep(t.route.stopover.city)} · ${t.route.stopover.nights} ноч. · ` : ""}{rub(t.route.total)}</div>
@@ -13927,7 +14139,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		setBlk("overview");
 		setToast("Жильё скрыто — вернуть можно в Обзоре");
 	}} className="press" style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		cursor: "pointer",
 		paddingTop: 10,
@@ -13957,7 +14169,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
             </div>;
 	})}
           <div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 8
 	}}>Сроки ориентировочные — проверяйте на официальных сайтах</div>
@@ -13984,21 +14196,21 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 			color: T.text,
 			fontWeight: 600
 		}}>{s.title}</div><div style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			color: T.subd
 		}}>от {s.from} ₽ · {s.sub}</div></div>
               {added ? <span onClick={() => upd((x) => ({
 			...x,
 			servicesAdded: (x.servicesAdded || []).filter((id) => id !== s.id)
 		}))} className="press" style={{
-			fontSize: 11.5,
+			fontSize: 12,
 			color: T.subd,
 			cursor: "pointer"
 		}}>убрать</span> : <span onClick={() => upd((x) => ({
 			...x,
 			servicesAdded: [...x.servicesAdded || [], s.id]
 		}))} className="press" style={{
-			fontSize: 11.5,
+			fontSize: 12,
 			color: s.color,
 			fontWeight: 700,
 			border: `1px solid ${s.color}55`,
@@ -14075,7 +14287,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		if (!rest.length) return null;
 		return <div key={grp} style={{ paddingTop: 8 }}>
               <div style={{
-			fontSize: 11,
+			fontSize: 12,
 			fontWeight: 800,
 			color: T.subd,
 			letterSpacing: .4,
@@ -14087,7 +14299,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 			flexWrap: "wrap"
 		}}>
                 {rest.map((n) => <span key={n} onClick={() => addItem(n)} className="press" style={{
-			fontSize: 11.5,
+			fontSize: 12,
 			fontWeight: 700,
 			color: T.text,
 			border: `1px dashed ${T.line}`,
@@ -14149,18 +14361,18 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 			color: T.text,
 			fontWeight: 700
 		}}>{s.title}</div><div style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			color: T.subd
 		}}>от {s.from} ₽ · {s.sub}</div></div>
           {added ? <span style={{
-			fontSize: 11.5,
+			fontSize: 12,
 			fontWeight: 700,
 			color: T.green
 		}}>✓ в плане</span> : <span onClick={() => upd((x) => ({
 			...x,
 			servicesAdded: [...x.servicesAdded || [], s.id]
 		}))} className="press" style={{
-			fontSize: 11.5,
+			fontSize: 12,
 			fontWeight: 700,
 			color: s.color,
 			border: `1px solid ${s.color}55`,
@@ -14296,7 +14508,7 @@ function NewTripSheet({ onClose, onCreate, profile = {} }) {
 		});
 	};
 	return <Overlay onClose={onClose}><SheetHead title="Новая поездка" onClose={onClose} /><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		marginBottom: 6
 	}}>Куда едем</div>{dest ? <div style={{
@@ -14331,7 +14543,7 @@ function NewTripSheet({ onClose, onCreate, profile = {} }) {
 		borderRadius: 10
 	}}>{a.flag || "📍"} {a.city} <span style={{
 		color: T.subd,
-		fontSize: 11.5
+		fontSize: 12
 	}}>· {a.country}</span></div>)}{canFreeform && <div onClick={() => setDest({
 		city: qq,
 		country: profile.homeCountry,
@@ -14346,11 +14558,11 @@ function NewTripSheet({ onClose, onCreate, profile = {} }) {
 		fontWeight: 800
 	}}>＋ Поездка в «{qq}» <span style={{
 		color: T.subd,
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 500
 	}}>· {profile.homeCountry}</span></div>}<div style={{ height: 6 }} /></>}
   <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		margin: "4px 0 6px"
 	}}>Даты поездки</div><DateRangeField from={df} to={dt} title="Даты поездки" allowSameDay onChange={(a, b) => {
@@ -14389,12 +14601,12 @@ function NewTripSheet({ onClose, onCreate, profile = {} }) {
 		fontWeight: 800,
 		color: T.text
 	}}>Вся поездка под ключ</div><div style={{
-		fontSize: 10.8,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 3
 	}}>Сразу добавим все основные блоки подготовки</div></div><MiniSwitch label="Вся поездка под ключ" on={allBlocks} onChange={() => setAllBlocks(!allBlocks)} /></div>
     <div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd,
 		lineHeight: 1.4,
 		margin: "11px 0 8px",
@@ -14417,7 +14629,7 @@ function NewTripSheet({ onClose, onCreate, profile = {} }) {
 		color: T.text,
 		fontWeight: 700
 	}}>{title}</div><div style={{
-		fontSize: 10.3,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 2
 	}}>{sub}</div></div><MiniSwitch label={title} on={blocks[key]} onChange={() => setBlocks((x) => ({
@@ -14426,7 +14638,7 @@ function NewTripSheet({ onClose, onCreate, profile = {} }) {
 	}))} /></div>)}</div>
   </div>
   {profile.homeCity && <div style={{
-		fontSize: 10.8,
+		fontSize: 12,
 		color: T.subd,
 		marginBottom: 10
 	}}>Домашний город: {profile.homeCity}{profile.homeAirport ? ` · ${profile.homeAirport}` : ""}. Для поездки внутри {profile.homeCountry || "страны"} загранпаспортные требования не добавляются автоматически.</div>}
@@ -14512,7 +14724,7 @@ function PublicTripCard({ trip, onClick, liked, onLike }) {
 		marginTop: 5
 	}}>{trip.title}</div>
     <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 4
 	}}>{trip.routeLabel || trip.destination}</div>
@@ -14521,12 +14733,12 @@ function PublicTripCard({ trip, onClick, liked, onLike }) {
 		fontWeight: 900,
 		marginTop: 11
 	}}>{publicBudgetLabel(trip)} <span style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		fontWeight: 500
 	}}>на человека</span></div>
     <div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.sub,
 		marginTop: 6
 	}}>{trip.freeSeats} свободных мест · {PUB_COST_LABEL[trip.publication?.costMode] || "Условия обсуждаются"}</div></div>
@@ -14540,12 +14752,13 @@ const PUBLIC_FILTER_DEFAULTS = {
 	gender: "any",
 	budgetMin: "",
 	budgetMax: "",
+	currency: "RUB",
 	costMode: "any",
 	sort: "recommended"
 };
 function publicTripScore(t, liked) {
-	const p = t && t.publication || {}, budget = Number(p.budgetMin) || Number(p.budgetMax) || 0, seats = Number(t && t.freeSeats) || 0, hasDates = t && t.df ? 1 : 0, description = p.description ? 1 : 0;
-	return (liked ? 1e5 : 0) + hasDates * 1e3 + description * 70 + seats * 18 + (budget ? Math.max(0, 5e4 - budget / 100) : 0);
+	const p = t?.publication || {};
+	return (liked ? 100 : 0) + (t.df ? 20 : 0) + (p.description ? 10 : 0) + (p.costMode && p.costMode !== "discuss" ? 5 : 0) + (Number(p.budgetMin) > 0 ? 5 : 0) + Math.min(5, Number(t.freeSeats) || 0);
 }
 function PublicFilters({ filters, setFilters, countries, onClose, onReset }) {
 	const set = (k, v) => setFilters((x) => ({
@@ -14553,7 +14766,7 @@ function PublicFilters({ filters, setFilters, countries, onClose, onReset }) {
 		[k]: v
 	}));
 	const chip = (k, v, label) => <span onClick={() => set(k, v)} className="press" style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 800,
 		color: filters[k] === v ? T.violet : T.sub,
 		border: `1px solid ${filters[k] === v ? T.violet : T.line}`,
@@ -14584,23 +14797,23 @@ function PublicFilters({ filters, setFilters, countries, onClose, onReset }) {
 		fontWeight: 800
 	}}><input type="checkbox" checked={filters.likedOnly} onChange={(e) => set("likedOnly", e.target.checked)} /> Только лайкнутые</label>
     <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		fontWeight: 800,
 		margin: "11px 0 6px"
 	}}>Страна</div><select value={filters.country} onChange={(e) => set("country", e.target.value)} style={inp}><option value="">Все страны</option>{countries.map((c) => <option key={c} value={c}>{c}</option>)}</select>
     <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		fontWeight: 800,
 		margin: "12px 0 6px"
-	}}>Возраст попутчиков</div><div style={{
+	}}>Возраст, который подходит организатору</div><div style={{
 		display: "grid",
 		gridTemplateColumns: "1fr 1fr",
 		gap: 8
 	}}><input inputMode="numeric" placeholder="от" value={filters.ageMin} onChange={(e) => set("ageMin", e.target.value.replace(/\D/g, ""))} style={inp} /><input inputMode="numeric" placeholder="до" value={filters.ageMax} onChange={(e) => set("ageMax", e.target.value.replace(/\D/g, ""))} style={inp} /></div>
     <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		fontWeight: 800,
 		margin: "12px 0 6px"
@@ -14610,17 +14823,24 @@ function PublicFilters({ filters, setFilters, countries, onClose, onReset }) {
 		flexWrap: "wrap"
 	}}>{chip("gender", "any", "Любой")}{chip("gender", "female", "Женщины")}{chip("gender", "male", "Мужчины")}</div>
     <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		fontWeight: 800,
 		margin: "12px 0 6px"
-	}}>Стоимость на человека</div><div style={{
+	}}>Стоимость на человека · в выбранной валюте</div><select aria-label="Валюта бюджета" value={filters.currency} onChange={(e) => set("currency", e.target.value)} style={{
+		...inp,
+		marginBottom: 8
+	}}>{[
+		"RUB",
+		"EUR",
+		"USD"
+	].map((c) => <option key={c}>{c}</option>)}</select><div style={{
 		display: "grid",
 		gridTemplateColumns: "1fr 1fr",
 		gap: 8
 	}}><input inputMode="decimal" placeholder="от" value={filters.budgetMin} onChange={(e) => set("budgetMin", e.target.value.replace(/[^\d.,]/g, "").replace(",", "."))} style={inp} /><input inputMode="decimal" placeholder="до" value={filters.budgetMax} onChange={(e) => set("budgetMax", e.target.value.replace(/[^\d.,]/g, "").replace(",", "."))} style={inp} /></div>
     <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		fontWeight: 800,
 		margin: "12px 0 6px"
@@ -14630,7 +14850,7 @@ function PublicFilters({ filters, setFilters, countries, onClose, onReset }) {
 		flexWrap: "wrap"
 	}}>{chip("costMode", "any", "Любой")}{chip("costMode", "self", "Каждый за себя")}{chip("costMode", "split", "Делим вместе")}{chip("costMode", "covered", "Часть покрыта")}{chip("costMode", "discuss", "Обсуждается")}</div>
     <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		fontWeight: 800,
 		margin: "12px 0 6px"
@@ -14741,7 +14961,11 @@ function PublicTripPreview({ trip, onClose, onOpenOwn, profile, setToast }) {
 		fontWeight: 800,
 		cursor: "pointer"
 	};
-	return <FullScreenOverlay onClose={onClose}><div style={{ padding: "4px 18px 100px" }}>
+	return <FullScreenOverlay onClose={onClose}><div style={{ padding: "4px 0 40px" }}><div style={{
+		display: "flex",
+		justifyContent: "flex-end",
+		marginBottom: 8
+	}}><button aria-label="Закрыть поездку" onClick={onClose}>×</button></div>
     <div style={{ position: "relative" }}><TripCover trip={detail} height={158} /><div style={{
 		position: "absolute",
 		left: 15,
@@ -14761,7 +14985,7 @@ function PublicTripPreview({ trip, onClose, onOpenOwn, profile, setToast }) {
 		color: T.text,
 		margin: "17px 0 5px"
 	}}>{publicBudgetLabel(detail)} <span style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 500,
 		color: T.subd
 	}}>на человека</span></div>
@@ -14860,7 +15084,7 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
 		const p = t.publication || {}, country = String(t.country || "");
 		const minAge = Number(p.ageMin) || 18, maxAge = Number(p.ageMax) || 90, reqMin = Number(publicFilters.ageMin) || 0, reqMax = Number(publicFilters.ageMax) || 90;
 		const low = Number(p.budgetMin) || 0, high = Number(p.budgetMax) || low || Infinity, bMin = Number(String(publicFilters.budgetMin || "").replace(",", ".")) || 0, bMax = Number(String(publicFilters.budgetMax || "").replace(",", ".")) || Infinity;
-		return (!publicFilters.likedOnly || likedPublic.includes(t.id)) && (!publicFilters.country || country === publicFilters.country) && (!reqMin || maxAge >= reqMin) && (!publicFilters.ageMax || minAge <= reqMax) && (!publicFilters.gender || publicFilters.gender === "any" || p.preferredGender === publicFilters.gender || p.preferredGender === "any") && high >= bMin && low <= bMax && (!publicFilters.costMode || publicFilters.costMode === "any" || p.costMode === publicFilters.costMode);
+		return (!publicFilters.likedOnly || likedPublic.includes(t.id)) && (!publicFilters.country || country === publicFilters.country) && (!reqMin || maxAge >= reqMin) && (!publicFilters.ageMax || minAge <= reqMax) && (!publicFilters.gender || publicFilters.gender === "any" || p.preferredGender === publicFilters.gender || p.preferredGender === "any") && (!(publicFilters.budgetMin || publicFilters.budgetMax || publicFilters.sort === "price") || (p.currency || "RUB") === publicFilters.currency && (Number(p.budgetMin) > 0 || Number(p.budgetMax) > 0)) && high >= bMin && low <= bMax && (!publicFilters.costMode || publicFilters.costMode === "any" || p.costMode === publicFilters.costMode);
 	}).sort((a, b) => {
 		if (publicFilters.sort === "date") return String(a.df || "9999").localeCompare(String(b.df || "9999"));
 		if (publicFilters.sort === "price") return (Number(a.publication?.budgetMin) || Number.MAX_SAFE_INTEGER) - (Number(b.publication?.budgetMin) || Number.MAX_SAFE_INTEGER);
@@ -14945,7 +15169,7 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
 		fontWeight: 900,
 		whiteSpace: "nowrap",
 		flexShrink: 0
-	}}>Смотреть все&nbsp;→</span>
+	}}>→</span>
     </button>
     <div style={{
 		display: "flex",
@@ -15002,7 +15226,7 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
 		textAlign: "left",
 		color: T.text
 	}}>{x.name}<div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd
 	}}>{x.dates}</div></button><button aria-label="Убрать из сохранённого" onClick={() => onUnlike(x.id)} style={link}>×</button></div>)}<div style={{
 		color: T.subd,
@@ -15013,7 +15237,11 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
 		display: "block"
 	}} onClick={() => onRunRecent(x)}>{x.name} · {x.dates}</button>)}</div>}
   </div>
-  {catalog && <FullScreenOverlay onClose={() => setCatalog(false)}><div style={{ padding: "0 18px 80px" }}><div style={{
+  {catalog && <FullScreenOverlay onClose={() => setCatalog(false)}><div style={{ padding: "0 0 40px" }}><div style={{
+		display: "flex",
+		justifyContent: "flex-end",
+		marginBottom: 8
+	}}><button aria-label="Закрыть каталог" onClick={() => setCatalog(false)}>×</button></div><div style={{
 		display: "flex",
 		alignItems: "center",
 		gap: 10
@@ -15041,7 +15269,7 @@ function RoutesScreen({ trips, publicTrips, publicLoading, reloadPublic, publicM
 		borderRadius: 99,
 		background: T.violet,
 		color: "#fff",
-		fontSize: 9,
+		fontSize: 12,
 		fontWeight: 900,
 		display: "grid",
 		placeItems: "center"
@@ -15505,15 +15733,17 @@ const SERVICES = [
 	}
 ];
 const todayISO = () => new Date().toISOString().slice(0, 10);
-function promosForTrip({ country, city, depISO }) {
+function promosForTrip({ country, city, depISO, retISO }) {
 	const today = todayISO();
 	const out = [];
 	for (const s of SERVICES) for (const p of s.promos || []) {
+		if (p.verified !== true || !isReferralUrl(p.refUrl || s.refUrl)) continue;
 		if (p.endDate && p.endDate < today) continue;
-		if (p.country && country && p.country !== country) continue;
-		if (p.city && city && p.city !== city) continue;
+		if (p.country && p.country !== country) continue;
+		if (p.city && p.city !== city) continue;
 		if (p.stayFrom && depISO && depISO < p.stayFrom) continue;
 		if (p.stayTo && depISO && depISO > p.stayTo) continue;
+		if (p.stayTo && retISO && retISO > p.stayTo) continue;
 		out.push({
 			...p,
 			service: s.name,
@@ -15638,7 +15868,7 @@ function ServiceGrid({ setToast }) {
 		fontFamily: "Sora,sans-serif"
 	}}>{s.title}</div>
           <div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 2,
 		flex: 1,
@@ -15651,7 +15881,7 @@ function ServiceGrid({ setToast }) {
 		marginTop: 8
 	}}>
             <span style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 800,
 		color: s.color,
 		background: s.color + "1a",
@@ -15698,12 +15928,12 @@ function ServiceGrid({ setToast }) {
 		color: T.text,
 		fontFamily: "Sora,sans-serif"
 	}}>{lounge.title}</div><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 2
 	}}>{lounge.sub}</div></div>
       <span style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		fontWeight: 800,
 		color: lounge.color,
 		background: lounge.color + "1a",
@@ -15724,7 +15954,7 @@ function ServiceGrid({ setToast }) {
 	}}><Icon d={I.arrow} size={12} color={T.sub} /></div>
     </div>}
     <div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 8,
 		textAlign: "center"
@@ -15802,7 +16032,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		if (dd.E < 9999) parts.push(`не раньше чем за ${dd.E} дн.`);
 		if (dd.P > 0) parts.push(`оформляется ~${dd.P} дн.`);
 		return parts.length ? <span style={{
-			fontSize: 10,
+			fontSize: 12,
 			color: T.subd,
 			whiteSpace: "nowrap"
 		}}>{parts.join(" · ")}</span> : null;
@@ -15835,7 +16065,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 			color: dim ? T.subd : T.text,
 			lineHeight: 1.25
 		}}>{dd.name}</div><div style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			color: T.subd
 		}}>{DOC_TYPE_LABEL[info.type] || ""}</div></div>
       {timingText(dd)}
@@ -15925,7 +16155,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		color: T.text,
 		fontFamily: "Sora,sans-serif"
 	}}>Подобрать документы для поездки</div><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 2
 	}}>Пара вопросов — и персональный комплект со сроками</div></div>
@@ -15957,7 +16187,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		marginBottom: 4
 	}}>Помочь с конкретным документом</div>
           <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		marginBottom: 10
 	}}>Например: TDAC, eVisa, шенгенская анкета</div>
@@ -15973,7 +16203,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		marginTop: 10
 	}}>
             {popular.map((x) => <span key={x.id} onClick={() => setDoc(x)} className="press" style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.violet,
 		fontWeight: 700,
 		background: T.violet + "14",
@@ -16002,7 +16232,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 			flex: 1
 		}}>Мои документы</div>
               <span style={{
-			fontSize: 11.5,
+			fontSize: 12,
 			color: T.subd
 		}}>{mine.length}</span>
             </div>
@@ -16051,14 +16281,14 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 				textOverflow: "ellipsis"
 			}}>{d.name}</div>
                       <div style={{
-				fontSize: 11,
+				fontSize: 12,
 				color: T.subd,
 				marginTop: 2
 			}}>{d.country || "Документ"} · заполнено {fld} из {total}</div>
                     </div>
                     <span style={{
 				flexShrink: 0,
-				fontSize: 10,
+				fontSize: 12,
 				fontWeight: 800,
 				letterSpacing: .3,
 				color: ready ? T.green : "#e0a53a",
@@ -16205,7 +16435,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		color: purpose === p ? T.violet : T.text
 	}}>{PURPOSE_LABEL[p]}</div>)}
         </div><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 6
 	}}>{purpose === "none" ? "Для этой поездки отдельная цель в визовом сценарии не нужна." : "По умолчанию выбрано: отпуск."}</div></div>}
@@ -16312,7 +16542,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		fontSize: 18,
 		color: T.text
 	}}>{country}</div><div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd
 	}}>{TRIP_TYPE_LABEL}{linkedTrip ? ` · поездка «${linkedTrip.title}»` : ""}</div></div>
         </div>
@@ -16328,7 +16558,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 			margin: "12px 0 10px"
 		}}>
               <span style={{
-			fontSize: 11,
+			fontSize: 12,
 			fontWeight: 800,
 			color: noVisa ? T.green : T.violet,
 			background: (noVisa ? T.green : T.violet) + "1e",
@@ -16337,7 +16567,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 			padding: "4px 10px"
 		}}>{(ENTRY_MODE_LABEL[cCfg.entryMode] || "").toUpperCase()}</span>
               <span style={{
-			fontSize: 9.5,
+			fontSize: 12,
 			fontWeight: 800,
 			color: sl.col,
 			background: sl.col + "1a",
@@ -16348,7 +16578,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		}}>{sl.txt}</span>
             </div>
             {cCfg.note && <div style={{
-			fontSize: 11.5,
+			fontSize: 12,
 			color: T.subd,
 			marginBottom: 10,
 			lineHeight: 1.45
@@ -16405,10 +16635,10 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 				txt: "Заполняется",
 				col: "#e0a53a"
 			} : {
-				txt: it.kind === "request" ? "Запросить" : it.kind === "form" ? "Заполнить" : it.kind === "external" ? "На сайте" : "Проверить",
+				txt: it.kind === "request" ? "Запросить" : it.kind === "form" || docConfig(it.id, it.name, country) ? "Заполнить" : it.kind === "external" ? "На сайте" : "Проверить",
 				col: T.violet
 			};
-			const canOpen = it.kind === "form" || it.kind === "request";
+			const canOpen = !!docConfig(it.id, it.name, country) || it.kind === "request";
 			const dd = ALL_DOCS.find((x) => x.id === it.id);
 			return <div key={it.id} onClick={() => {
 				if (!canOpen) return;
@@ -16441,7 +16671,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 				lineHeight: 1.3
 			}}>{d.what || it.name}</div>
                       {d.why && <div style={{
-				fontSize: 11.5,
+				fontSize: 12,
 				color: T.subd,
 				lineHeight: 1.45,
 				marginTop: 4
@@ -16449,7 +16679,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
                     </div>
                     <span style={{
 				flexShrink: 0,
-				fontSize: 10,
+				fontSize: 12,
 				fontWeight: 800,
 				color: meta.col,
 				background: meta.col + "1a",
@@ -16465,7 +16695,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 				marginTop: 9
 			}}>
                     {d.cost && <span style={{
-				fontSize: 10.5,
+				fontSize: 12,
 				color: T.sub,
 				background: T.card2,
 				border: `1px solid ${T.line}`,
@@ -16473,7 +16703,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 				padding: "4px 8px"
 			}}>💳 {d.cost}</span>}
                     {d.days && <span style={{
-				fontSize: 10.5,
+				fontSize: 12,
 				color: T.sub,
 				background: T.card2,
 				border: `1px solid ${T.line}`,
@@ -16485,7 +16715,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		})}
             </div>
             {cCfg.supportLevel === "information_only" && <div style={{
-			fontSize: 11.5,
+			fontSize: 12,
 			color: "#e0a53a",
 			marginBottom: 14,
 			lineHeight: 1.45
@@ -16517,7 +16747,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 			marginBottom: 8
 		}}>
               <span style={{
-			fontSize: 11,
+			fontSize: 12,
 			fontWeight: 800,
 			letterSpacing: .3,
 			color: col,
@@ -16527,11 +16757,11 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 			padding: "3px 10px"
 		}}>{vi.status.toUpperCase()}</span>
               {vi.days ? <span style={{
-			fontSize: 11.5,
+			fontSize: 12,
 			color: T.subd
 		}}>до {vi.days} {plural(vi.days, "дня", "дней", "дней")}</span> : null}
               {vi.visaType ? <span style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			color: T.subd,
 			marginLeft: "auto"
 		}}>{vi.visaType}</span> : null}
@@ -16549,7 +16779,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 			marginBottom: 10
 		}}>
               {vi.processing && <span style={{
-			fontSize: 11,
+			fontSize: 12,
 			color: T.sub,
 			background: T.card2,
 			border: `1px solid ${T.line}`,
@@ -16557,7 +16787,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 			padding: "5px 9px"
 		}}>⏱ {vi.processing}</span>}
               {vi.center && <span style={{
-			fontSize: 11,
+			fontSize: 12,
 			color: T.sub,
 			background: T.card2,
 			border: `1px solid ${T.line}`,
@@ -16573,7 +16803,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 			marginBottom: 10
 		}}>
               <div style={{
-			fontSize: 11,
+			fontSize: 12,
 			fontWeight: 800,
 			color: T.violet,
 			marginBottom: 6
@@ -16599,7 +16829,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 			flexShrink: 0
 		}} />
                 <span style={{
-			fontSize: 11.5,
+			fontSize: 12,
 			color: T.subd,
 			lineHeight: 1.4
 		}}>{r}</span></div>)}
@@ -16668,7 +16898,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 				window.open(s.url, "_blank");
 			} catch (e) {}
 		}} className="press" style={{
-			fontSize: 11.5,
+			fontSize: 12,
 			color: T.violet,
 			fontWeight: 700,
 			border: `1px solid ${T.violet}44`,
@@ -16679,7 +16909,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		}}>{s.label} →</span>)}
             </div>
             <div style={{
-			fontSize: 10,
+			fontSize: 12,
 			color: checkIsStale(vi.checked) ? T.gold : T.subd,
 			marginTop: 9
 		}}>{checkIsStale(vi.checked) ? "Проверка старше 30 дней" : `Сведения от ${vi.checked}`} · актуальность перед поездкой проверьте в официальном источнике</div>
@@ -16728,7 +16958,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
               </div>
               <span onClick={() => setKitSel(sel ? kitSel.filter((x) => x !== dd.id) : [...kitSel, dd.id])} className="press" style={{
 			flexShrink: 0,
-			fontSize: 11.5,
+			fontSize: 12,
 			fontWeight: 700,
 			color: sel ? T.green : T.violet,
 			border: `1px solid ${sel ? T.green : T.violet}55`,
@@ -16752,7 +16982,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		cursor: "pointer"
 	}}>Добавить комплект в путешествие</div>
         <div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 8,
 		textAlign: "center"
@@ -16788,7 +17018,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		color: T.text,
 		fontWeight: 600
 	}}>{x.name}</span> <span style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd
 	}}>· {x.country}</span></div>)}
         {!found.length && <div style={{
@@ -16801,7 +17031,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		setDoc(x);
 		setSearchOpen(false);
 	}} className="press" style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.violet,
 		fontWeight: 700,
 		background: T.violet + "14",
@@ -16956,7 +17186,7 @@ function Docs({ trips, onOpenTrip, onCreateTrip, onAddDocToTrip, preOpenDoc, onP
 		fontWeight: 700,
 		color: T.text
 	}}>{t.title}</div><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd
 	}}>документы уже внутри — отметьте готовые</div></div>
         <Icon d={I.chevR} size={15} color={T.subd} />
@@ -17017,7 +17247,7 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 			setGuests(Math.max(1, activeTravelers(trip).length));
 		}
 	}, [trip && trip.id]);
-	const activePromos = (s) => (s.promos || []).filter((p) => !p.endDate || p.endDate >= today).sort((a, b) => (b.discountRub || 0) - (a.discountRub || 0));
+	const activePromos = (s) => (s.promos || []).filter((p) => p.verified === true && isReferralUrl(p.refUrl || s.refUrl) && (!p.endDate || p.endDate >= today)).sort((a, b) => (b.discountRub || 0) - (a.discountRub || 0));
 	const changeFrom = (v) => {
 		setPFrom(v);
 		setDateErr("");
@@ -17037,13 +17267,15 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		if (!q) return [];
 		const resolved = resolveDestination(pq), out = [];
 		for (const s of SERVICES) for (const p of activePromos(s)) {
-			const hay = `${p.country || ""} ${p.city || ""} ${p.header || ""} ${s.name}`.toLowerCase(), universal = !p.country && !p.city;
-			let geoOk = hay.includes(q) || universal;
+			const universal = !p.country && !p.city;
+			let geoOk = universal || [p.country, p.city].some(v => v && v.toLowerCase() === q);
 			if (resolved) {
 				const cOk = !p.country || resolved.country && p.country === resolved.country, ctOk = !p.city || resolved.city && p.city === resolved.city;
-				if (cOk && ctOk) geoOk = true;
+				geoOk = !!(cOk && ctOk);
 			}
 			if (!geoOk) continue;
+			if (pFrom && p.stayFrom && pFrom < p.stayFrom) continue;
+			if (pTo && p.stayTo && pTo > p.stayTo) continue;
 			if (pFrom && p.stayTo && pFrom > p.stayTo) continue;
 			if (pTo && p.stayFrom && pTo < p.stayFrom) continue;
 			out.push({
@@ -17056,7 +17288,8 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 	const copy = async (p) => {
 		try {
 			await navigator.clipboard.writeText(p.code);
-			setGoUrl(isReferralUrl(p.refUrl) ? p.refUrl : null);
+			const target = p.refUrl || p._svc?.refUrl || svc?.refUrl;
+			setGoUrl(isReferralUrl(target) ? target : null);
 			setToast("Промокод скопирован");
 		} catch (e) {
 			setToast("Не удалось скопировать");
@@ -17169,7 +17402,7 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		changeTo(b);
 	}} />
         {dateErr && <div style={{
-		fontSize: 10.8,
+		fontSize: 12,
 		color: "#ff7ba9",
 		marginTop: 5
 	}}>{dateErr}</div>}
@@ -17179,7 +17412,7 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		gap: 10,
 		marginTop: 10
 	}}><div style={{ flex: 1 }}><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd
 	}}>Гостей</div><div style={{
 		fontSize: 13,
@@ -17233,7 +17466,7 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		fontWeight: 800,
 		color: T.text
 	}}>Результаты подбора скидок</div><div style={{
-		fontSize: 10.8,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 2
 	}}>{matchedPromos.length ? `${matchedPromos.length} промо найдено` : `Промокодов под эти даты пока нет`}</div></div><Icon d={I.chevR} size={15} color={T.subd} /></div>}
@@ -17271,12 +17504,12 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 			color: T.text,
 			lineHeight: 1.15
 		}}>{s.name}</div></div><div style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			color: T.subd,
 			lineHeight: 1.35,
 			marginTop: 9
 		}}>{s.desc}</div><div style={{
-			fontSize: 10.5,
+			fontSize: 12,
 			color: n ? T.cyan : T.subd,
 			fontWeight: 800,
 			marginTop: 7
@@ -17304,13 +17537,13 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		fontWeight: 800,
 		color: T.text
 	}}>Уже забронировали?</div><div style={{
-		fontSize: 10.8,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 2
 	}}>Добавьте жильё и цену прямо в {trip.title}</div></div><Icon d={I.chevR} size={15} color={T.subd} /></div>}
     </div>
     {promoOpen && <Overlay onClose={() => setPromoOpen(false)}><SheetHead title="Скидки под ваши даты" onClose={() => setPromoOpen(false)} /><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd,
 		marginBottom: 11
 	}}>{pq}{pFrom ? ` · ${ddmm(pFrom)}` : ""}{pTo ? ` — ${ddmm(pTo)}` : ""}</div><div style={{
@@ -17337,11 +17570,11 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		fontWeight: 800,
 		color: T.text
 	}}>{promoHeadline(p)}</div><div style={{
-		fontSize: 10.8,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 3
 	}}>{p._svc.name} · {p.header}</div>{p.endDate && <div style={{
-		fontSize: 10,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 4
 	}}>Бронирование до {ddmm(p.endDate)}{p.stayTo ? ` · проживание до ${ddmm(p.stayTo)}` : ""}</div>}</div></div><div style={{
@@ -17361,12 +17594,12 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		letterSpacing: .7,
 		flex: 1
 	}}>{p.code}</span><span onClick={() => copy(p)} className="press" style={{
-		fontSize: 11,
+		fontSize: 12,
 		fontWeight: 800,
 		color: T.cyan,
 		cursor: "pointer"
-	}}>Скопировать</span>{isReferralUrl(p.refUrl) && <span onClick={() => openProvider(p._svc, p.refUrl)} className="press" style={{
-		fontSize: 11,
+	}}>Скопировать</span>{isReferralUrl(p.refUrl || p._svc.refUrl) && <span onClick={() => openProvider(p._svc, p.refUrl || p._svc.refUrl)} className="press" style={{
+		fontSize: 12,
 		fontWeight: 800,
 		color: T.text,
 		cursor: "pointer"
@@ -17388,7 +17621,7 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		fontWeight: 800,
 		color: T.text
 	}}>{promoHeadline(p)}</div><div style={{
-		fontSize: 10.8,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 3
 	}}>{p.header}</div><div style={{
@@ -17402,7 +17635,7 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		fontFamily: "Sora,sans-serif",
 		fontWeight: 900
 	}}>{p.code}</span><span onClick={() => copy(p)} className="press" style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.cyan,
 		fontWeight: 800,
 		cursor: "pointer"
@@ -17443,11 +17676,11 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		borderRadius: 10,
 		padding: 9,
 		color: stay.pricingMode === v ? T.cyan : T.subd,
-		fontSize: 11,
+		fontSize: 12,
 		fontWeight: 800,
 		cursor: "pointer"
 	}}>{l}</div>)}</div><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 9
 	}}>По умолчанию расход разделится на всех текущих путешественников. Плательщика можно уточнить в бюджете поездки.</div><div onClick={addStay} className="press" style={{
@@ -17647,28 +17880,32 @@ function App() {
 	const [kb, setKb] = useState(false);
 	useEffect(() => {
 		let tm = null;
-		const isField = (el) => el && el.tagName && [
-			"INPUT",
-			"TEXTAREA",
-			"SELECT"
-		].includes(el.tagName);
-		const onIn = (e) => {
-			if (isField(e.target)) {
-				clearTimeout(tm);
-				setKb(true);
-			}
+		const check = () => {
+			const el = document.activeElement, focused = el?.isConnected && ["INPUT", "TEXTAREA"].includes(el.tagName) && ![
+				"checkbox",
+				"radio",
+				"button"
+			].includes(el.type);
+			const vv = window.visualViewport;
+			setKb(!!focused && (!vv || window.innerHeight - vv.height > 100));
 		};
-		const onOut = (e) => {
-			if (isField(e.target)) {
-				clearTimeout(tm);
-				tm = setTimeout(() => setKb(false), 120);
-			}
+		const defer = () => {
+			clearTimeout(tm);
+			tm = setTimeout(check, 80);
 		};
-		document.addEventListener("focusin", onIn);
-		document.addEventListener("focusout", onOut);
+		const observer = new MutationObserver(defer);
+		observer.observe(document.body, {
+			childList: true,
+			subtree: true
+		});
+		document.addEventListener("focusin", defer);
+		document.addEventListener("focusout", defer);
+		window.visualViewport?.addEventListener("resize", defer);
 		return () => {
-			document.removeEventListener("focusin", onIn);
-			document.removeEventListener("focusout", onOut);
+			observer.disconnect();
+			document.removeEventListener("focusin", defer);
+			document.removeEventListener("focusout", defer);
+			window.visualViewport?.removeEventListener("resize", defer);
 			clearTimeout(tm);
 		};
 	}, []);
@@ -17979,7 +18216,7 @@ function App() {
 	const datesLabel = (f) => f.dep ? f.round && f.ret ? `${fmtShort(f.dep)} — ${fmtShort(f.ret)}` : fmtShort(f.dep) : "";
 	const runSearch = async (f) => {
 		const ff = f || form;
-		if (!ff.origin || !ff.dest || !ff.dep) {
+		if (!ff.origin || !ff.dest || !ff.dep || ff.round && !ff.ret || ff.round && ff.ret < ff.dep) {
 			setSheet(true);
 			setToast("Заполните откуда, куда и дату");
 			return;
@@ -17998,7 +18235,9 @@ function App() {
 			destinationId: ff.dest.destId || ff.dest.code,
 			adults: ff.adults,
 			datesLabel: datesLabel(ff),
-			depISO: iso(ff.dep)
+			depISO: iso(ff.dep),
+			retISO: ff.round && ff.ret ? iso(ff.ret) : "",
+			children: ff.children || []
 		};
 		lastSearchRef.current = {
 			oc: ff.origin.code,
@@ -18008,7 +18247,10 @@ function App() {
 			a: ff.adults || 1,
 			ch: ff.children || []
 		};
-		setQuery(nq);
+		setQuery({
+			...nq,
+			priceNotice: ff.children?.length ? "Сумма только за взрослых. Детские тарифы и итог — у продавца." : "Цены из прошлых поисков. Наличие и итог — у продавца."
+		});
 		setSheet(false);
 		setTab("routes");
 		setStack(["results"]);
@@ -18020,7 +18262,8 @@ function App() {
 			round: ff.round,
 			dep: iso(ff.dep),
 			ret: ff.ret ? iso(ff.ret) : null,
-			adults: ff.adults
+			adults: ff.adults,
+			children: ff.children || []
 		};
 		setRecent((p) => [{
 			name: `${nq.origin} — ${nq.destName}`,
@@ -18046,9 +18289,10 @@ function App() {
 				}
 			});
 			if (seq !== searchSequence.current) return;
-			setRoutes(res);
+			setRoutes(res.routes);
+			if (res.priceNotice) setQuery(q => ({ ...q, priceNotice: res.priceNotice }));
 			if (pendingOpenId.current) {
-				const match = res.find((x) => x.id === pendingOpenId.current);
+				const match = res.routes.find((x) => x.id === pendingOpenId.current);
 				pendingOpenId.current = null;
 				if (match) {
 					setSelected(match);
@@ -18551,10 +18795,9 @@ function App() {
 			setStack((p) => p.slice(0, -1));
 		};
 		try {
-			if (canBack) {
-				tg.BackButton.show();
-				if (tg.BackButton.onClick) tg.BackButton.onClick(onBack);
-			} else tg.BackButton.hide();
+			window.__tripwiseAppCanBack = !!canBack;
+			syncModalBack();
+			tg.BackButton.onClick?.(onBack);
 		} catch (e) {}
 		return () => {
 			try {
@@ -18767,6 +19010,10 @@ function App() {
 	}}>
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap');
+
+input:not([type=checkbox]):not([type=radio]),textarea,select{min-width:0;max-width:100%;font-size:16px!important}button{font:inherit;color:inherit;cursor:pointer;min-height:44px;border-radius:10px;background:#091a2c;border:1px solid rgba(129,156,204,.3);padding:8px 10px}button[aria-label]{min-width:44px}button:disabled{opacity:.5;cursor:default}.press{touch-action:manipulation}.press:focus-visible,button:focus-visible{outline:2px solid #31c7f3;outline-offset:2px}img{max-width:100%}[data-tripwise-modal]{isolation:isolate}.budget-summary{min-width:0}
+
+
       *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
       @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
       @keyframes fadeUp{from{opacity:0;transform:translate3d(0,6px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
@@ -18868,7 +19115,7 @@ function App() {
 		marginTop: 3
 	}}>{query.datesLabel}{confirmTrip.stopover ? ` · стоповер в ${prep(confirmTrip.stopover.city)} ${confirmTrip.stopover.nights} ноч.` : ""} · {rub(confirmTrip.total)}</div>
           <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		marginTop: 8,
 		lineHeight: 1.4
@@ -18941,7 +19188,7 @@ function App() {
 		boxShadow: "0 14px 34px rgba(102,91,255,.32)",
 		fontSize: 34
 	}}>✈️</div><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.violet,
 		fontWeight: 900,
 		letterSpacing: .4,
@@ -18962,7 +19209,7 @@ function App() {
 		background: T.line,
 		margin: "16px 0 12px"
 	}} /><div style={{
-		fontSize: 10.5,
+		fontSize: 12,
 		color: T.subd,
 		fontWeight: 800,
 		textAlign: "left",
@@ -18987,7 +19234,7 @@ function App() {
 		background: T.violet + "22",
 		display: "grid",
 		placeItems: "center",
-		fontSize: 11,
+		fontSize: 12,
 		fontWeight: 900,
 		color: T.violet,
 		overflow: "hidden"
@@ -19006,10 +19253,10 @@ function App() {
 		textOverflow: "ellipsis",
 		whiteSpace: "nowrap"
 	}}>{x.name || `Путешественник ${i + 1}`}</div><div style={{
-		fontSize: 10,
+		fontSize: 12,
 		color: x.joined ? T.green : T.subd
 	}}>{x.joined ? "в TripWise" : "путешественник"}</div></div></div>)}{!(invitePreview.participants || []).length && <div style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		textAlign: "left"
 	}}>{invitePreview.travelerCount} {plural(invitePreview.travelerCount, "путешественник", "путешественника", "путешественников")}</div>}</div><div onClick={async () => {
@@ -19033,7 +19280,7 @@ function App() {
 		fontWeight: 900,
 		cursor: "pointer"
 	}}>Присоединиться</div><div onClick={() => setInvitePreview(null)} style={{
-		fontSize: 11.5,
+		fontSize: 12,
 		color: T.subd,
 		fontWeight: 700,
 		padding: "11px 0 2px",
@@ -19078,7 +19325,7 @@ function App() {
 			display: "grid",
 			placeItems: "center",
 			overflow: "hidden",
-			fontSize: 11,
+			fontSize: 12,
 			fontWeight: 900,
 			color: T.violet
 		}}>{m && m.photoUrl ? <img src={m.photoUrl} style={{
@@ -19087,7 +19334,7 @@ function App() {
 			objectFit: "cover"
 		}} /> : String(tr.name || "?").split(/\s+/).slice(0, 2).map((v) => v[0]).join("").toUpperCase()}</div>;
 	})}</div><div style={{
-		fontSize: 11,
+		fontSize: 12,
 		color: T.subd,
 		marginBottom: 13
 	}}>{(inviteJoined.travelers || []).filter((x) => x.active !== false).length} {plural((inviteJoined.travelers || []).filter((x) => x.active !== false).length, "путешественник", "путешественника", "путешественников")} · общий план синхронизирован</div><div onClick={() => {
