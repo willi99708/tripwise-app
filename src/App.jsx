@@ -55,7 +55,7 @@ function calculateReadiness(t, requiredDocuments = []) {
 	if (b.lodging && (!t.df || !t.dt || t.df !== t.dt)) {
 		const stays = t.stays || [], xs = stays.length ? stays.map((x) => ["stay:" + x.id, !!x.done]) : [["lodging", false]];
 		if (stays.length) xs.push(["lodgingCoverage", lodgingCoverage(t)]);
-		if (t.route?.stopover && !checks.lodgeStop) xs.push(["lodgeStop", false]);
+		if (stopoverNeedsHotel(t.route?.stopover) && !checks.lodgeStop) xs.push(["lodgeStop", false]);
 		groups.push({
 			w: 25,
 			items: xs
@@ -416,7 +416,7 @@ function budgetSummary(t) {
 //#endregion
 //#region TripWiseAI-v7-release/frontend/src/App.jsx
 const API_BASE = import.meta.env.VITE_API_BASE || "https://functions.yandexcloud.net/d4e3hpvr0lrijksc8i1r";
-const APP_VERSION = "7.0.0-rc.6";
+const APP_VERSION = "7.0.0-rc.7";
 const YM_ID = Number(import.meta.env.VITE_METRIKA_ID) || 0;
 const YM_TAB_PATH = {
 	home: "/home",
@@ -2178,6 +2178,7 @@ const isoOff = (iso) => {
 };
 const depOf = (s) => s.departHM || (s.departISO ? String(s.departISO).slice(11, 16) : "—");
 const arrOf = (s) => {
+	if (s.timingUnverified || (s.transfers || 0) > 0) return "—";
 	if (s.arriveHM) return s.arriveHM;
 	if (s.departISO && s.durationMin != null) {
 		const t = Date.parse(s.departISO) + s.durationMin * 6e4 + isoOff(s.departISO) * 6e4;
@@ -2186,6 +2187,9 @@ const arrOf = (s) => {
 	return "—";
 };
 const legDur = (segs) => (segs || []).filter((s) => s.mode !== "ferry").reduce((s, x) => s + (x.durationMin || 0), 0);
+const legTimeUnverified = (segs) => (segs || []).some(s => s.timingUnverified || (s.transfers || 0) > 0);
+const stopoverText = (stop) => stop.kind === "layover" ? `${hm(stop.waitMin)} ожидания · ${stop.city}` : `${stop.nights} ${plural(stop.nights, "ночь", "ночи", "ночей")} · ${stop.city}`;
+function stopoverNeedsHotel(stop) { return !!stop && stop.kind !== "layover" && Number(stop.nights) > 0; }
 const LABELS = {
 	recommended: {
 		t: "Выбор TripWise",
@@ -3923,10 +3927,10 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
 		const junctions = Math.max(0, Math.max(0, planes.length - 1) - (stop ? 1 : 0));
 		const t = intra + junctions;
 		const durSum = legMin != null && legMin > 0 ? legMin : (segs || []).reduce((n, s) => n + (s.durationMin || 0), 0);
-		const durTxt = durSum > 0 ? hm(durSum) : "";
+		const durTxt = legTimeUnverified(segs) ? "Полное время — у продавца" : durSum > 0 ? hm(durSum) : "";
 		let txt, col = T.subd;
 		if (stop) {
-			txt = `${stop.nights} ${plural(stop.nights, "ночь", "ночи", "ночей")} отдыха в ${stop.city}${t > 0 ? ` · ${t} ${plural(t, "пересадка", "пересадки", "пересадок")}` : " · без пересадок"}`;
+			txt = stop.kind === "layover" ? `${durTxt} · ${stopoverText(stop)}` : stopoverText(stop);
 			col = T.green;
 		} else {
 			const trTxt = t > 0 ? `${t} ${plural(t, "пересадка", "пересадки", "пересадок")}${waitMin > 0 ? ` на ${hm(waitMin)}` : ""}` : "прямой";
@@ -4017,7 +4021,7 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
 	}}>{r.stopover ? `Stopover: ${r.stopover.city}` : r.roundTrip ? "Туда — обратно" : r.transfers ? "С пересадкой" : "Прямой перелёт"}</div><div style={{
 		fontSize: 12,
 		color: T.subd
-	}}>{r.stopover ? `${r.stopover.nights} ноч. в пути` : r.roundTrip ? "время по направлениям выше" : r.durationMin > 0 ? hm(r.durationMin) : "—"}</div></div>
+	}}>{r.stopover ? stopoverText(r.stopover) : r.roundTrip ? "время по направлениям выше" : legTimeUnverified(outSegs) ? "Полное время — у продавца" : r.durationMin > 0 ? hm(r.durationMin) : "—"}</div></div>
       <div style={{
 		fontFamily: "Sora,sans-serif",
 		fontWeight: 800,
@@ -4174,7 +4178,9 @@ function AirlineLogo({ code }) {
 function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, onTakeTrip, inTrip, takeLabel }) {
 	const dur = legDur(r.segments);
 	const segs = r.segments || [];
-	const twoTicketNote = segs.length === 2 && (r.notes || []).some((n) => /раздельны|отдельных билета|два отдельных/i.test(n)) ? "Два отдельных билета" : null;
+	const twoTicketNote = r.selfTransfer ? "Самостоятельная пересадка · отдельные билеты" : r.roundTrip && (r.bookingLinks || []).length > 1 ? "Билеты туда и обратно — раздельные" : null;
+	const outTime = legTimeUnverified(segs.filter(s => s.direction !== "return")) ? "—" : hm(r.roundTrip ? r.durationOut : r.durationMin || dur);
+	const retTime = legTimeUnverified(segs.filter(s => s.direction === "return")) ? "—" : hm(r.durationRet);
 	return <div style={{ animation: "slideIn .18s ease-out" }}>
     <Header onBack={onBack} onEdit={onEdit} title={`${query.origin} → ${query.destName}`} subtitle={query.datesLabel} /><div role="note" style={{
 		fontSize: 12,
@@ -4324,13 +4330,13 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 	}}>
         {(r.roundTrip ? [
 		[rub(r.total), "Билеты"],
-		[hm(r.durationOut || dur), "Туда"],
-		[hm(r.durationRet || 0), "Обратно"],
+		[outTime, "Туда"],
+		[retTime, "Обратно"],
 		[`${query.adults || 1} взр.${query.children?.length ? " + " + query.children.length + " дет." : ""}`, "Эконом"],
 		[r.transfers ? `${r.transfers}` : "0", "Пересадки"]
 	] : [
 		[rub(r.total), "Билеты"],
-		[hm(dur), "Туда"],
+		[outTime, "Туда"],
 		[`${query.adults || 1} взр.${query.children?.length ? " + " + query.children.length + " дет." : ""}`, "Эконом"],
 		[r.transfers ? `${r.transfers}` : "0", "Пересадки"]
 	]).map(([a, b], i) => <div key={i} style={{ textAlign: "center" }}><div style={{
@@ -4439,7 +4445,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		textAlign: "center",
 		fontSize: 12,
 		color: T.subd
-	}}>{hm(s.durationMin || 0)}<div style={{
+	}}>{legTimeUnverified([s]) ? "Время — у продавца" : hm(s.durationMin || 0)}<div style={{
 		height: 1,
 		background: T.line,
 		margin: "5px 0"
@@ -4469,7 +4475,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 	}}>{rub(s.priceLive || s.priceEstimate)}</div></a> : null}
             </div>
           </div>
-          {r.stopover && i === 0 && r.segments.length > 1 && <div style={{
+          {r.stopover && (r.stopover.kind === "layover" ? segs[i + 1]?.connectMin > 0 && s.toCode === r.stopover.hubCode : i === 0 && r.segments.length > 1) && <div style={{
 		background: T.card2,
 		border: `1px solid ${T.violet}33`,
 		borderRadius: 14,
@@ -4484,13 +4490,13 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		fontSize: 13,
 		fontWeight: 700,
 		color: T.text
-	}}>{r.stopover.nights} {plural(r.stopover.nights, "ночь", "ночи", "ночей")} в {prep(r.stopover.city)}</span></div>
+	}}>{stopoverText(r.stopover)}</span></div>
               <div style={{
 		fontSize: 12,
 		color: T.subd,
 		marginTop: 6
-	}}>Жильё подберём со скидкой — промокоды уже в карточке выше</div>
-              <div onClick={() => goHotels(null)} className="press" style={{
+	}}>{r.stopover.kind === "layover" ? "Можно рассмотреть выход в город. Проверьте условия въезда, багаж и запас на возврат." : "Жильё можно подобрать отдельно."}</div>
+              {r.stopover.nights > 0 && <div onClick={() => goHotels(null)} className="press" style={{
 		marginTop: 10,
 		textAlign: "center",
 		background: T.violet + "22",
@@ -4501,7 +4507,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		fontSize: 12,
 		fontWeight: 700,
 		cursor: "pointer"
-	}}>Посмотреть варианты</div>
+	}}>Посмотреть варианты</div>}
             </div>}
         </div>)}
       </div>
@@ -9103,7 +9109,7 @@ function nextAction(t) {
 			act: "hotels",
 			tone: T.violet
 		};
-		if (!(t.stays || []).length && t.route && t.route.stopover && !checks.lodgeStop) return {
+		if (!(t.stays || []).length && stopoverNeedsHotel(t.route?.stopover) && !checks.lodgeStop) return {
 			block: "lodging",
 			title: "Нужно жильё на пересадке",
 			sub: "в маршруте есть ночная остановка",
@@ -9728,7 +9734,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 	const stays = t.stays || [], timeline = today.timeline;
 	const legacyLodgeTotal = bOn.lodging && !t.lodgingOff ? 1 + (t.route && t.route.stopover ? 1 : 0) : 0;
 	const lodgeTotal = stays.length ? stays.length : legacyLodgeTotal;
-	const lodgeDone = stays.length ? stays.filter((x) => x.done).length : legacyLodgeTotal ? (checks.lodgeMain ? 1 : 0) + (t.route && t.route.stopover && checks.lodgeStop ? 1 : 0) : 0;
+	const lodgeDone = stays.length ? stays.filter((x) => x.done).length : legacyLodgeTotal ? (checks.lodgeMain ? 1 : 0) + (stopoverNeedsHotel(t.route?.stopover) && checks.lodgeStop ? 1 : 0) : 0;
 	const docsRequired = docs.filter((x) => x.required !== false), docsUnits = docsRequired.reduce((a, d) => {
 		const c = tripDocCompletion(t, d);
 		return {
@@ -13358,11 +13364,11 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 	const [customDraft, setCustomDraft] = useState("");
 	const upd = (fn) => onUpdate(t.id, fn);
 	const nightsAll = t.df && t.dt ? Math.max(1, Math.round((new Date(t.dt) - new Date(t.df)) / 864e5)) : null;
-	const stopN = t.route && t.route.stopover && t.route.stopover.nights || 0;
+	const stopN = stopoverNeedsHotel(t.route?.stopover) ? t.route.stopover.nights : 0;
 	const nightsMain = nightsAll != null ? Math.max(1, nightsAll - stopN) : null;
 	const lodgeOn = bOn.lodging && !t.lodgingOff;
 	const lodgeTotal = 1 + (t.route && t.route.stopover ? 1 : 0);
-	const lodgeDone = (t.checks.lodgeMain ? 1 : 0) + (t.route && t.route.stopover && t.checks.lodgeStop ? 1 : 0);
+	const lodgeDone = (t.checks.lodgeMain ? 1 : 0) + (stopoverNeedsHotel(t.route?.stopover) && t.checks.lodgeStop ? 1 : 0);
 	const docsDone = docs.filter((x) => t.checks.docs[x.id]).length;
 	const svcAdded = t.servicesAdded || [];
 	const svcDone = svcAdded.filter((id) => t.checks.services[id]).length;
@@ -13562,7 +13568,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		borderRadius: 999,
 		padding: "3px 9px",
 		marginBottom: 6
-	}}>ЛУЧШИЙ СТОПОВЕР · {t.route.stopover.nights} НОЧ. {t.route.stopover.city.toUpperCase()}</span>}
+	}}>СТОПОВЕР · {stopoverText(t.route.stopover)}</span>}
           <div style={{
 		fontFamily: "Sora,sans-serif",
 		fontWeight: 800,
@@ -13828,7 +13834,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		color: T.text
 	}}>Отель: {t.dcName}{nightsMain != null ? ` · ${nightsMain} ноч.` : ""}</div>
             </div>
-            {t.route && t.route.stopover && <div style={{
+            {stopoverNeedsHotel(t.route?.stopover) && <div style={{
 		display: "flex",
 		alignItems: "center",
 		gap: 9,
@@ -14040,7 +14046,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		fontSize: 12,
 		color: T.subd,
 		marginTop: 2
-	}}>{t.route.stopover ? `стоповер в ${prep(t.route.stopover.city)} · ${t.route.stopover.nights} ноч. · ` : ""}{rub(t.route.total)}</div>
+	}}>{t.route.stopover ? `${stopoverText(t.route.stopover)} · ` : ""}{rub(t.route.total)}</div>
           <div style={{
 		display: "flex",
 		alignItems: "center",
@@ -14105,7 +14111,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 		cursor: "pointer"
 	}}>Подобрать</span>
           </div>
-          {t.route && t.route.stopover && <div style={{
+          {stopoverNeedsHotel(t.route?.stopover) && <div style={{
 		display: "flex",
 		alignItems: "center",
 		gap: 9,
@@ -15733,25 +15739,52 @@ const SERVICES = [
 	}
 ];
 const todayISO = () => new Date().toISOString().slice(0, 10);
-function promosForTrip({ country, city, depISO, retISO }) {
-	const today = todayISO();
+const promoPlace = (value) => String(value || "").normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase().replace(/ё/g, "е");
+function resolvePromoDestination(value, trip, services = SERVICES) {
+	const q = promoPlace(value);
+	if (!q) return null;
+	if (trip && q === promoPlace(trip.dcName) && trip.country) return { country: trip.country, city: trip.dcName };
+	const countryExact = DEST_BASE.find((d) => promoPlace(d.country) === q);
+	if (countryExact) return { country: countryExact.country, city: null };
+	const cityMatches = DEST_BASE.flatMap((d) => d.cities.filter((c) => [c.city, ...(c.zones || [])].map(promoPlace).includes(q)).map((c) => ({ country: d.country, city: c.city })));
+	if (cityMatches.length) return cityMatches.length === 1 ? cityMatches[0] : null;
+	// Offer locality can extend the destination catalog, but never with a partial or ambiguous match.
+	const offers = services.flatMap((s) => (s.promos || []).filter((p) => p.verified === true));
+	const cities = offers.filter((p) => p.country && p.city && promoPlace(p.city) === q);
+	const country = offers.find((p) => promoPlace(p.country) === q);
+	if (country && !cities.length) return { country: country.country, city: null };
+	if (!country && cities.length && new Set(cities.map((p) => promoPlace(p.country))).size === 1) return { country: cities[0].country, city: cities[0].city };
+	return null;
+}
+function matchHotelPromos(services, { country, city, from, to, today = todayISO(), browse = false } = {}) {
+	const validDate = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+	const amount = (value) => Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : 0;
+	if (!validDate(today) || from && !validDate(from) || to && !validDate(to) || from && to && to <= from) return [];
 	const out = [];
-	for (const s of SERVICES) for (const p of s.promos || []) {
-		if (p.verified !== true || !isReferralUrl(p.refUrl || s.refUrl)) continue;
-		if (p.endDate && p.endDate < today) continue;
-		if (p.country && p.country !== country) continue;
-		if (p.city && p.city !== city) continue;
-		if (p.stayFrom && depISO && depISO < p.stayFrom) continue;
-		if (p.stayTo && depISO && depISO > p.stayTo) continue;
-		if (p.stayTo && retISO && retISO > p.stayTo) continue;
-		out.push({
-			...p,
-			service: s.name,
-			serviceId: s.id,
-			serviceUrl: s.refUrl || null
-		});
+	for (const service of services) for (const promo of service.promos || []) {
+		const url = promo.refUrl || service.refUrl;
+		const code = typeof promo.code === "string" ? promo.code.trim() : "";
+		if (promo.verified !== true || !code || !isReferralUrl(url)) continue;
+		const { startDate, endDate, stayFrom, stayTo } = promo;
+		if ([startDate, endDate, stayFrom, stayTo].some((date) => date && !validDate(date))) continue;
+		if (startDate && today < startDate || endDate && today > endDate || stayTo && today >= stayTo || stayFrom && stayTo && stayFrom >= stayTo) continue;
+		if (!browse) {
+			if (promo.country && promoPlace(promo.country) !== promoPlace(country) || promo.city && promoPlace(promo.city) !== promoPlace(city)) continue;
+			if (stayFrom && (!from || from < stayFrom) || stayTo && (!to || to > stayTo || from && from >= stayTo)) continue;
+		}
+		out.push({ ...promo, code, refUrl: url, service: service.name, serviceId: service.id, serviceUrl: url, _svc: service });
 	}
-	return out.sort((a, b) => b.discountRub - a.discountRub);
+	out.sort((a, b) => amount(b.discountRub) - amount(a.discountRub) || amount(a.minSpendRub) - amount(b.minSpendRub) || a.code.localeCompare(b.code, "ru"));
+	const seen = new Set();
+	return out.filter((promo) => {
+		const key = JSON.stringify([promo.serviceId, promo.code]);
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+}
+function promosForTrip({ country, city, depISO, retISO }) {
+	return matchHotelPromos(SERVICES, { country, city, from: depISO, to: retISO });
 }
 const PACK_SUGGEST = [
 	["Техника", [
@@ -17213,7 +17246,7 @@ const ddmm = (s) => {
 	return p.length === 3 ? `${p[2]}/${p[1]}` : s;
 };
 function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }) {
-	const [svc, setSvc] = useState(null), [goUrl, setGoUrl] = useState(null), [bookingOpen, setBookingOpen] = useState(false), [promoOpen, setPromoOpen] = useState(false);
+	const [svc, setSvc] = useState(null), [bookingOpen, setBookingOpen] = useState(false), [promoOpen, setPromoOpen] = useState(false);
 	const today = new Date().toISOString().slice(0, 10), scoped = !!(trip && trip.id);
 	const travelers = scoped ? activeTravelers(trip) : [];
 	const [pq, setPq] = useState(() => scoped ? trip.dcName || trip.country || "" : "");
@@ -17234,7 +17267,6 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 			const x = SERVICES.find((s) => s.id === preOpen);
 			if (x) {
 				setSvc(x);
-				setGoUrl(null);
 			}
 			onPreDone && onPreDone();
 		}
@@ -17247,49 +17279,22 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 			setGuests(Math.max(1, activeTravelers(trip).length));
 		}
 	}, [trip && trip.id]);
-	const activePromos = (s) => (s.promos || []).filter((p) => p.verified === true && isReferralUrl(p.refUrl || s.refUrl) && (!p.endDate || p.endDate >= today)).sort((a, b) => (b.discountRub || 0) - (a.discountRub || 0));
-	const changeFrom = (v) => {
-		setPFrom(v);
-		setDateErr("");
-		if (v && pTo && pTo <= v) setPTo(addIsoDays(v, 1));
-	};
-	const changeTo = (v) => {
-		if (pFrom && v && v <= pFrom) {
+	const activePromos = (s) => matchHotelPromos([s], { today, browse: true });
+	const changePromoDates = (from, to) => {
+		if (from && to && to <= from) {
 			setDateErr("Выезд должен быть позже заезда");
 			return;
 		}
 		setDateErr("");
-		setPTo(v);
+		setPFrom(from);
+		setPTo(to);
 	};
 	const validDates = !pFrom || !pTo || pTo > pFrom;
-	const matchedPromos = (() => {
-		const q = pq.trim().toLowerCase();
-		if (!q) return [];
-		const resolved = resolveDestination(pq), out = [];
-		for (const s of SERVICES) for (const p of activePromos(s)) {
-			const universal = !p.country && !p.city;
-			let geoOk = universal || [p.country, p.city].some(v => v && v.toLowerCase() === q);
-			if (resolved) {
-				const cOk = !p.country || resolved.country && p.country === resolved.country, ctOk = !p.city || resolved.city && p.city === resolved.city;
-				geoOk = !!(cOk && ctOk);
-			}
-			if (!geoOk) continue;
-			if (pFrom && p.stayFrom && pFrom < p.stayFrom) continue;
-			if (pTo && p.stayTo && pTo > p.stayTo) continue;
-			if (pFrom && p.stayTo && pFrom > p.stayTo) continue;
-			if (pTo && p.stayFrom && pTo < p.stayFrom) continue;
-			out.push({
-				...p,
-				_svc: s
-			});
-		}
-		return out.sort((a, b) => (b.discountRub || 0) - (a.discountRub || 0)).slice(0, 8);
-	})();
+	const promoDestination = resolvePromoDestination(pq, trip);
+	const matchedPromos = pq.trim() ? matchHotelPromos(SERVICES, { ...promoDestination, from: pFrom, to: pTo, today }).slice(0, 8) : [];
 	const copy = async (p) => {
 		try {
 			await navigator.clipboard.writeText(p.code);
-			const target = p.refUrl || p._svc?.refUrl || svc?.refUrl;
-			setGoUrl(isReferralUrl(target) ? target : null);
 			setToast("Промокод скопирован");
 		} catch (e) {
 			setToast("Не удалось скопировать");
@@ -17303,11 +17308,11 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		}
 		trackGoal("hotel_partner_click", {
 			partner: s.id,
-			country: (resolveDestination(pq) || {}).country || "",
-			city: (resolveDestination(pq) || {}).city || ""
+			country: promoDestination?.country || "",
+			city: promoDestination?.city || ""
 		});
 		try {
-			window.open(target, "_blank");
+			window.open(target, "_blank", "noopener,noreferrer");
 		} catch (e) {}
 		setToast(`Открываем ${s.name}…`);
 	};
@@ -17397,10 +17402,7 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		...dInput,
 		marginBottom: 9
 	}} />
-        <DateRangeField from={pFrom} to={pTo} title="Даты проживания" minDate={today} onChange={(a, b) => {
-		changeFrom(a);
-		changeTo(b);
-	}} />
+        <DateRangeField from={pFrom} to={pTo} title="Даты проживания" minDate={today} onChange={changePromoDates} />
         {dateErr && <div style={{
 		fontSize: 12,
 		color: "#ff7ba9",
@@ -17485,7 +17487,6 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		const n = activePromos(s).length;
 		return <div key={s.id} onClick={() => {
 			setSvc(s);
-			setGoUrl(null);
 		}} className="press" style={{
 			background: T.card,
 			border: `1px solid ${T.line}`,
@@ -17552,7 +17553,7 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		gap: 9,
 		maxHeight: "62vh",
 		overflowY: "auto"
-	}}>{matchedPromos.length ? matchedPromos.map((p, i) => <div key={p.code + i} style={{
+	}}>{matchedPromos.length ? matchedPromos.map((p) => <div key={`${p.serviceId}:${p.code}`} style={{
 		background: `linear-gradient(135deg,${T.card2},${T.card})`,
 		border: `1px solid ${T.line}`,
 		borderRadius: 16,
@@ -17598,12 +17599,12 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		fontWeight: 800,
 		color: T.cyan,
 		cursor: "pointer"
-	}}>Скопировать</span>{isReferralUrl(p.refUrl || p._svc.refUrl) && <span onClick={() => openProvider(p._svc, p.refUrl || p._svc.refUrl)} className="press" style={{
+	}}>Скопировать</span><span onClick={() => openProvider(p._svc, p.refUrl)} className="press" style={{
 		fontSize: 12,
 		fontWeight: 800,
 		color: T.text,
 		cursor: "pointer"
-	}}>Открыть ↗</span>}</div></div>) : <EmptyState compact icon="🏷️" title="Промокодов под эти даты пока нет" sub="Добавьте действующий код перед релизом." />}</div></Overlay>}
+	}}>Открыть ↗</span></div></div>) : <EmptyState compact icon="🏷️" title="Подходящих промокодов пока нет" sub={!promoDestination ? "Попробуйте указать полное название города или страны." : !pFrom || !pTo ? "Укажите даты заезда и выезда — часть скидок действует только в определённый период." : "Попробуйте изменить даты или направление."} />}</div></Overlay>}
     {svc && <Overlay onClose={() => setSvc(null)}><SheetHead title={svc.name} onClose={() => setSvc(null)} /><div style={{
 		display: "flex",
 		flexDirection: "column",
@@ -17624,7 +17625,7 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		fontSize: 12,
 		color: T.subd,
 		marginTop: 3
-	}}>{p.header}</div><div style={{
+	}}>{p.header}</div>{(p.country || p.city || p.stayFrom || p.stayTo) && <div style={{ fontSize: 12, color: T.subd, marginTop: 4 }}>{[p.country, p.city, p.stayFrom ? `заезд с ${ddmm(p.stayFrom)}` : null, p.stayTo ? `выезд до ${ddmm(p.stayTo)}` : null].filter(Boolean).join(" · ")}</div>}<div style={{
 		display: "flex",
 		alignItems: "center",
 		gap: 8,
@@ -17639,7 +17640,7 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 		color: T.cyan,
 		fontWeight: 800,
 		cursor: "pointer"
-	}}>Скопировать</span></div></div>) : <EmptyState compact title="Промокодов сейчас нет" sub="Добавьте действующий код перед релизом." />}</div><div style={{ marginTop: 13 }}><Btn onClick={() => openProvider(svc, goUrl || svc.refUrl)}>Открыть по реферальной ссылке</Btn></div></Overlay>}
+	}}>Скопировать</span><span onClick={() => openProvider(svc, p.refUrl)} className="press" style={{ fontSize: 12, color: T.text, fontWeight: 800, cursor: "pointer" }}>Открыть ↗</span></div></div>) : <EmptyState compact title="Промокодов сейчас нет" sub="Проверьте предложения других партнёров." />}</div>{isReferralUrl(svc.refUrl) && <div style={{ marginTop: 13 }}><Btn onClick={() => openProvider(svc, svc.refUrl)}>Открыть по реферальной ссылке</Btn></div>}</Overlay>}
     {bookingOpen && <Overlay onClose={() => setBookingOpen(false)}><SheetHead title="Добавить жильё" onClose={() => setBookingOpen(false)} /><input value={stay.name} onChange={(e) => setStay((x) => ({
 		...x,
 		name: e.target.value
@@ -19113,7 +19114,7 @@ input:not([type=checkbox]):not([type=radio]),textarea,select{min-width:0;max-wid
 		fontSize: 12,
 		color: T.subd,
 		marginTop: 3
-	}}>{query.datesLabel}{confirmTrip.stopover ? ` · стоповер в ${prep(confirmTrip.stopover.city)} ${confirmTrip.stopover.nights} ноч.` : ""} · {rub(confirmTrip.total)}</div>
+	}}>{query.datesLabel}{confirmTrip.stopover ? ` · ${stopoverText(confirmTrip.stopover)}` : ""} · {rub(confirmTrip.total)}</div>
           <div style={{
 		fontSize: 12,
 		color: T.subd,
