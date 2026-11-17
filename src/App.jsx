@@ -10019,7 +10019,8 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 				}
 				setPanelNotice(r.ok ? (r.recorded ? (r.updated ? "Интерактивный пульт обновлён в чате с ботом." : "Интерактивный виджет отправлен в чат с ботом.") : "Виджет отправлен, но запись не обновилась. Проверьте чат с ботом.") :
 					r.error === "TELEGRAM_403" ? "Откройте бота и нажмите «Начать», затем повторите." :
-					r.uncertain ? "Нет подтверждения Telegram. Проверьте чат с ботом перед повтором." : r.error || "Не удалось отправить пульт.");
+					r.uncertain ? "Нет подтверждения Telegram. Проверьте чат с ботом перед повтором." :
+					r.detail ? `${r.error || "Telegram"}: ${r.detail}` : r.error || "Не удалось отправить пульт.");
 			} catch {
 				setPanelNotice("Нет подтверждения доставки. Проверьте чат с ботом перед повтором.");
 			} finally { clearTimeout(timer); }
