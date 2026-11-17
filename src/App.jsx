@@ -10000,9 +10000,29 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		if (syncState !== "saved") { setToast("Сначала дождитесь сохранения поездки"); return; }
 		panelInFlight.current = true; setPanelBusy(true); setPanelNotice(""); setPanelBotUrl("");
 		try {
-			const r = await sharedApi("trip-cockpit-send", {tripId:t.id}, 45e3);
-			if (r.botUrl) setPanelBotUrl(r.botUrl);
-			setPanelNotice(r.ok ? (r.mode === "widget" ? (r.updated ? "Интерактивный пульт обновлён в чате с ботом." : "Интерактивный виджет отправлен в чат с ботом.") : "Telegram отправил текстовую карточку вместо виджета. Проверим поддержку или ошибку отправки.") : r.error === "bot start required" ? "Откройте бота, нажмите «Начать», затем повторите отправку." : r.error === "telegram required" ? "Откройте TripWise в Telegram." : r.error === "timeout" ? "Нет подтверждения доставки. Проверьте чат с ботом перед повторной попыткой." : r.error || "Не удалось отправить пульт.");
+			const prepared = await sharedApi("trip-cockpit-prepare", {tripId:t.id}, 20e3);
+			if (prepared.botUrl) setPanelBotUrl(prepared.botUrl);
+			if (!prepared.ok || !prepared.ticket) {
+				setPanelNotice(prepared.error === "telegram required" ? "Откройте TripWise в Telegram." : prepared.error || "Не удалось подготовить пульт.");
+				return;
+			}
+			const ctrl = new AbortController();
+			const timer = setTimeout(() => ctrl.abort(), 45e3);
+			try {
+				const response = await fetch("/api/trip-widget", {method:"POST", headers:{"Content-Type":"application/json"},
+					body:JSON.stringify({ticket:prepared.ticket}), signal:ctrl.signal});
+				const r = await response.json().catch(() => ({}));
+				if (!r.recorded && r.messageId && r.ok) {
+					const receipt = await sharedApi("trip-cockpit-finish", {ticket:prepared.ticket,
+						result:{status:"sent",messageId:r.messageId}}, 12e3);
+					r.recorded = !!receipt.ok;
+				}
+				setPanelNotice(r.ok ? (r.recorded ? (r.updated ? "Интерактивный пульт обновлён в чате с ботом." : "Интерактивный виджет отправлен в чат с ботом.") : "Виджет отправлен, но запись не обновилась. Проверьте чат с ботом.") :
+					r.error === "TELEGRAM_403" ? "Откройте бота и нажмите «Начать», затем повторите." :
+					r.uncertain ? "Нет подтверждения Telegram. Проверьте чат с ботом перед повтором." : r.error || "Не удалось отправить пульт.");
+			} catch {
+				setPanelNotice("Нет подтверждения доставки. Проверьте чат с ботом перед повтором.");
+			} finally { clearTimeout(timer); }
 		} finally { panelInFlight.current = false; setPanelBusy(false); }
 	};
 	const shareInvite = async () => {
