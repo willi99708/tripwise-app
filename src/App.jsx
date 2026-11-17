@@ -10000,7 +10000,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		if (syncState !== "saved") { setToast("Сначала дождитесь сохранения поездки"); return; }
 		panelInFlight.current = true; setPanelBusy(true); setPanelNotice(""); setPanelBotUrl("");
 		try {
-			const r = await sharedApi("trip-cockpit-send", {tripId:t.id});
+			const r = await sharedApi("trip-cockpit-send", {tripId:t.id}, 45e3);
 			if (r.botUrl) setPanelBotUrl(r.botUrl);
 			setPanelNotice(r.ok ? (r.updated ? "Пульт обновлён в чате с ботом." : "Пульт отправлен в чат с ботом.") : r.error === "bot start required" ? "Откройте бота, нажмите «Начать», затем повторите отправку." : r.error === "telegram required" ? "Откройте TripWise в Telegram." : r.error === "timeout" ? "Нет подтверждения доставки. Проверьте чат с ботом перед повторной попыткой." : r.error || "Не удалось отправить пульт.");
 		} finally { panelInFlight.current = false; setPanelBusy(false); }
@@ -11995,7 +11995,12 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		fontSize: 13,
 		fontWeight: 800,
 		cursor: "pointer"
-	}}>Пригласить пользователя TripWise</div></>}</Overlay>}
+	}}>Пригласить пользователя TripWise</div></>}
+	<div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${T.line}`}}>
+		<button type="button" disabled={panelBusy} onClick={sendPanel} style={{width:"100%",minHeight:44,background:T.card2,border:`1px solid ${T.line}`,borderRadius:13,padding:11,color:T.text,fontSize:13,fontWeight:800,cursor:panelBusy?"wait":"pointer"}}>{panelBusy ? "Отправляю…" : "Отправить пульт поездки в личку"}</button>
+		{panelNotice && <p role="status" style={{fontSize:13,lineHeight:1.45,color:T.sub,overflowWrap:"anywhere",margin:"9px 0 0"}}>{panelNotice}</p>}
+		{panelBotUrl && <button type="button" onClick={openPanelBot} style={{width:"100%",minHeight:44,marginTop:8,background:T.card2,border:`1px solid ${T.line}`,borderRadius:13,padding:11,color:T.text,fontSize:13,fontWeight:800}}>Открыть чат с ботом</button>}
+	</div></Overlay>}
 
     {travelerOpen && (() => {
 		const tr = travelerOpen, r = travelerReadiness(t, tr, budget), own = viewerTraveler && viewerTraveler.id === tr.id;
