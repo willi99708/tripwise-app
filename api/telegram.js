@@ -55,6 +55,14 @@ function telegram(token, method, input, timeoutMs = 20000) {
 }
 
 export default async function handler(request, response) {
+  if (request.method === "GET" && request.query?.health === "tw_net_probe_57e58e4f") {
+    try {
+      const upstream = await telegram("0:health", "getMe", { body: {} }, 7000);
+      return response.status(200).json({ reachable: true, upstreamStatus: upstream.status });
+    } catch (error) {
+      return response.status(200).json({ reachable: false, code: error?.code || "NETWORK_ERROR" });
+    }
+  }
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Method not allowed" });
   if (!authorized(request.headers["x-proxy-key"])) return response.status(401).json({ ok: false, error: "Unauthorized" });
   try {
