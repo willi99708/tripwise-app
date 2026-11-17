@@ -72,7 +72,8 @@ export default async function handler(request, response) {
     const messageId = payload.method === 'sendWidget' ? r.body?.result?.message_id : payload.body.message_id;
     if (r.body?.ok && Number.isSafeInteger(messageId)) result = {status:'sent', messageId};
     else result = {status:[400,403,429].includes(r.body?.error_code) ? 'failed' : 'uncertain',
-      code:r.body?.error_code ? `TELEGRAM_${r.body.error_code}` : 'TELEGRAM_HTTP_ERROR'};
+      code:r.body?.error_code ? `TELEGRAM_${r.body.error_code}` : 'TELEGRAM_HTTP_ERROR',
+      description:typeof r.body?.description === 'string' ? r.body.description.slice(0,400) : ''};
   } catch (error) { result = {status:'uncertain', code:error?.code === 'ETIMEDOUT' ? 'TELEGRAM_UPSTREAM_TIMEOUT' : 'TELEGRAM_NETWORK_ERROR'}; }
 
   let recorded = false;
@@ -83,5 +84,5 @@ export default async function handler(request, response) {
   if (result.status === 'sent') return response.status(200).json({ok:true, mode:'widget', messageId:result.messageId,
     updated:payload.method !== 'sendWidget', recorded});
   return response.status(result.status === 'failed' ? 422 : 503).json({ok:false,error:result.code,
-    uncertain:result.status !== 'failed', recorded});
+    detail:result.description || undefined, uncertain:result.status !== 'failed', recorded});
 }
