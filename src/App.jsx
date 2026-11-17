@@ -10002,7 +10002,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		try {
 			const r = await sharedApi("trip-cockpit-send", {tripId:t.id}, 45e3);
 			if (r.botUrl) setPanelBotUrl(r.botUrl);
-			setPanelNotice(r.ok ? (r.updated ? "Пульт обновлён в чате с ботом." : "Пульт отправлен в чат с ботом.") : r.error === "bot start required" ? "Откройте бота, нажмите «Начать», затем повторите отправку." : r.error === "telegram required" ? "Откройте TripWise в Telegram." : r.error === "timeout" ? "Нет подтверждения доставки. Проверьте чат с ботом перед повторной попыткой." : r.error || "Не удалось отправить пульт.");
+			setPanelNotice(r.ok ? (r.mode === "widget" ? (r.updated ? "Интерактивный пульт обновлён в чате с ботом." : "Интерактивный виджет отправлен в чат с ботом.") : "Telegram отправил текстовую карточку вместо виджета. Проверим поддержку или ошибку отправки.") : r.error === "bot start required" ? "Откройте бота, нажмите «Начать», затем повторите отправку." : r.error === "telegram required" ? "Откройте TripWise в Telegram." : r.error === "timeout" ? "Нет подтверждения доставки. Проверьте чат с ботом перед повторной попыткой." : r.error || "Не удалось отправить пульт.");
 		} finally { panelInFlight.current = false; setPanelBusy(false); }
 	};
 	const shareInvite = async () => {
