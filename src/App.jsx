@@ -1,5 +1,6 @@
 import { parseDay, localDay, routeSearch, routeKey, matchesSaved } from "./domain/route-state.js";
 import React, { Component, useEffect, useRef, useState } from "react";
+import {connectionAfter} from "./lib/connection-view.js";
 
 //#region TripWiseAI-v7-release/frontend/src/domain/readiness.js
 function tripDocCompletion(t, doc) {
@@ -2237,7 +2238,7 @@ const PREP = {
 	"Абу-Даби": "Абу-Даби"
 };
 const prep = (c) => PREP[c] || c;
-const stopLabel = (s) => `${s.nights} ${dayWord(s.nights)} в ${prep(s.city)}`;
+const stopLabel = (s) => s.kind==="layover" ? `${hm(s.waitMin)} в ${prep(s.city)}` : stopoverText(s);
 function storageScope() {
 	try {
 		const p = new URLSearchParams(tgInitData()), u = JSON.parse(p.get("user") || "null");
@@ -4217,7 +4218,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		fontWeight: 800,
 		fontSize: 20,
 		fontFamily: "Sora,sans-serif"
-	}}>почти бесплатно</div>}</div>
+	}}>Остановка по пути</div>}</div>
       </div>
     </div>
     {}
@@ -4402,7 +4403,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		flexDirection: "column",
 		gap: 10
 	}}>
-        {r.segments.map((s, i) => <div key={i}>
+        {r.segments.map((s, i) => {const connection=connectionAfter(r,i), stop=connection?.stop;return <div key={i}>
           <div style={{
 		background: T.card,
 		border: `1px solid ${T.line}`,
@@ -4475,7 +4476,8 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 	}}>{rub(s.priceLive || s.priceEstimate)}</div></a> : null}
             </div>
           </div>
-          {r.stopover && (r.stopover.kind === "layover" ? segs[i + 1]?.connectMin > 0 && s.toCode === r.stopover.hubCode : i === 0 && r.segments.length > 1) && <div style={{
+          {connection && !stop && <p style={{fontSize:13,color:T.sub}}>Пересадка в {s.toCode} · ожидание {hm(connection.wait)}</p>}
+          {stop && <div style={{
 		background: T.card2,
 		border: `1px solid ${T.violet}33`,
 		borderRadius: 14,
@@ -4490,13 +4492,13 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		fontSize: 13,
 		fontWeight: 700,
 		color: T.text
-	}}>{stopoverText(r.stopover)}</span></div>
+	}}>{stopoverText(stop)}</span></div>
               <div style={{
 		fontSize: 12,
 		color: T.subd,
 		marginTop: 6
-	}}>{r.stopover.kind === "layover" ? "Можно рассмотреть выход в город. Проверьте условия въезда, багаж и запас на возврат." : "Жильё можно подобрать отдельно."}</div>
-              {r.stopover.nights > 0 && <div onClick={() => goHotels(null)} className="press" style={{
+	}}>{stop.kind === "layover" ? "Можно рассмотреть выход в город. Проверьте условия въезда, багаж и запас на возврат." : "Жильё можно подобрать отдельно."}</div>
+              {stopoverNeedsHotel(stop) && <div onClick={() => goHotels(null)} className="press" style={{
 		marginTop: 10,
 		textAlign: "center",
 		background: T.violet + "22",
@@ -4509,7 +4511,7 @@ function Detail({ r, query, onBack, onEdit, liked, onLike, onShare, goHotels, on
 		cursor: "pointer"
 	}}>Посмотреть варианты</div>}
             </div>}
-        </div>)}
+        </div>})}
       </div>
       {(() => {
 		const notes = (r.notes || []).filter((n) => !/раздельны|отдельных билета|два отдельных|один билет туда-обратно/i.test(n));
@@ -9745,7 +9747,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 	};
 	const checks = t.checks || {}, docChecks = checks.docs || {}, svcChecks = checks.services || {};
 	const stays = t.stays || [], timeline = today.timeline;
-	const legacyLodgeTotal = bOn.lodging && !t.lodgingOff ? 1 + (t.route && t.route.stopover ? 1 : 0) : 0;
+	const legacyLodgeTotal = bOn.lodging && !t.lodgingOff ? 1 + Number(stopoverNeedsHotel(t.route?.stopover)) : 0;
 	const lodgeTotal = stays.length ? stays.length : legacyLodgeTotal;
 	const lodgeDone = stays.length ? stays.filter((x) => x.done).length : legacyLodgeTotal ? (checks.lodgeMain ? 1 : 0) + (stopoverNeedsHotel(t.route?.stopover) && checks.lodgeStop ? 1 : 0) : 0;
 	const docsRequired = docs.filter((x) => x.required !== false), docsUnits = docsRequired.reduce((a, d) => {
@@ -13406,7 +13408,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
 	const stopN = stopoverNeedsHotel(t.route?.stopover) ? t.route.stopover.nights : 0;
 	const nightsMain = nightsAll != null ? Math.max(1, nightsAll - stopN) : null;
 	const lodgeOn = bOn.lodging && !t.lodgingOff;
-	const lodgeTotal = 1 + (t.route && t.route.stopover ? 1 : 0);
+	const lodgeTotal = 1 + Number(stopoverNeedsHotel(t.route?.stopover));
 	const lodgeDone = (t.checks.lodgeMain ? 1 : 0) + (stopoverNeedsHotel(t.route?.stopover) && t.checks.lodgeStop ? 1 : 0);
 	const docsDone = docs.filter((x) => t.checks.docs[x.id]).length;
 	const svcAdded = t.servicesAdded || [];
