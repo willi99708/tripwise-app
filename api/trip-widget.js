@@ -1,5 +1,5 @@
 import https from 'node:https';
-import {createHash, createDecipheriv} from 'node:crypto';
+import {createHash, createHmac, createDecipheriv} from 'node:crypto';
 
 export const maxDuration = 60;
 const API = 'https://functions.yandexcloud.net/d4e3hpvr0lrijksc8i1r';
@@ -17,7 +17,7 @@ function ticketPayload(ticket) {
     cipher.setAuthTag(tag);
     const payload = JSON.parse(Buffer.concat([cipher.update(data), cipher.final()]).toString());
     if (payload.v !== 1 || payload.exp < Date.now() || payload.exp > Date.now() + 120000 ||
-        !['sendWidget','editMessageWidgetData'].includes(payload.method) ||
+        !['sendMessage','editMessageText'].includes(payload.method) ||
         !/^\d+:[A-Za-z0-9_-]{30,}$/.test(payload.botToken || '') ||
         String(payload.body?.chat_id) !== payload.user || !/^[a-f0-9-]{36}$/.test(payload.op || '')) throw Error();
     return payload;
@@ -69,20 +69,20 @@ export default async function handler(request, response) {
   let result;
   try {
     const r = await telegram(payload.botToken, payload.method, payload.body);
-    const messageId = payload.method === 'sendWidget' ? r.body?.result?.message_id : payload.body.message_id;
-    if (r.body?.ok && Number.isSafeInteger(messageId)) result = {status:'sent', messageId};
+    const messageId = payload.method === 'sendMessage' ? r.body?.result?.message_id : payload.body.message_id;
+    const unchanged=payload.method==='editMessageText'&&r.body?.error_code===400&&/message is not modified/i.test(r.body.description||'');
+    if ((r.body?.ok || unchanged) && Number.isSafeInteger(messageId)) result = {status:'sent', messageId};
+    else if(payload.method==='editMessageText'&&r.body?.error_code===400&&/message to edit not found/i.test(r.body.description||''))result={status:'failed',code:'MESSAGE_GONE',description:'Старое сообщение удалено. Нажмите отправку ещё раз.'};
     else result = {status:[400,403,429].includes(r.body?.error_code) ? 'failed' : 'uncertain',
       code:r.body?.error_code ? `TELEGRAM_${r.body.error_code}` : 'TELEGRAM_HTTP_ERROR',
       description:typeof r.body?.description === 'string' ? r.body.description.slice(0,400) : ''};
   } catch (error) { result = {status:'uncertain', code:error?.code === 'ETIMEDOUT' ? 'TELEGRAM_UPSTREAM_TIMEOUT' : 'TELEGRAM_NETWORK_ERROR'}; }
 
+  result.proof=createHmac('sha256',createHash('sha256').update(process.env.PROXY_SHARED_SECRET).digest()).update(JSON.stringify([ticket,result.status,result.messageId||0,result.code||''])).digest('hex');
   let recorded = false;
   try { await updateState('finish', ticket, result); recorded = true; } catch {}
-  if (result.status === 'sent' && recorded && payload.oldMessageId && payload.method === 'sendWidget') {
-    await telegram(payload.botToken, 'deleteMessage', {chat_id:payload.user, message_id:payload.oldMessageId}, 5000).catch(() => {});
-  }
-  if (result.status === 'sent') return response.status(200).json({ok:true, mode:'widget', messageId:result.messageId,
-    updated:payload.method !== 'sendWidget', recorded});
+  if (result.status === 'sent') return response.status(200).json({ok:true, mode:'message', messageId:result.messageId,proof:result.proof,
+    updated:payload.method === 'editMessageText', recorded});
   return response.status(result.status === 'failed' ? 422 : 503).json({ok:false,error:result.code,
     detail:result.description || undefined, uncertain:result.status !== 'failed', recorded});
 }

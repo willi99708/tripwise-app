@@ -554,9 +554,10 @@ function tripCoverMeta(trip) {
 		trip && trip.country,
 		trip && trip.title
 	].filter(Boolean).join(" ").toLowerCase();
+	if (/бангкок|bangkok|\bbkk\b/i.test(hay+" "+String(trip?.dc||""))) return {src:"/graphics/trip-bangkok.webp",grad:GRAD.ocean,emoji:"",key:"bangkok"};
 	const hit = Object.values(TRIP_COVER_ASSETS).find((x) => hay.includes(x.key));
 	return hit || {
-		src: null,
+		src: "/graphics/trip-journey.webp",
 		grad: gradFor(String(trip && (trip.dc || trip.country || trip.id) || "X")),
 		emoji: "✈️",
 		key: ""
@@ -572,7 +573,7 @@ function TripCover({ trip, height = 104 }) {
 		overflow: "hidden",
 		background: meta.grad
 	}}>
-    {meta.src && <img src={meta.src} alt="" draggable={false} style={{
+    {meta.src && <img key={meta.src} src={meta.src} loading="lazy" decoding="async" alt="" draggable={false} style={{
 		position: "absolute",
 		inset: 0,
 		width: "100%",
@@ -2090,7 +2091,8 @@ async function sharedApi(action, payload = {}, timeoutMs = 3e4) {
 	const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
 	const timer = ctrl ? setTimeout(() => ctrl.abort(), Math.max(1e3, timeoutMs || 3e4)) : null;
 	try {
-		const r = await fetch(API_BASE + "?action=" + encodeURIComponent(action), {
+		const url=action==="export-document" && payload.delivery==="telegram" ? "/api/document-delivery" : API_BASE + "?action=" + encodeURIComponent(action);
+		const r = await fetch(url, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
@@ -2181,10 +2183,7 @@ const depOf = (s) => s.departHM || (s.departISO ? String(s.departISO).slice(11, 
 const arrOf = (s) => {
 	if (s.timingUnverified || (s.transfers || 0) > 0) return "—";
 	if (s.arriveHM) return s.arriveHM;
-	if (s.departISO && s.durationMin != null) {
-		const t = Date.parse(s.departISO) + s.durationMin * 6e4 + isoOff(s.departISO) * 6e4;
-		return new Date(t).toISOString().slice(11, 16);
-	}
+	// The departure offset is not the arrival airport’s timezone.
 	return "—";
 };
 const legDur = (segs) => (segs || []).filter((s) => s.mode !== "ferry").reduce((s, x) => s + (x.durationMin || 0), 0);
@@ -3931,7 +3930,7 @@ function RouteCard({ r, onOpen, liked, onLike, i }) {
 		const durTxt = legTimeUnverified(segs) ? "Полное время — у продавца" : durSum > 0 ? hm(durSum) : "";
 		let txt, col = T.subd;
 		if (stop) {
-			txt = stop.kind === "layover" ? `${durTxt} · ${stopoverText(stop)}` : stopoverText(stop);
+			txt = [durTxt && `${durTxt} в пути`, stopoverText(stop)].filter(Boolean).join(" · ");
 			col = T.green;
 		} else {
 			const trTxt = t > 0 ? `${t} ${plural(t, "пересадка", "пересадки", "пересадок")}${waitMin > 0 ? ` на ${hm(waitMin)}` : ""}` : "прямой";
@@ -8078,6 +8077,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 	const [focusF, setFocusF] = useState(null);
 	const [aiQ, setAiQ] = useState("");
 	const [aiBusy, setAiBusy] = useState(false);
+	const [suggestion,setSuggestion]=useState(null);
 	const [aiOpen, setAiOpen] = useState(false);
 	const [aiMessages, setAiMessages] = useState([]);
 	const [exportBusy, setExportBusy] = useState(false), [exportResult, setExportResult] = useState(null), exportAttempt = useRef(null);
@@ -8401,6 +8401,14 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			setAiBusy(false);
 		}
 	};
+	const editableAiField=focusF && ["itinerary","cities","occupationExtra","occupation"].includes(focusF.k) && !!ans[focusF.k];
+	const reviseField=async()=>{
+		if(aiBusy||!editableAiField)return;
+		const key=focusF.k, original=ans[key];setAiBusy(true);setSuggestion(null);
+		try{const r=await sharedApi("ai-help",{doc:cfg.title,country:cfg.country,question:"Для поля "+focusF.en+" отредактируй только стиль на английском. Верни только новое значение, не добавляй факты, места, даты или реквизиты. Исходный текст: "+String(original).slice(0,1600)},35000);
+			if(r.ok!==false && typeof r.answer==="string" && r.answer.trim() && r.answer.length<=2000)setSuggestion({key,original,value:r.answer.trim()});else setToast("Не удалось получить вариант. Ответ в анкете не изменён.");
+		}finally{setAiBusy(false);}
+	};
 	const inputSt = {
 		width: "100%",
 		maxWidth: "100%",
@@ -8594,7 +8602,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 		color: T.subd,
 		lineHeight: 1.45,
 		marginBottom: 9
-	}}>Помощник отвечает только по заполнению этого документа. Значения из анкеты ему не отправляются.</div><div style={{
+	}}>В обычном вопросе данные анкеты не передаются. Для правки можно отправить ИИ текст только выбранного поля.</div>{editableAiField && <button type="button" disabled={aiBusy} onClick={reviseField}>Отправить текст поля «{focusF.label}» ИИ для правки</button>}{suggestion && suggestion.key===focusF?.k && suggestion.original===ans[suggestion.key] && <div><p style={{whiteSpace:"pre-wrap"}}>{suggestion.value}</p><button type="button" onClick={()=>{setVal(suggestion.key,suggestion.value);setSuggestion(null);setAiOpen(false);}}>Применить правку</button><button type="button" onClick={()=>setSuggestion(null)}>Оставить мой вариант</button></div>}<div style={{
 		maxHeight: "44vh",
 		overflowY: "auto",
 		display: "flex",
@@ -8654,7 +8662,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			color: T.subd,
 			marginBottom: 12,
 			lineHeight: 1.45
-		}}>Анкета подготовлена для переноса данных. PDF и Word можно отправить в ваш чат с ботом или скачать. Подача на официальном сайте, подписи и приложения — следующий шаг.</div>
+		}}>{["jvisa","jp_form"].includes(doc.id) ? "PDF — оригинальный бланк МИД Японии с заполненными полями. Проверьте обе страницы и заполните оставшиеся поля. Word — список ваших ответов для сверки, не бланк." : doc.id==="tdac" ? "PDF и Word — инструкция по TDAC с экраном портала и вашими ответами. Данные на портал не отправляются." : "PDF и Word содержат ваши ответы для сверки и переноса. Это не официальный бланк и не подтверждение подачи."}</div>
         {ready.map((f) => <div key={f.k} style={{
 			display: "flex",
 			alignItems: "center",
@@ -10019,10 +10027,10 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 				const r = await response.json().catch(() => ({}));
 				if (!r.recorded && r.messageId && r.ok) {
 					const receipt = await sharedApi("trip-cockpit-finish", {ticket:prepared.ticket,
-						result:{status:"sent",messageId:r.messageId}}, 12e3);
+						result:{status:"sent",messageId:r.messageId,proof:r.proof}}, 12e3);
 					r.recorded = !!receipt.ok;
 				}
-				setPanelNotice(r.ok ? (r.recorded ? (r.updated ? "Интерактивный пульт обновлён в чате с ботом." : "Интерактивный виджет отправлен в чат с ботом.") : "Виджет отправлен, но запись не обновилась. Проверьте чат с ботом.") :
+				setPanelNotice(r.ok ? (r.recorded ? (r.updated ? "Кнопочный пульт обновлён в чате с ботом." : "Кнопочный пульт отправлен в чат с ботом.") : "Пульт отправлен. Проверьте чат с ботом.") :
 					r.error === "TELEGRAM_403" ? "Откройте бота и нажмите «Начать», затем повторите." :
 					r.uncertain ? "Нет подтверждения Telegram. Проверьте чат с ботом перед повтором." :
 					r.detail ? `${r.error || "Telegram"}: ${r.detail}` : r.error || "Не удалось отправить пульт.");
