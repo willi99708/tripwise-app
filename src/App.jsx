@@ -1,3 +1,4 @@
+import { parseDay, localDay, routeSearch, routeKey, matchesSaved } from "./domain/route-state.js";
 import React, { Component, useEffect, useRef, useState } from "react";
 
 //#region TripWiseAI-v7-release/frontend/src/domain/readiness.js
@@ -106,7 +107,7 @@ function calculateReadiness(t, requiredDocuments = []) {
 		pct: Math.round(score / weight * 100)
 	};
 }
-function tripPhase(t, today = new Date().toISOString().slice(0, 10)) {
+function tripPhase(t, today = localDay()) {
 	if (t.status === "cancelled") return {
 		key: "cancelled",
 		label: "Отменена"
@@ -3008,7 +3009,7 @@ const addIsoDays = (v, n) => {
 	if (!v) return "";
 	const d = new Date(v + "T12:00:00");
 	d.setDate(d.getDate() + n);
-	return d.toISOString().slice(0, 10);
+	return localDay(d);
 };
 const promoHeadline = (p) => {
 	const disc = Number(p && p.discountRub) || 0, min = Number(p && p.minSpendRub) || 0;
@@ -8033,7 +8034,7 @@ function validateDocumentField(f, ans) {
 	const err = validateField(f, ans[f.k]);
 	if (err) return err;
 	if (f.k === "dep" && ans.arr && ans.dep && ans.dep < ans.arr) return "выезд раньше въезда";
-	if (f.k === "dob" && ans.dob > new Date().toISOString().slice(0, 10)) return "дата рождения в будущем";
+	if (f.k === "dob" && ans.dob > localDay()) return "дата рождения в будущем";
 	if (f.k === "pexp" && ans.arr && ans.pexp && ans.pexp < ans.arr) return "паспорт истекает до поездки";
 	return null;
 }
@@ -8084,7 +8085,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 		if (exportBusy) return;
 		setExportBusy(true);
 		setExportResult(null);
-		const signature = JSON.stringify(ans);
+		const signature = JSON.stringify([doc.id, ans]);
 		if (!exportAttempt.current || exportAttempt.current.signature !== signature) exportAttempt.current = {
 			signature,
 			id: "doc-" + (crypto.randomUUID?.() || Date.now().toString(36))
@@ -8097,8 +8098,11 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 				delivery,
 				requestId: exportAttempt.current.id
 			}, 1e5);
-			setExportResult(result);
+			// Do not retain a second, base64-encoded copy of the passport form in React state.
+			const { files = [], ...receipt } = result;
+			setExportResult({ ...receipt, files: files.map(({ format, name, sent, status }) => ({ format, name, sent, status })) });
 			if (delivery === "download" && result.ok) {
+				if (!files.length || files.some(f => !f.base64 || !f.name)) throw Error("missing download");
 				for (const file of result.files || []) {
 					const raw = atob(file.base64), bytes = Uint8Array.from(raw, (c) => c.charCodeAt(0)), url = URL.createObjectURL(new Blob([bytes], { type: file.mime }));
 					const a = document.createElement("a");
@@ -8112,7 +8116,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 		} catch {
 			setExportResult({
 				ok: false,
-				error: "Соединение прервалось. Проверьте чат перед повторной отправкой."
+				error: delivery === "download" ? "Не удалось скачать файл. Повторите скачивание." : "Соединение прервалось. Проверьте чат перед повторной отправкой."
 			});
 		} finally {
 			setExportBusy(false);
@@ -8731,6 +8735,7 @@ function DocWizard({ doc, onClose, setToast, savedId, onSaved, fullScreen = fals
 			gap: 8,
 			marginTop: 8
 		}}><button disabled={exportBusy} onClick={() => exportDocument("download", "pdf")} style={{ flex: 1 }}>Скачать PDF</button><button disabled={exportBusy} onClick={() => exportDocument("download", "docx")} style={{ flex: 1 }}>Скачать Word</button></div>
+      {exportResult?.ok && exportResult.missing?.length > 0 && <p role="status" style={{color:T.gold,fontSize:13}}>Файл — черновик. Не заполнены обязательные поля ({exportResult.missing.length}): {exportResult.missing.slice(0,3).join(", ")}{exportResult.missing.length > 3 ? " и другие" : ""}.</p>}
       {exportResult && !exportResult.ok && <div role="status" style={{
 			color: T.gold,
 			fontSize: 13,
@@ -9221,7 +9226,7 @@ function TripCard({ t, onOpen }) {
 	const p = tripProgress(t), phase = tripPhase(t), act = nextAction(t), archived = ["completed", "cancelled"].includes(phase.key);
 	const color = phase.key === "in_trip" ? T.green : phase.key === "waiting" ? T.cyan : T.violet;
 	const destination = [t.dcName, t.country].filter(Boolean).join(", ");
-	const autoTitle = t.dcName && t.df ? `${t.dcName} · ${MONTHS_S[new Date(t.df).getMonth()]}` : "";
+	const autoTitle = t.dcName && t.df ? `${t.dcName} · ${MONTHS_S[parseDay(t.df)?.getMonth()] || ""}` : "";
 	const customTitle = t.title && t.title !== autoTitle;
 	return <button type="button" aria-label={`Открыть поездку ${t.title || destination || "без названия"}`} onClick={onOpen} className="press" style={{
 		width: "100%",
@@ -9246,7 +9251,7 @@ function TripCard({ t, onOpen }) {
 	}}><strong style={{
 		fontSize: 16,
 		lineHeight: 1.2
-	}}>{t.df ? fmtShort(new Date(t.df)) : "Даты не выбраны"}{t.dt ? ` — ${fmtShort(new Date(t.dt))}` : ""}</strong><span style={{
+	}}>{t.df ? fmtShort(parseDay(t.df)) : "Даты не выбраны"}{t.dt ? ` — ${fmtShort(parseDay(t.dt))}` : ""}</strong><span style={{
 		fontSize: 12,
 		fontWeight: 800,
 		color,
@@ -11445,7 +11450,7 @@ function SharedTripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onLeaveTr
 		fontSize: 12,
 		color: "rgba(255,255,255,.84)",
 		marginTop: 3
-	}}>{[t.dcName, t.country].filter(Boolean).join(", ")}{t.df ? ` · ${fmtShort(new Date(t.df))}` : ""}{t.dt ? ` — ${fmtShort(new Date(t.dt))}` : ""}{today.active ? " · сейчас в поездке" : d != null && d > 0 ? ` · через ${d} дн.` : ""}</div><div style={{
+	}}>{[t.dcName, t.country].filter(Boolean).join(", ")}{t.df ? ` · ${fmtShort(parseDay(t.df))}` : ""}{t.dt ? ` — ${fmtShort(parseDay(t.dt))}` : ""}{today.active ? " · сейчас в поездке" : d != null && d > 0 ? ` · через ${d} дн.` : ""}</div><div style={{
 		display: "inline-flex",
 		marginTop: 6,
 		padding: "4px 8px",
@@ -13604,7 +13609,7 @@ function TripScreen({ t, initialBlk, onBack, onUpdate, onDelete, onFindTickets, 
           <div style={{
 		fontSize: 12,
 		color: "rgba(255,255,255,.85)"
-	}}>{t.dcName}{t.country && t.country !== t.dcName ? `, ${t.country}` : ""}{t.df ? ` · ${fmtShort(new Date(t.df))}` : ""}{t.dt ? ` — ${fmtShort(new Date(t.dt))}` : ""}{d != null && d > 0 ? ` · через ${d} дн.` : ""}{t.adults > 1 ? ` · ${t.adults} чел.` : ""}</div>
+	}}>{t.dcName}{t.country && t.country !== t.dcName ? `, ${t.country}` : ""}{t.df ? ` · ${fmtShort(parseDay(t.df))}` : ""}{t.dt ? ` — ${fmtShort(parseDay(t.dt))}` : ""}{d != null && d > 0 ? ` · через ${d} дн.` : ""}{t.adults > 1 ? ` · ${t.adults} чел.` : ""}</div>
         </div>
       </div>
       {menu && <div style={{
@@ -15764,7 +15769,7 @@ const SERVICES = [
 		}]
 	}
 ];
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const todayISO = () => localDay();
 const promoPlace = (value) => String(value || "").normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase().replace(/ё/g, "е");
 function resolvePromoDestination(value, trip, services = SERVICES) {
 	const q = promoPlace(value);
@@ -17273,7 +17278,7 @@ const ddmm = (s) => {
 };
 function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }) {
 	const [svc, setSvc] = useState(null), [bookingOpen, setBookingOpen] = useState(false), [promoOpen, setPromoOpen] = useState(false);
-	const today = new Date().toISOString().slice(0, 10), scoped = !!(trip && trip.id);
+	const today = localDay(), scoped = !!(trip && trip.id);
 	const travelers = scoped ? activeTravelers(trip) : [];
 	const [pq, setPq] = useState(() => scoped ? trip.dcName || trip.country || "" : "");
 	const [pFrom, setPFrom] = useState(() => scoped ? trip.df || "" : "");
@@ -17317,7 +17322,7 @@ function Hotels({ setToast, preOpen, onPreDone, trip = null, onBack, onAddStay }
 	};
 	const validDates = !pFrom || !pTo || pTo > pFrom;
 	const promoDestination = resolvePromoDestination(pq, trip);
-	const matchedPromos = pq.trim() ? matchHotelPromos(SERVICES, { ...promoDestination, from: pFrom, to: pTo, today }).slice(0, 8) : [];
+	const matchedPromos = promoDestination ? matchHotelPromos(SERVICES, { ...promoDestination, from: pFrom, to: pTo, today }).slice(0, 8) : [];
 	const copy = async (p) => {
 		try {
 			await navigator.clipboard.writeText(p.code);
@@ -18140,7 +18145,7 @@ function App() {
 		loadPublicTrips();
 	}, []);
 	const pendingOpenId = useRef(null);
-	const lastSearchRef = useRef(null);
+	const lastSearchRef = useRef(null), openedFromSaved = useRef(false);
 	const b64urlEnc = (s) => btoa(unescape(encodeURIComponent(s))).split("+").join("-").split("/").join("_").replace(/=+$/, "");
 	const b64urlDec = (s) => decodeURIComponent(escape(atob(s.split("-").join("+").split("_").join("/"))));
 	const deepLinkDone = useRef(false);
@@ -18222,9 +18227,10 @@ function App() {
 						origin: o,
 						dest: ds,
 						round: !!d.dt,
-						dep: new Date(d.df),
-						ret: d.dt ? new Date(d.dt) : null,
-						adults: d.a || 1
+						dep: parseDay(d.df),
+						ret: parseDay(d.dt),
+						adults: d.a || 1,
+						children: Array.isArray(d.ch) ? d.ch : []
 					};
 					setForm(f);
 					pendingOpenId.current = d.id || null;
@@ -18243,6 +18249,7 @@ function App() {
 	const datesLabel = (f) => f.dep ? f.round && f.ret ? `${fmtShort(f.dep)} — ${fmtShort(f.ret)}` : fmtShort(f.dep) : "";
 	const runSearch = async (f) => {
 		const ff = f || form;
+		openedFromSaved.current = false;
 		if (!ff.origin || !ff.dest || !ff.dep || ff.round && !ff.ret || ff.round && ff.ret < ff.dep) {
 			setSheet(true);
 			setToast("Заполните откуда, куда и дату");
@@ -18251,11 +18258,12 @@ function App() {
 		trackGoal("flight_search_started", {
 			from: ff.origin && (ff.origin.code || ff.origin.city) || "",
 			to: ff.dest && (ff.dest.code || ff.dest.city) || "",
-			departDate: ff.dep ? new Date(ff.dep).toISOString().slice(0, 10) : "",
-			returnDate: ff.ret ? new Date(ff.ret).toISOString().slice(0, 10) : "",
+			departDate: ff.dep ? localDay(ff.dep) : "",
+			returnDate: ff.ret ? localDay(ff.ret) : "",
 			passengers: (ff.adults || 1) + (ff.children ? ff.children.length : 0)
 		});
 		const nq = {
+			originCode: ff.origin.code, destCode: ff.dest.code,
 			origin: ff.origin.city,
 			destName: ff.dest.city,
 			destCountry: ff.dest.country,
@@ -18670,7 +18678,7 @@ function App() {
 			return;
 		}
 		const ls = lastSearchRef.current || {};
-		const dup = trips.find((t) => t.route && (t.route.rid === r.id || t.route.id === r.id) && t.df === (ls.df || ""));
+		const dup = trips.find((t) => t.route && (t.route.rid === r.id || t.route.id === r.id) && t.df === (ls.df || "") && t.oc === ls.oc && t.dc === ls.dc && (t.dt || "") === (ls.dt || ""));
 		if (dup) {
 			openTripScreen(dup.id);
 			return;
@@ -18679,12 +18687,12 @@ function App() {
 	};
 	const takeTrip = (r) => {
 		const ls = lastSearchRef.current || {};
-		const dup = trips.find((t) => t.route && (t.route.rid === r.id || t.route.id === r.id) && t.df === (ls.df || ""));
+		const dup = trips.find((t) => t.route && (t.route.rid === r.id || t.route.id === r.id) && t.df === (ls.df || "") && t.oc === ls.oc && t.dc === ls.dc && (t.dt || "") === (ls.dt || ""));
 		if (dup) {
 			openTripScreen(dup.id);
 			return;
 		}
-		const dep = ls.df ? new Date(ls.df) : null;
+		const dep = parseDay(ls.df);
 		const t = {
 			id: "t" + Date.now(),
 			title: `${query.destName || ls.dc || "Поездка"}${dep ? " · " + MONTHS_S[dep.getMonth()] : ""}`,
@@ -18734,8 +18742,8 @@ function App() {
 			origin: o,
 			dest: ds,
 			round: !!t.dt,
-			dep: t.df ? new Date(t.df) : null,
-			ret: t.dt ? new Date(t.dt) : null,
+			dep: parseDay(t.df),
+			ret: parseDay(t.dt),
 			adults: t.adults || 1,
 			children: t.children || []
 		};
@@ -18842,14 +18850,16 @@ function App() {
 		flow,
 		tab
 	]);
-	const isLiked = (r) => !!saved.find((x) => x.id === "liked-" + r.id);
+	const viewedSearch = (r) => routeSearch(r, query, lastSearchRef.current);
+	const isLiked = (r) => saved.some(x => matchesSaved(x, r, viewedSearch(r)));
 	const likeRoute = (r) => {
 		try {
 			trackGoal("route_saved");
 		} catch (e) {}
-		const id = "liked-" + r.id;
-		if (saved.find((x) => x.id === id)) {
-			setSaved((p) => p.filter((x) => x.id !== id));
+		const search = viewedSearch(r);
+		const id = "route:" + routeKey(r, search);
+		if (saved.some(x => matchesSaved(x, r, search))) {
+			setSaved(p => p.filter(x => !matchesSaved(x, r, search)));
 			setToast("Удалено из маршрутов");
 		} else {
 			setSaved((p) => [{
@@ -18859,6 +18869,7 @@ function App() {
 				price: r.total,
 				emoji: "🛫",
 				route: r,
+				search,
 				query
 			}, ...p]);
 			setToast("Добавлено в «Маршруты»");
@@ -18907,6 +18918,14 @@ function App() {
 		}
 	};
 	const openSaved = (s) => {
+		if (!s?.route) return;
+		const search = routeSearch(s.route, s.query, s.search);
+		openedFromSaved.current = true;
+		lastSearchRef.current = search;
+		setForm({ origin: AIRPORTS.find(a => a.code === search.oc) || null, dest: AIRPORTS.find(a => a.code === search.dc) || null, dep: parseDay(search.df), ret: parseDay(search.dt), round: !!search.dt, adults: search.a, children: search.ch });
+		setFlow(null);
+		++searchSequence.current;
+		setLoading(false);
 		setSelected(s.route);
 		setQuery({
 			...s.query,
@@ -18936,13 +18955,13 @@ function App() {
 		else if (top === "trip") main = <RoutesScreen trips={trips} publicTrips={publicTrips} publicLoading={publicLoading} reloadPublic={() => loadPublicTrips(0)} publicMore={publicMore} loadMorePublic={() => loadPublicTrips(publicMore)} profile={profile} setToast={setToast} onOpenTrip={openTripScreen} onNewTrip={() => setNewTrip(true)} onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved((p) => p.filter((x) => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => {
 			const f = {
 				...s.form,
-				dep: s.form.dep ? new Date(s.form.dep) : null,
-				ret: s.form.ret ? new Date(s.form.ret) : null
+				dep: parseDay(s.form.dep),
+				ret: parseDay(s.form.ret)
 			};
 			setForm(f);
 			runSearch(f);
 		}} />;
-		else if (top === "detail") main = <Detail r={selected} query={query} onBack={() => setStack(["results"])} onEdit={() => {
+		else if (top === "detail") main = <Detail r={selected} query={query} onBack={() => setStack(openedFromSaved.current ? [] : ["results"])} onEdit={() => {
 			if (!(flow && flow.tripId)) setTab("home");
 			setSheet(true);
 		}} liked={isLiked(selected)} onLike={likeRoute} onShare={shareRoute} goHotels={(svc) => {
@@ -18955,7 +18974,7 @@ function App() {
 			else setFlow(null);
 			setTab("hotels");
 			setStack([]);
-		}} onTakeTrip={askTakeTrip} takeLabel={flow && flow.kind === "tickets" && scopedTrip ? `Добавить в ${scopedTrip.title}` : null} inTrip={!!(selected && trips.some((t) => t.route && (t.route.rid === selected.id || t.route.id === selected.id) && t.df === ((lastSearchRef.current || {}).df || "")))} />;
+		}} onTakeTrip={askTakeTrip} takeLabel={flow && flow.kind === "tickets" && scopedTrip ? `Добавить в ${scopedTrip.title}` : null} inTrip={!!(selected && trips.some((t) => t.route && (t.route.rid === selected.id || t.route.id === selected.id) && t.df === lastSearchRef.current?.df && t.oc === lastSearchRef.current?.oc && t.dc === lastSearchRef.current?.dc && (t.dt || "") === (lastSearchRef.current?.dt || "")))} />;
 		else if (top === "results") {
 			main = <Results query={query} routes={routes} loading={loading} error={searchError} onRetry={() => runSearch()} onEdit={() => {
 				if (!(flow && flow.tripId)) setTab("home");
@@ -18967,8 +18986,8 @@ function App() {
 		} else main = <RoutesScreen trips={trips} publicTrips={publicTrips} publicLoading={publicLoading} reloadPublic={() => loadPublicTrips(0)} publicMore={publicMore} loadMorePublic={() => loadPublicTrips(publicMore)} profile={profile} setToast={setToast} onOpenTrip={openTripScreen} onNewTrip={() => setNewTrip(true)} onPickDest={openSheetWithDest} onSearch={() => setSheet(true)} saved={saved} onUnlike={(id) => setSaved((p) => p.filter((x) => x.id !== id))} onOpenSaved={openSaved} recent={recent} onClearRecent={() => setRecent([])} onRunRecent={(s) => {
 			const f = {
 				...s.form,
-				dep: s.form.dep ? new Date(s.form.dep) : null,
-				ret: s.form.ret ? new Date(s.form.ret) : null
+				dep: parseDay(s.form.dep),
+				ret: parseDay(s.form.ret)
 			};
 			setForm(f);
 			runSearch(f);
